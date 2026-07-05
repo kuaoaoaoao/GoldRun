@@ -1,3 +1,27 @@
 .DS_Store
 docs/.DS_Store
 docs/images/.DS_Store
+.env
+
+# Local IDE / agent state
+.idea/
+.claude/
+.codebuddy/
+.codex/
+.cursor/
+.gemini/
+.opencode/
+.qoder/
+.qwen/
+.trae/
+
+# Agent workflow helpers
+openspec/
+skills/
+.github/prompts/
+.github/skills/
+
+# Local build and release scratch space
+demo/
+github-public-release/
+coolRun 2026-07-03 17-31-31/

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CAFE01CAFE01CAFE01CAF001 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = CAFE02CAFE02CAFE02CAF002 /* PostHog */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		8FCE25482FBE97330023FC83 /* coolRun.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = coolRun.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CAFE01CAFE01CAFE01CAF001 /* PostHog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,6 +69,9 @@
 				8FCE254A2FBE97330023FC83 /* coolRun */,
 			);
 			name = coolRun;
+			packageProductDependencies = (
+				CAFE02CAFE02CAFE02CAF002 /* PostHog */,
+			);
 			productName = coolRun;
 			productReference = 8FCE25482FBE97330023FC83 /* coolRun.app */;
 			productType = "com.apple.product-type.application";
@@ -92,6 +100,9 @@
 			);
 			mainGroup = 8FCE253F2FBE97330023FC83;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CAFE03CAFE03CAFE03CAF003 /* XCRemoteSwiftPackageReference "posthog-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8FCE25492FBE97330023FC83 /* Products */;
 			projectDirPath = "";
@@ -347,6 +358,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CAFE03CAFE03CAFE03CAF003 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.64.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CAFE02CAFE02CAFE02CAF002 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CAFE03CAFE03CAFE03CAF003 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8FCE25402FBE97330023FC83 /* Project object */;
 }

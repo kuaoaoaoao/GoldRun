@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="coolRun 匿名使用统计：总用户数、下载趋势、平台和系统版本分布。">
+  <meta property="og:title" content="coolRun - Usage Stats">
+  <meta property="og:description" content="coolRun 的匿名聚合使用统计，不包含个人身份信息。">
+  <meta property="og:type" content="website">
+  <title>coolRun - Usage Stats</title>
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once unregister identify set_config reset get_distinct_id get_session_id opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+
+    posthog.init("phc_ADRxZPgBzDQVUTZELLGfCFU4uisGEh9zFBUNZD3cjkjU", {
+      api_host: "https://us.i.posthog.com",
+      capture_pageview: false,
+      person_profiles: "identified_only"
+    });
+  </script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --paper: #f7f8f6;
+      --ink: #111820;
+      --muted: #6d747d;
+      --panel: #ffffff;
+      --panel-soft: #fbfbf8;
+      --rule: rgba(17, 24, 32, 0.13);
+      --green: #2ecb71;
+      --blue: #2653f4;
+      --shadow: 0 18px 54px rgba(17, 24, 32, 0.12);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #101316;
+        --ink: #f3f6fa;
+        --muted: #a8b1bb;
+        --panel: #191f25;
+        --panel-soft: #151a20;
+        --rule: rgba(243, 246, 250, 0.14);
+        --shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 25% 0%, rgba(46, 203, 113, 0.12), transparent 30%),
+        radial-gradient(circle at 80% 12%, rgba(38, 83, 244, 0.08), transparent 28%),
+        var(--paper);
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topbar {
+      position: sticky;
+      z-index: 10;
+      top: 0;
+      background: color-mix(in srgb, var(--paper) 88%, transparent);
+      border-bottom: 1px solid var(--rule);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav,
+    .page,
+    .footer-inner {
+      width: min(1080px, calc(100% - 34px));
+      margin: 0 auto;
+    }
+
+    .nav {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 28px;
+      font-weight: 780;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #fff;
+      background: #111820;
+      box-shadow: var(--shadow);
+    }
+
+    .brand-mark::before {
+      content: "";
+      width: 20px;
+      height: 20px;
+      border: 5px solid var(--green);
+      border-left-color: transparent;
+      border-radius: 50%;
+    }
+
+    .download {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 48px;
+      padding: 0 22px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--green);
+      font-size: 17px;
+      font-weight: 760;
+      box-shadow: 0 14px 34px rgba(46, 203, 113, 0.26);
+    }
+
+    .page {
+      padding: 86px 0 70px;
+    }
+
+    .hero {
+      max-width: 760px;
+      margin: 0 auto 54px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 18px;
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 820;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(54px, 9vw, 88px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .hero p:not(.eyebrow) {
+      max-width: 650px;
+      margin: 24px auto 0;
+      color: var(--muted);
+      font-size: clamp(19px, 3.8vw, 30px);
+      line-height: 1.55;
+    }
+
+    .back {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      margin-top: 34px;
+      padding: 0 28px;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--panel) 62%, transparent);
+      font-size: 18px;
+    }
+
+    .stats-shell {
+      overflow: hidden;
+      border: 1px solid var(--rule);
+      border-radius: 28px;
+      background: color-mix(in srgb, var(--panel-soft) 92%, transparent);
+      box-shadow: var(--shadow);
+    }
+
+    .stats-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 24px 28px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .posthog-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 28px;
+      font-weight: 820;
+    }
+
+    .posthog-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, #1d4ed8 0 22%, transparent 22% 32%, #f97316 32% 54%, transparent 54% 64%, #facc15 64% 100%);
+    }
+
+    .refresh-note {
+      color: var(--muted);
+      font-size: 17px;
+      white-space: nowrap;
+    }
+
+    .embed-frame {
+      display: block;
+      width: 100%;
+      min-height: 820px;
+      border: 0;
+      background: var(--panel);
+    }
+
+    .placeholder {
+      padding: 34px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .placeholder-card {
+      min-height: 220px;
+      padding: 26px;
+      border: 1px solid var(--rule);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    .placeholder-card h2 {
+      margin: 0 0 24px;
+      font-size: 26px;
+    }
+
+    .big-number {
+      display: block;
+      text-align: center;
+      font-size: 110px;
+      line-height: 1;
+      font-weight: 840;
+    }
+
+    .bar-list {
+      display: grid;
+      gap: 18px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 20px;
+    }
+
+    .bar {
+      height: 46px;
+      background: var(--blue);
+    }
+
+    .bar.two {
+      width: 70%;
+      background: #6a1bb0;
+    }
+
+    .bar.three {
+      width: 62%;
+      background: #438b80;
+    }
+
+    .setup-note {
+      margin: 0;
+      padding: 18px 22px;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .setup-note code {
+      color: var(--ink);
+      font-family: Menlo, Monaco, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    footer {
+      padding: 30px 0 46px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      .nav {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 18px 0;
+      }
+
+      .download {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .stats-top {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .refresh-note {
+        white-space: normal;
+      }
+
+      .bar-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav" aria-label="统计页导航">
+      <a class="brand" href="./">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>coolRun</span>
+      </a>
+      <a class="download" href="https://github.com/kuaoaoaoao/coolRun/releases" data-analytics-event="download_clicked" data-analytics-location="usage_stats_header" data-analytics-destination="github_releases" data-analytics-platform="macos">↓ 下载最新版</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Anonymous Analytics</p>
+      <h1>Usage Stats</h1>
+      <p>所有指标都是匿名聚合统计，不包含个人身份信息。</p>
+      <a class="back" href="./">← Back to Home</a>
+    </section>
+
+    <section class="stats-shell" aria-label="PostHog 使用统计">
+      <div class="stats-top">
+        <div class="posthog-brand">
+          <span class="posthog-mark" aria-hidden="true"></span>
+          <span>PostHog</span>
+        </div>
+        <span class="refresh-note">Last refreshed automatically by PostHog</span>
+      </div>
+
+      <iframe
+        id="posthog-stats-frame"
+        class="embed-frame"
+        name="coolRunUsageStats"
+        title="coolRun PostHog usage stats"
+        src=""
+        hidden
+      ></iframe>
+
+      <div id="posthog-placeholder" class="placeholder">
+        <article class="placeholder-card">
+          <h2>总用户数</h2>
+          <span class="big-number">--</span>
+        </article>
+        <article class="placeholder-card">
+          <h2>芯片型号分布</h2>
+          <div class="bar-list">
+            <div class="bar-row"><span>Apple M4</span><span class="bar"></span></div>
+            <div class="bar-row"><span>Apple M1</span><span class="bar two"></span></div>
+            <div class="bar-row"><span>Apple M2</span><span class="bar three"></span></div>
+          </div>
+        </article>
+      </div>
+
+      <p class="setup-note">
+        设置方式：在 PostHog dashboard 点击 <code>Share</code>，打开公开分享，复制 embed iframe 的 <code>src</code>，填到本文件里的 <code>POSTHOG_DASHBOARD_EMBED_URL</code>。
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      Made with PostHog — open-source product analytics
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var POSTHOG_DASHBOARD_EMBED_URL = "";
+      var iframe = document.getElementById("posthog-stats-frame");
+      var placeholder = document.getElementById("posthog-placeholder");
+
+      function capture(eventName, properties) {
+        if (!window.posthog || typeof window.posthog.capture !== "function") {
+          return;
+        }
+
+        window.posthog.capture(eventName, Object.assign({
+          page_path: window.location.pathname,
+          page_title: document.title,
+          referrer_host: document.referrer ? new URL(document.referrer).host : ""
+        }, properties || {}));
+      }
+
+      capture("usage_stats_page_viewed", {
+        website: "github_pages"
+      });
+
+      if (POSTHOG_DASHBOARD_EMBED_URL) {
+        iframe.src = POSTHOG_DASHBOARD_EMBED_URL;
+        iframe.hidden = false;
+        placeholder.hidden = true;
+      }
+
+      window.addEventListener("message", function (event) {
+        if (event.data && event.data.event === "posthog:dimensions" && event.data.name === "coolRunUsageStats") {
+          iframe.height = event.data.height;
+        }
+      });
+
+      document.querySelectorAll("a[data-analytics-event]").forEach(function (link) {
+        link.addEventListener("click", function () {
+          capture(link.dataset.analyticsEvent, {
+            link_text: link.textContent.trim(),
+            link_url: link.href,
+            location: link.dataset.analyticsLocation || "",
+            destination: link.dataset.analyticsDestination || "",
+            platform: link.dataset.analyticsPlatform || ""
+          });
+        });
+      });
+    }());
+  </script>
+</body>
+</html>

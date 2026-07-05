@@ -3,39 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="coolRun 把实时金价和 Mac 状态放进菜单栏。点击即可查看 CPU、内存、储存、电池、网络、温度和运行时间。">
-  <meta property="og:title" content="coolRun - 金价和 Mac 状态，放进菜单栏">
-  <meta property="og:description" content="轻量 macOS 菜单栏工具：实时金价、系统监控、CPU 负载金币动画，SwiftUI 开源。">
-  <meta property="og:image" content="https://kuaoaoaoao.github.io/coolRun/images/dark-main.png">
+  <meta name="description" content="coolRun 是 macOS 菜单栏工具，集合实时金价、金价分析、系统监控、日历生日、小说阅读和语音朗读。">
+  <meta property="og:title" content="coolRun - 金价、Mac 状态和小说阅读，放进菜单栏">
+  <meta property="og:description" content="轻量 macOS 菜单栏工具：实时金价、系统监控、金价分析、悬浮小说阅读、语音朗读，SwiftUI 开源。">
+  <meta property="og:image" content="https://kuaoaoaoao.github.io/coolRun/images/menu-popover-monitor.png">
   <meta property="og:type" content="website">
-  <title>coolRun - 金价和 Mac 状态，放进菜单栏</title>
+  <title>coolRun - 金价、Mac 状态和小说阅读，放进菜单栏</title>
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once unregister identify set_config reset get_distinct_id get_session_id opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+
+    posthog.init("phc_ADRxZPgBzDQVUTZELLGfCFU4uisGEh9zFBUNZD3cjkjU", {
+      api_host: "https://us.i.posthog.com",
+      capture_pageview: false,
+      person_profiles: "identified_only"
+    });
+  </script>
   <style>
     :root {
       color-scheme: light dark;
-      --paper: #f6f7f2;
-      --ink: #151a20;
-      --muted: #66727f;
+      --paper: #f4f6f4;
+      --ink: #121820;
+      --muted: #62707d;
       --panel: #ffffff;
-      --panel-2: #edf1f5;
-      --rule: rgba(21, 26, 32, 0.14);
-      --rail: #171c22;
-      --gold: #d99322;
-      --signal: #0878e6;
-      --mint: #0f8f68;
-      --shadow: 0 18px 54px rgba(21, 26, 32, 0.16);
+      --panel-2: #e9eef0;
+      --rail: #0e1217;
+      --rule: rgba(18, 24, 32, 0.13);
+      --gold: #ce8b22;
+      --green: #26a66b;
+      --blue: #256fd6;
+      --red: #c95353;
+      --shadow: 0 18px 54px rgba(18, 24, 32, 0.15);
       --radius: 8px;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --paper: #101214;
-        --ink: #f4f7fb;
-        --muted: #a8b3bf;
-        --panel: #191e24;
-        --panel-2: #20262d;
-        --rule: rgba(244, 247, 251, 0.14);
-        --rail: #080a0d;
+        --paper: #101316;
+        --ink: #f3f6fa;
+        --muted: #a9b3bd;
+        --panel: #191f25;
+        --panel-2: #212831;
+        --rail: #07090d;
+        --rule: rgba(243, 246, 250, 0.14);
         --shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
       }
     }
@@ -60,7 +70,8 @@
       text-decoration: none;
     }
 
-    img {
+    img,
+    video {
       display: block;
       max-width: 100%;
     }
@@ -71,14 +82,14 @@
       top: 0;
       left: 0;
       right: 0;
-      background: rgba(8, 10, 13, 0.78);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
       color: #fff;
+      background: rgba(8, 10, 13, 0.82);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
       backdrop-filter: blur(18px);
     }
 
     .nav {
-      width: min(1120px, calc(100% - 40px));
+      width: min(1160px, calc(100% - 40px));
       height: 64px;
       margin: 0 auto;
       display: flex;
@@ -91,112 +102,118 @@
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      font-weight: 760;
       font-size: 18px;
+      font-weight: 780;
+    }
+
+    .brand-mark {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 13px 0 0 var(--green), 26px 0 0 var(--blue);
     }
 
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 22px;
       color: rgba(255, 255, 255, 0.78);
       font-size: 15px;
       font-weight: 650;
     }
 
-    .nav-links a:hover {
+    .nav-links a:hover,
+    .nav-links a:focus-visible {
       color: #fff;
     }
 
     .hero {
       position: relative;
-      min-height: 84vh;
-      padding: 124px 0 76px;
+      min-height: 88vh;
+      padding: 128px 0 80px;
       display: flex;
       align-items: center;
       overflow: hidden;
       color: #fff;
-      background: #0b0f14;
+      background: var(--rail);
     }
 
-    .hero::before {
-      content: "";
+    .hero-media {
       position: absolute;
-      inset: 0;
-      background-image: url("images/dark-main.png");
-      background-size: cover;
-      background-position: center top;
-      opacity: 0.18;
-      filter: saturate(0.8);
-      transform: scale(1.02);
+      inset: 0 0 0 auto;
+      width: min(58vw, 760px);
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: 0.58;
+      filter: saturate(0.94) contrast(1.04);
     }
 
     .hero::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: rgba(5, 7, 10, 0.72);
+      background: rgba(5, 8, 11, 0.62);
     }
 
     .hero-inner {
       position: relative;
       z-index: 1;
-      width: min(1120px, calc(100% - 40px));
+      width: min(1160px, calc(100% - 40px));
       margin: 0 auto;
     }
 
-    .status-rail {
-      width: min(760px, 100%);
-      height: 58px;
-      margin-bottom: 42px;
+    .menu-strip {
+      width: min(640px, 100%);
+      margin-bottom: 34px;
+      padding: 10px 12px;
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      grid-template-columns: auto 1fr auto;
       align-items: center;
-      gap: 18px;
-    }
-
-    .rail-line {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.28);
-      position: relative;
-    }
-
-    .rail-line::before,
-    .rail-line::after {
-      content: "";
-      position: absolute;
-      top: -3px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--gold);
-    }
-
-    .rail-line::before {
-      left: 0;
-    }
-
-    .rail-line::after {
-      right: 0;
-      background: var(--signal);
-    }
-
-    .price-chip {
-      overflow: hidden;
-      width: 220px;
-      border: 1px solid rgba(255, 255, 255, 0.22);
+      gap: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: var(--radius);
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: 0 18px 58px rgba(0, 0, 0, 0.32);
+      background: rgba(255, 255, 255, 0.08);
     }
 
-    .price-chip img {
-      width: 100%;
-      height: auto;
+    .traffic {
+      display: flex;
+      gap: 7px;
+    }
+
+    .traffic span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff605c;
+    }
+
+    .traffic span:nth-child(2) {
+      background: #ffbd44;
+    }
+
+    .traffic span:nth-child(3) {
+      background: #00ca4e;
+    }
+
+    .strip-line {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.24);
+    }
+
+    .price-pill {
+      color: #111820;
+      background: #fff;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      font-weight: 760;
+      white-space: nowrap;
     }
 
     .eyebrow {
-      margin: 0 0 16px;
+      margin: 0 0 14px;
       color: #ffd37c;
       font-size: 14px;
       font-weight: 760;
@@ -215,28 +232,28 @@
       max-width: 880px;
       margin: 0;
       font-family: "Avenir Next Condensed", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 92px;
-      line-height: 0.92;
-      font-weight: 820;
-    }
-
-    .hero-copy {
-      max-width: 780px;
-      margin-top: 24px;
-      color: rgba(255, 255, 255, 0.86);
-      font-size: 22px;
+      font-size: clamp(58px, 9vw, 110px);
+      line-height: 0.9;
+      font-weight: 840;
     }
 
     .hero-statement {
-      max-width: 860px;
+      max-width: 880px;
       margin: 10px 0 0;
       color: #fff;
-      font-size: 34px;
-      line-height: 1.18;
-      font-weight: 760;
+      font-size: clamp(26px, 3.4vw, 42px);
+      line-height: 1.15;
+      font-weight: 780;
     }
 
-    .hero-actions {
+    .hero-copy {
+      max-width: 760px;
+      margin: 24px 0 0;
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 20px;
+    }
+
+    .actions {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
@@ -256,7 +273,8 @@
       transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
     }
 
-    .button:hover {
+    .button:hover,
+    .button:focus-visible {
       transform: translateY(-1px);
     }
 
@@ -272,16 +290,16 @@
     }
 
     section {
-      padding: 88px 0;
+      padding: 84px 0;
     }
 
     .section-inner {
-      width: min(1120px, calc(100% - 40px));
+      width: min(1160px, calc(100% - 40px));
       margin: 0 auto;
     }
 
     .section-heading {
-      max-width: 760px;
+      max-width: 790px;
       margin-bottom: 34px;
     }
 
@@ -294,7 +312,7 @@
     .section-heading h2 {
       margin: 0;
       font-family: "Avenir Next", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 42px;
+      font-size: clamp(32px, 4vw, 46px);
       line-height: 1.12;
       font-weight: 780;
     }
@@ -305,23 +323,23 @@
       font-size: 18px;
     }
 
-    .telemetry-strip {
+    .capability-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 1px;
-      background: var(--rule);
+      overflow: hidden;
       border: 1px solid var(--rule);
       border-radius: var(--radius);
-      overflow: hidden;
+      background: var(--rule);
       box-shadow: var(--shadow);
     }
 
-    .telemetry-item {
+    .capability {
       padding: 22px;
       background: var(--panel);
     }
 
-    .telemetry-item code {
+    .capability code {
       display: block;
       margin-bottom: 10px;
       color: var(--gold);
@@ -330,15 +348,20 @@
       font-weight: 760;
     }
 
-    .telemetry-item strong {
+    .capability strong,
+    .feature strong,
+    .install-step strong {
       display: block;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       font-size: 17px;
     }
 
-    .telemetry-item span {
+    .capability span,
+    .feature p,
+    .install-step p,
+    .note {
       color: var(--muted);
-      font-size: 14px;
+      font-size: 15px;
     }
 
     .feature-grid {
@@ -347,12 +370,13 @@
       gap: 14px;
     }
 
-    .feature {
-      min-height: 170px;
+    .feature,
+    .install-step {
+      min-height: 178px;
       padding: 22px;
-      background: var(--panel);
       border: 1px solid var(--rule);
       border-radius: var(--radius);
+      background: var(--panel);
     }
 
     .feature-label {
@@ -363,51 +387,15 @@
       padding: 0 10px;
       border-radius: 8px;
       background: var(--panel-2);
-      color: var(--signal);
+      color: var(--blue);
       font-family: Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
       font-weight: 760;
     }
 
-    .feature strong {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 17px;
-    }
-
-    .feature p {
+    .feature p,
+    .install-step p {
       margin: 0;
-      color: var(--muted);
-      font-size: 15px;
-    }
-
-    .audience {
-      padding-top: 0;
-    }
-
-    .audience-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .audience-item {
-      padding: 20px;
-      background: var(--panel);
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
-    }
-
-    .audience-item strong {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 17px;
-    }
-
-    .audience-item p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 15px;
     }
 
     .showcase {
@@ -416,59 +404,43 @@
       border-bottom: 1px solid var(--rule);
     }
 
-    .screenshot-grid {
+    .showcase-board {
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
-      gap: 24px;
+      grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
+      gap: 20px;
       align-items: start;
     }
 
-    .demo-panel {
-      max-width: 760px;
-      margin: 0 auto 28px;
-      padding: 16px;
-      background: var(--panel);
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-    }
-
-    .demo-panel video {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      display: block;
-      border-radius: 6px;
-      background: #11161d;
-      object-fit: cover;
-    }
-
-    .screenshot-stack {
-      display: grid;
-      gap: 16px;
-    }
-
     .shot {
-      background: var(--panel);
+      overflow: hidden;
       border: 1px solid var(--rule);
       border-radius: var(--radius);
+      background: var(--panel);
       box-shadow: var(--shadow);
-      overflow: hidden;
     }
 
-    .shot.pad {
-      min-height: 138px;
-      padding: 18px;
+    .shot img,
+    .shot video {
+      width: 100%;
+      height: auto;
+    }
+
+    .shot video {
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      background: #101419;
+    }
+
+    .shot-row {
       display: grid;
-      place-items: center;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 20px;
     }
 
-    .shot.pad img {
-      width: auto;
-      max-height: 90px;
-    }
-
-    .shot.monitor {
-      max-width: 320px;
+    .stack {
+      display: grid;
+      gap: 20px;
     }
 
     .caption {
@@ -478,20 +450,46 @@
       text-align: center;
     }
 
+    .reader-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
+      gap: 28px;
+      align-items: start;
+    }
+
+    .reader-copy {
+      padding-top: 18px;
+    }
+
+    .reader-copy ul {
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    .reader-copy li {
+      padding-left: 18px;
+      border-left: 4px solid var(--green);
+      color: var(--muted);
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
     .install-grid {
+      counter-reset: step;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
-      counter-reset: step;
     }
 
     .install-step {
       counter-increment: step;
-      min-height: 170px;
-      padding: 22px;
-      background: var(--panel);
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
     }
 
     .install-step::before {
@@ -502,21 +500,9 @@
       height: 34px;
       margin-bottom: 16px;
       border-radius: 50%;
-      background: var(--signal);
+      background: var(--blue);
       color: #fff;
       font-weight: 820;
-    }
-
-    .install-step strong {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 17px;
-    }
-
-    .install-step p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 15px;
     }
 
     .note {
@@ -525,7 +511,6 @@
       border-left: 4px solid var(--gold);
       border-radius: var(--radius);
       background: var(--panel);
-      color: var(--muted);
     }
 
     .download {
@@ -555,7 +540,7 @@
       color: rgba(255, 255, 255, 0.74);
     }
 
-    .download-box .hero-actions {
+    .download-box .actions {
       justify-content: flex-end;
       margin-top: 0;
     }
@@ -568,7 +553,7 @@
     }
 
     .footer-inner {
-      width: min(1120px, calc(100% - 40px));
+      width: min(1160px, calc(100% - 40px));
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
@@ -596,7 +581,7 @@
       }
     }
 
-    @media (max-width: 860px) {
+    @media (max-width: 900px) {
       .nav-links {
         display: none;
       }
@@ -606,42 +591,32 @@
         padding: 112px 0 64px;
       }
 
-      .status-rail {
-        height: auto;
-        grid-template-columns: 1fr;
-        margin-bottom: 32px;
+      .hero-media {
+        width: 100%;
+        opacity: 0.26;
       }
 
-      .rail-line {
-        display: none;
+      .menu-strip {
+        grid-template-columns: auto 1fr;
       }
 
-      h1 {
-        font-size: 56px;
+      .price-pill {
+        grid-column: 1 / -1;
+        justify-self: start;
       }
 
       .hero-copy {
         font-size: 18px;
       }
 
-      .hero-statement {
-        font-size: 26px;
-      }
-
-      .section-heading h2 {
-        font-size: 32px;
-      }
-
-      .telemetry-strip,
-      .audience-grid,
+      .capability-grid,
       .feature-grid,
-      .screenshot-grid,
+      .showcase-board,
+      .shot-row,
+      .reader-grid,
+      .settings-grid,
       .install-grid {
         grid-template-columns: 1fr;
-      }
-
-      .shot.monitor {
-        max-width: 100%;
       }
 
       .download-box {
@@ -649,7 +624,7 @@
         flex-direction: column;
       }
 
-      .download-box .hero-actions {
+      .download-box .actions {
         justify-content: flex-start;
       }
     }
@@ -659,61 +634,63 @@
   <header class="topbar">
     <nav class="nav" aria-label="主导航">
       <a class="brand" href="#">
+        <span class="brand-mark" aria-hidden="true"></span>
         <span>coolRun</span>
       </a>
       <div class="nav-links">
-        <a href="#features">亮点</a>
-        <a href="#audience">适合谁</a>
-        <a href="#showcase">界面</a>
+        <a href="#features">功能</a>
+        <a href="#showcase">截图</a>
+        <a href="#reader">小说</a>
+        <a href="#settings">设置</a>
         <a href="#install">安装</a>
-        <a href="https://github.com/kuaoaoaoao/coolRun">GitHub</a>
+        <a href="usage-stats.html" data-analytics-event="usage_stats_clicked" data-analytics-location="nav" data-analytics-destination="usage_stats">统计</a>
+        <a href="https://github.com/kuaoaoaoao/coolRun" data-analytics-event="github_link_clicked" data-analytics-location="nav" data-analytics-destination="repository">GitHub</a>
       </div>
     </nav>
   </header>
 
   <main>
     <section class="hero">
+      <img class="hero-media" src="images/menu-popover-monitor.png" alt="coolRun 菜单栏四入口悬浮窗">
       <div class="hero-inner">
-        <div class="status-rail" aria-label="菜单栏金价预览">
-          <span class="rail-line"></span>
-          <span class="price-chip">
-            <img src="images/money.png" alt="菜单栏实时金价">
-          </span>
-          <span class="rail-line"></span>
+        <div class="menu-strip" aria-label="菜单栏状态">
+          <span class="traffic" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="strip-line"></span>
+          <span class="price-pill">¥898.86/g</span>
         </div>
-        <p class="eyebrow">gold price + mac vitals</p>
+        <p class="eyebrow">gold analysis + mac vitals + floating reader</p>
         <h1>coolRun</h1>
-        <p class="hero-statement">金价和 Mac 状态，放进菜单栏。</p>
-        <p class="hero-copy">实时查看浙商银行积存金价格，也能一眼看到 CPU、内存、储存、电池、网络、温度和运行时间。金币图标会跟着 CPU 负载加速旋转，电脑忙不忙，不点开也知道。</p>
-        <div class="hero-actions">
-          <a class="button primary" href="https://github.com/kuaoaoaoao/coolRun/releases">下载最新版</a>
-          <a class="button secondary" href="https://github.com/kuaoaoaoao/coolRun">查看源码</a>
+        <p class="hero-statement">把金价、Mac 状态和小说阅读收进菜单栏。</p>
+        <p class="hero-copy">实时金价、持仓建议、系统监控、农历生日、txt 阅读和系统语音朗读都在一个轻量悬浮窗里。图钉固定后，它可以像桌面小工具一样停在手边。</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/kuaoaoaoao/coolRun/releases" data-analytics-event="download_clicked" data-analytics-location="hero" data-analytics-destination="github_releases" data-analytics-platform="macos">下载最新版</a>
+          <a class="button secondary" href="https://github.com/kuaoaoaoao/coolRun" data-analytics-event="github_link_clicked" data-analytics-location="hero" data-analytics-destination="repository">查看源码</a>
         </div>
       </div>
     </section>
 
     <section aria-label="核心能力">
       <div class="section-inner">
-        <div class="telemetry-strip">
-          <div class="telemetry-item">
+        <div class="capability-grid">
+          <div class="capability">
             <code>MENUBAR</code>
-            <strong>常驻菜单栏</strong>
-            <span>不占 Dock，不打断工作流。</span>
+            <strong>固定悬浮窗</strong>
+            <span>左键展开，右键打开快捷菜单，图钉固定后不会因切换应用而关闭。</span>
           </div>
-          <div class="telemetry-item">
+          <div class="capability">
             <code>GOLD</code>
-            <strong>金价一眼看见</strong>
-            <span>人民币/克展示，打开就能用。</span>
+            <strong>金价与持仓</strong>
+            <span>记录价格走势，输入克数和买入均价后给出盈亏与操作参考。</span>
           </div>
-          <div class="telemetry-item">
-            <code>LOAD</code>
-            <strong>金币会转</strong>
-            <span>CPU 越忙，菜单栏金币转得越快。</span>
+          <div class="capability">
+            <code>MAC</code>
+            <strong>系统状态</strong>
+            <span>CPU、内存、储存、电池、网络、温度和运行时间一屏查看。</span>
           </div>
-          <div class="telemetry-item">
-            <code>SWIFTUI</code>
-            <strong>原生小工具</strong>
-            <span>SwiftUI + AppKit，MIT 开源。</span>
+          <div class="capability">
+            <code>READ</code>
+            <strong>小说与朗读</strong>
+            <span>txt 书库、章节进度、迷你阅读器和 macOS 系统语音朗读。</span>
           </div>
         </div>
       </div>
@@ -722,62 +699,24 @@
     <section id="features">
       <div class="section-inner">
         <div class="section-heading">
-          <h2>扫一眼就够，不需要打开大面板</h2>
-          <p>coolRun 的重点不是堆满图表，而是把每天高频查看的信息放到最顺手的位置。</p>
+          <h2>金价不只显示一个数字</h2>
+          <p>新版本把实时价格、指标解释、个人成本和风险提示放到一起。对新手来说，它会尽量用“可小额分批”“暂不建议追买”“盈利可分批落袋”这样的普通话讲清楚。</p>
         </div>
         <div class="feature-grid">
           <article class="feature">
-            <span class="feature-label">CPU</span>
-            <strong>金币动态指示</strong>
-            <p>CPU 占用越高，菜单栏金币旋转越快，不打开面板也能感知负载。</p>
-          </article>
-          <article class="feature">
-            <span class="feature-label">RAM</span>
-            <strong>紧凑监控面板</strong>
-            <p>集中展示 CPU、内存、储存、电池、网络、温度和运行时间。</p>
-          </article>
-          <article class="feature">
             <span class="feature-label">¥/g</span>
-            <strong>浙商积存金价格</strong>
-            <p>菜单栏直接显示金价，不需要用户配置 API Key。</p>
+            <strong>实时价格与走势</strong>
+            <p>展示积存金价格，记录本地历史样本，支持折线、K 线和周期切换。</p>
           </article>
           <article class="feature">
-            <span class="feature-label">UI</span>
-            <strong>浅色与深色模式</strong>
-            <p>使用 macOS 系统自适应颜色，跟随系统外观保持清晰。</p>
+            <span class="feature-label">RSI</span>
+            <strong>指标翻译成人话</strong>
+            <p>RSI、MACD、均线、波动率、支撑位和压力位都有新手解释。</p>
           </article>
           <article class="feature">
-            <span class="feature-label">REL</span>
-            <strong>GitHub Releases 分发</strong>
-            <p>设置页可打开 Releases，用户下载新版后替换旧版本即可。</p>
-          </article>
-          <article class="feature">
-            <span class="feature-label">MIT</span>
-            <strong>开源免费</strong>
-            <p>基于 MIT License 开源，欢迎提交 Issue 和 Pull Request。</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="audience" id="audience">
-      <div class="section-inner">
-        <div class="section-heading">
-          <h2>适合把菜单栏当仪表盘的人</h2>
-          <p>它不会替代专业监控软件，更像一个轻量的状态入口：平时安静待着，需要时点一下。</p>
-        </div>
-        <div class="audience-grid">
-          <article class="audience-item">
-            <strong>每天顺手看金价</strong>
-            <p>把积存金价格固定在菜单栏，不用再打开网页或银行页面反复查。</p>
-          </article>
-          <article class="audience-item">
-            <strong>想知道 Mac 是否在高负载</strong>
-            <p>发热、卡顿时，点开就能看到 CPU、内存和温度状态。</p>
-          </article>
-          <article class="audience-item">
-            <strong>喜欢原生、克制的小工具</strong>
-            <p>小窗口、毛玻璃、浅深色自适应，信息够用就收住。</p>
+            <span class="feature-label">POS</span>
+            <strong>个人持仓建议</strong>
+            <p>输入持有克数与买入均价，自动计算成本、市值、浮盈浮亏和分批策略。</p>
           </article>
         </div>
       </div>
@@ -786,39 +725,119 @@
     <section class="showcase" id="showcase">
       <div class="section-inner">
         <div class="section-heading center">
-          <h2>界面克制，信息直接</h2>
-          <p>左键展开监控，右键打开设置或退出。主界面保持小巧，适合停在菜单栏里长期使用。</p>
+          <h2>当前版本界面</h2>
+          <p>这些截图来自新版功能：悬浮窗四入口、金价分析、系统监控、小说阅读和设置页。</p>
         </div>
-        <div class="demo-panel">
-          <video src="images/coolRunShowDemo.mp4" autoplay muted loop playsinline poster="images/light-montring.png" aria-label="coolRun 动态演示"></video>
-          <p class="caption">动态演示</p>
+        <div class="showcase-board">
+          <div>
+            <div class="shot">
+              <img src="images/gold-analyze.png" alt="金价分析与个人持仓建议截图">
+            </div>
+            <p class="caption">金价分析与持仓建议</p>
+            <div class="shot-row">
+              <div>
+                <div class="shot">
+                  <img src="images/menu-popover-monitor.png" alt="菜单栏四入口悬浮窗截图">
+                </div>
+                <p class="caption">四入口悬浮窗</p>
+              </div>
+              <div>
+                <div class="shot">
+                  <img src="images/light-monitoring.png" alt="浅色系统监控截图">
+                </div>
+                <p class="caption">浅色监控</p>
+              </div>
+            </div>
+          </div>
+          <div class="stack">
+            <div>
+              <div class="shot">
+                <video src="images/coolRunShowDemo.mp4" autoplay muted loop playsinline poster="images/light-monitoring.png" aria-label="coolRun 动态演示"></video>
+              </div>
+              <p class="caption">菜单栏动态演示</p>
+            </div>
+            <div>
+              <div class="shot">
+                <img src="images/gold-analyze2.png" alt="金价策略分析截图">
+              </div>
+              <p class="caption">策略与指标说明</p>
+            </div>
+          </div>
         </div>
-        <div class="screenshot-grid">
-          <div class="screenshot-stack">
-            <div>
-              <div class="shot pad">
-                <img src="images/money.png" alt="菜单栏金价截图">
-              </div>
-              <p class="caption">菜单栏金价</p>
+      </div>
+    </section>
+
+    <section id="reader">
+      <div class="section-inner">
+        <div class="reader-grid">
+          <div class="reader-copy">
+            <div class="section-heading">
+              <h2>小说阅读可以留在悬浮窗里</h2>
+              <p>完整窗口适合沉浸阅读，菜单栏迷你阅读器适合边工作边看一段、听一段。朗读控制与阅读进度共用同一套书库。</p>
             </div>
-            <div>
-              <div class="shot monitor">
-                <img src="images/dark-main.png" alt="深色模式监控面板">
-              </div>
-              <p class="caption">深色模式</p>
-            </div>
-            <div>
-              <div class="shot monitor">
-                <img src="images/light-montring.png" alt="浅色模式监控面板">
-              </div>
-              <p class="caption">浅色模式</p>
-            </div>
+            <ul>
+              <li>导入 txt 后自动解析章节，保存上次阅读位置。</li>
+              <li>支持书签、主题、字号、行距、滚动阅读和翻页阅读。</li>
+              <li>语音朗读支持播放、暂停、停止、上一句、下一句和自动跟随。</li>
+            </ul>
           </div>
           <div>
             <div class="shot">
-              <img src="images/settings.png" alt="设置页面截图">
+              <img src="images/novel.png" alt="小说阅读器截图">
             </div>
-            <p class="caption">设置页面</p>
+            <p class="caption">小说阅读与语音朗读</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <div class="section-inner">
+        <div class="section-heading">
+          <h2>日历和系统状态也放在同一个入口</h2>
+          <p>日历支持农历、节假日和生日；系统监控保留轻量视图，展开后能看到更完整的状态细节。</p>
+        </div>
+        <div class="shot-row">
+          <div>
+            <div class="shot">
+              <img src="images/calendar.png" alt="日历截图">
+            </div>
+            <p class="caption">农历日历</p>
+          </div>
+          <div>
+            <div class="shot">
+              <img src="images/calender-birthday.png" alt="生日管理截图">
+            </div>
+            <p class="caption">生日提醒</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings">
+      <div class="section-inner">
+        <div class="section-heading">
+          <h2>设置页按日常使用重新整理</h2>
+          <p>菜单栏显示、监控项、数据说明和项目信息拆成更清楚的页面，发布到 GitHub 后读者能更快知道这个软件能做什么。</p>
+        </div>
+        <div class="settings-grid">
+          <div>
+            <div class="shot">
+              <img src="images/settings-menu.png" alt="菜单栏快捷菜单截图">
+            </div>
+            <p class="caption">右键快捷菜单</p>
+          </div>
+          <div>
+            <div class="shot">
+              <img src="images/settings-monitor.png" alt="监控设置截图">
+            </div>
+            <p class="caption">监控设置</p>
+          </div>
+          <div>
+            <div class="shot">
+              <img src="images/setting-info.png" alt="应用信息设置截图">
+            </div>
+            <p class="caption">应用信息</p>
           </div>
         </div>
       </div>
@@ -841,7 +860,7 @@
           </article>
           <article class="install-step">
             <strong>开始使用</strong>
-            <p>启动后在菜单栏找到金币图标，左键查看监控，右键打开快捷菜单。</p>
+            <p>启动后在菜单栏找到金币图标，左键打开悬浮窗，右键打开快捷菜单。</p>
           </article>
         </div>
         <p class="note">如果 macOS 提示无法验证开发者，可以右键点击 coolRun.app，选择“打开”，再在系统弹窗中确认。若提示文件已损坏，通常是因为应用暂未公证，可参考 README 中的安装说明处理。</p>
@@ -855,9 +874,9 @@
             <h2>让菜单栏多一个有用的小入口</h2>
             <p>前往 GitHub Releases 下载最新版，或查看源码参与改进。</p>
           </div>
-          <div class="hero-actions">
-            <a class="button primary" href="https://github.com/kuaoaoaoao/coolRun/releases">下载最新版</a>
-            <a class="button secondary" href="https://github.com/kuaoaoaoao/coolRun">GitHub 仓库</a>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/kuaoaoaoao/coolRun/releases" data-analytics-event="download_clicked" data-analytics-location="download_section" data-analytics-destination="github_releases" data-analytics-platform="macos">下载最新版</a>
+            <a class="button secondary" href="https://github.com/kuaoaoaoao/coolRun" data-analytics-event="github_link_clicked" data-analytics-location="download_section" data-analytics-destination="repository">GitHub 仓库</a>
           </div>
         </div>
       </div>
@@ -868,11 +887,69 @@
     <div class="footer-inner">
       <span>© 2026 kuaoaoaoao. Released under the MIT License.</span>
       <div class="footer-links">
-        <a href="https://github.com/kuaoaoaoao/coolRun">源码</a>
-        <a href="https://github.com/kuaoaoaoao/coolRun/releases">下载</a>
-        <a href="https://github.com/kuaoaoaoao/coolRun/issues">反馈</a>
+        <a href="https://github.com/kuaoaoaoao/coolRun" data-analytics-event="github_link_clicked" data-analytics-location="footer" data-analytics-destination="repository">源码</a>
+        <a href="https://github.com/kuaoaoaoao/coolRun/releases" data-analytics-event="download_clicked" data-analytics-location="footer" data-analytics-destination="github_releases" data-analytics-platform="macos">下载</a>
+        <a href="usage-stats.html" data-analytics-event="usage_stats_clicked" data-analytics-location="footer" data-analytics-destination="usage_stats">统计</a>
+        <a href="https://github.com/kuaoaoaoao/coolRun/issues" data-analytics-event="feedback_clicked" data-analytics-location="footer" data-analytics-destination="github_issues">反馈</a>
       </div>
     </div>
   </footer>
+  <script>
+    (function () {
+      var capturedPageView = false;
+
+      function capture(eventName, properties) {
+        if (!window.posthog || typeof window.posthog.capture !== "function") {
+          return;
+        }
+
+        window.posthog.capture(eventName, Object.assign({
+          page_path: window.location.pathname,
+          page_title: document.title,
+          referrer_host: document.referrer ? new URL(document.referrer).host : ""
+        }, properties || {}));
+      }
+
+      function capturePageView() {
+        if (capturedPageView) {
+          return;
+        }
+
+        capturedPageView = true;
+        capture("website_page_viewed", {
+          website: "github_pages",
+          page_url: window.location.href
+        });
+      }
+
+      function trackOutboundClick(event) {
+        var link = event.currentTarget;
+        var eventName = link.dataset.analyticsEvent;
+
+        capture(eventName, {
+          link_text: link.textContent.trim(),
+          link_url: link.href,
+          location: link.dataset.analyticsLocation || "",
+          destination: link.dataset.analyticsDestination || "",
+          platform: link.dataset.analyticsPlatform || ""
+        });
+
+        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank") {
+          return;
+        }
+
+        event.preventDefault();
+        window.setTimeout(function () {
+          window.location.href = link.href;
+        }, 180);
+      }
+
+      capturePageView();
+
+      document.querySelectorAll("a[data-analytics-event]").forEach(function (link) {
+        link.addEventListener("click", trackOutboundClick);
+      });
+    }());
+  </script>
 </body>
 </html>

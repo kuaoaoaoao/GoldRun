@@ -7,11 +7,21 @@
 
 import SwiftUI
 
+private let posthogApiKey = "phc_ADRxZPgBzDQVUTZELLGfCFU4uisGEh9zFBUNZD3cjkjU"
+private let posthogHost = "https://us.i.posthog.com"
+
 @main
 struct coolRunApp: App {
     #if os(macOS)
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     #endif
+
+    init() {
+        Analytics.configure(
+            projectToken: ProcessInfo.processInfo.environment["POSTHOG_API_KEY"] ?? posthogApiKey,
+            host: ProcessInfo.processInfo.environment["POSTHOG_HOST"] ?? posthogHost
+        )
+    }
 
     var body: some Scene {
         #if os(macOS)

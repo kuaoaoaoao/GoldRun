@@ -417,4 +417,5 @@ enum LocalizedString {
             return key
         }
     }
+
 }

@@ -140,6 +140,9 @@ struct SettingsView: View {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 settings.language = language
                             }
+                            Analytics.capture(.languageChanged, properties: [
+                                "language": language.rawValue,
+                            ])
                         }
 
                         if language != AppLanguage.allCases.last {
@@ -231,6 +234,9 @@ struct SettingsView: View {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 settings.menuBarDisplayMode = mode
                             }
+                            Analytics.capture(.menuBarDisplayModeChanged, properties: [
+                                "mode": mode.rawValue,
+                            ])
                         }
 
                         if mode != MenuBarDisplayMode.allCases.last {
@@ -521,6 +527,9 @@ private struct HolidayUpdateCard: View {
                     isUpdating = false
                     updateSuccess = true
                     updateMessage = LocalizedString.data("update_success", lang: settings.language)
+                    Analytics.capture(.holidayDataUpdated, properties: [
+                        "success": true,
+                    ])
 
                     // 3秒后清除消息
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
@@ -532,6 +541,10 @@ private struct HolidayUpdateCard: View {
                     isUpdating = false
                     updateSuccess = false
                     updateMessage = "\(LocalizedString.data("update_failed", lang: settings.language)): \(error.localizedDescription)"
+                    Analytics.capture(.holidayDataUpdated, properties: [
+                        "success": false,
+                        "error_type": String(describing: type(of: error)),
+                    ])
 
                     // 5秒后清除消息
                     DispatchQueue.main.asyncAfter(deadline: .now() + 5) {

@@ -12,12 +12,14 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private let goldPriceService = GoldPriceService()
     private let settings = AppSettings.shared
     private var windowCloseObserver: NSObjectProtocol?
+    private var novelWindowController: NSWindowController?
     private var iconTimer: Timer?
     private var goldPriceTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var coinPhase = 0.0
     private var goldPriceText = "--"
-    private let goldPriceRefreshInterval: Duration = .seconds(1)
+    private var isPopoverPinned = false
+    private let goldPriceRefreshInterval: Duration = .seconds(30)
     private let iconFramesPerSecond = 30.0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -32,19 +34,32 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
             button.title = " \(goldPriceText)"
             button.action = #selector(handleStatusItemClick)
             button.target = self
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+            button.toolTip = "打开 coolRun"
         }
 
         popover.behavior = .transient
         popover.animates = false
-        popover.contentSize = NSSize(width: 236, height: 380)
-        popover.contentViewController = NSHostingController(rootView: MenuBarMonitorView())
+        popover.contentSize = NSSize(width: 284, height: 430)
+        popover.contentViewController = NSHostingController(
+            rootView: MenuBarMonitorView(
+                isPinned: Binding(
+                    get: { [weak self] in self?.isPopoverPinned ?? false },
+                    set: { [weak self] pinned in
+                        self?.setPopoverPinned(pinned)
+                    }
+                )
+            )
+        )
 
         contextPopover.behavior = .transient
         contextPopover.animates = false
-        contextPopover.contentSize = NSSize(width: 150, height: 80)
+        contextPopover.contentSize = NSSize(width: 150, height: 112)
         contextPopover.contentViewController = NSHostingController(
             rootView: StatusContextMenuView(
+                openNovelReader: { [weak self] in
+                    self?.openNovelReaderFromContextMenu()
+                },
                 openSettings: { [weak self] in
                     self?.openSettingsFromContextMenu()
                 },
@@ -59,6 +74,8 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         viewModel.start()
         startIconAnimation()
         startGoldPriceUpdates()
+
+        Analytics.capture(.appLaunched, properties: AnalyticsDeviceProperties.launchProperties)
     }
 
     // 监听设置变化
@@ -74,6 +91,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         iconTimer?.invalidate()
         goldPriceTask?.cancel()
+        GoldPriceStore.shared.flushToDisk()
         if let windowCloseObserver {
             NotificationCenter.default.removeObserver(windowCloseObserver)
         }
@@ -92,11 +110,24 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private func togglePopover() {
         guard let button = statusItem?.button else { return }
 
+        if contextPopover.isShown {
+            contextPopover.performClose(nil)
+        }
+
         if popover.isShown {
+            if isPopoverPinned {
+                setPopoverPinned(false)
+            }
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            Analytics.capture(.popoverOpened)
         }
+    }
+
+    private func setPopoverPinned(_ pinned: Bool) {
+        isPopoverPinned = pinned
+        popover.behavior = pinned ? .applicationDefined : .transient
     }
 
     private func showContextMenu() {
@@ -122,6 +153,30 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 
     private func openSettingsFromContextMenu() {
         prepareToOpenSettings()
+        Analytics.capture(.settingsOpened)
+    }
+
+    private func openNovelReaderFromContextMenu() {
+        prepareToOpenSettings()
+        Analytics.capture(.novelReaderOpened)
+
+        if let window = novelWindowController?.window {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let hostingController = NSHostingController(rootView: NovelLibraryView())
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "小说阅读"
+        window.setContentSize(NSSize(width: 820, height: 620))
+        window.minSize = NSSize(width: 760, height: 560)
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.isReleasedWhenClosed = false
+        window.center()
+
+        let controller = NSWindowController(window: window)
+        novelWindowController = controller
+        controller.showWindow(nil)
     }
 
     private func observeSettingsWindowLifecycle() {
@@ -151,7 +206,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private func startIconAnimation() {
         iconTimer?.invalidate()
         let timer = Timer.scheduledTimer(withTimeInterval: 1 / iconFramesPerSecond, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.refreshIcon()
             }
         }
@@ -169,11 +224,16 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.image = CoinIconRenderer.image(phase: coinPhase)
 
         // 根据设置显示金价或日期
+        let nextTitle: String
         switch settings.menuBarDisplayMode {
         case .goldPrice:
-            statusItem?.button?.title = " \(goldPriceText)"
+            nextTitle = " \(goldPriceText)"
         case .date:
-            statusItem?.button?.title = " \(menuBarDateText)"
+            nextTitle = " \(menuBarDateText)"
+        }
+
+        if statusItem?.button?.title != nextTitle {
+            statusItem?.button?.title = nextTitle
         }
     }
 
@@ -199,10 +259,17 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         do {
             let quote = try await goldPriceService.fetchCNYPerGram()
             goldPriceText = quote.cnyPerGram.goldPriceText
+            GoldPriceStore.shared.addPrice(quote.cnyPerGram, timestamp: quote.updatedAt)
+            Analytics.capture(.goldPriceFetched, properties: [
+                "price_cny_per_gram": quote.cnyPerGram,
+            ], minimumInterval: 60 * 60)
         } catch {
             if goldPriceText == "--" {
                 goldPriceText = goldPriceFallbackText(for: error)
             }
+            Analytics.capture(.goldPriceFetchFailed, properties: [
+                "error_type": String(describing: type(of: error)),
+            ])
         }
         refreshIcon()
     }
@@ -220,11 +287,22 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 private struct StatusContextMenuView: View {
+    let openNovelReader: () -> Void
     let openSettings: () -> Void
     let quit: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
+            Button(action: openNovelReader) {
+                Label("小说阅读", systemImage: "books.vertical")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+
+            Divider()
+
             SettingsLink()
                 .simultaneousGesture(TapGesture().onEnded(openSettings))
                 .buttonStyle(.plain)

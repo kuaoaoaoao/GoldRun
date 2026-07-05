@@ -4,19 +4,25 @@ import SwiftUI
 
 enum ViewMode: String, CaseIterable {
     case monitor
+    case gold
     case calendar
+    case novel
 
     var icon: String {
         switch self {
         case .monitor: return "chart.bar.fill"
+        case .gold: return "chart.line.uptrend.xyaxis"
         case .calendar: return "calendar"
+        case .novel: return "book.pages"
         }
     }
 
     var displayName: String {
         switch self {
         case .monitor: return LocalizedString.calendar("monitor")
+        case .gold: return "金价"
         case .calendar: return LocalizedString.calendar("calendar")
+        case .novel: return "小说"
         }
     }
 }
@@ -43,8 +49,12 @@ struct ContentView: View {
                     cpuTempHistory: viewModel.cpuTempHistory,
                     gpuTempHistory: viewModel.gpuTempHistory
                 )
+            case .gold:
+                GoldAnalysisView()
             case .calendar:
                 CalendarView()
+            case .novel:
+                MenuBarNovelReaderView()
             }
         }
         .padding(8)
@@ -65,21 +75,27 @@ struct ContentView: View {
     // MARK: - 视图切换标签
 
     private var viewModePicker: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 4) {
             ForEach(ViewMode.allCases, id: \.self) { mode in
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewMode = mode
                     }
+                    Analytics.capture(.viewTabSwitched, properties: [
+                        "tab": mode.rawValue,
+                    ])
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: mode.icon)
                             .font(.system(size: 10, weight: .medium))
                         Text(mode.displayName)
                             .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                     }
+                    .frame(maxWidth: .infinity)
                     .foregroundStyle(viewMode == mode ? AppTheme.healthy : AppTheme.textSecondary(colorScheme))
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 6)
                     .background {
                         if viewMode == mode {
@@ -92,7 +108,7 @@ struct ContentView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
