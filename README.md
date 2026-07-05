@@ -10,6 +10,10 @@ coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历�
 
 下载：[GitHub Releases](https://github.com/kuaoaoaoao/coolRun/releases)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/coolRun&type=Date)](https://star-history.com/#kuaoaoaoao/coolRun&Date)
+
 ## 这次更新做了什么
 
 - 金价模块从“看价格”升级为“看分析”：记录历史价格，展示折线图、K 线、RSI、MACD、均线、波动率、买卖倾向和新手解释。
