@@ -17,10 +17,10 @@ enum NovelParserError: LocalizedError {
 
 enum NovelFileParser {
     private static let chapterPatterns = [
-        #"^第[零一二三四五六七八九十百千万\d]+[章节回卷集部篇]"#,
+        #"^第[零一二三四五六七八九十百千万0-9]+[章节回卷集部篇](?:\s|$)"#,
         #"^Chapter\s+\d+"#,
         #"^CHAPTER\s+\d+"#,
-        #"^第\d+章"#,
+        #"^第[0-9]+章(?:\s|$)"#,
         #"^(序章|序幕|前言|楔子|引子|尾声|后记)"#,
         #"^\d+\.\s+"#,
         #"^【第.+章】"#,
@@ -136,10 +136,36 @@ enum NovelFileParser {
 
     private static func isChapterTitle(_ text: String, regexes: [NSRegularExpression]) -> Bool {
         guard !text.isEmpty, text.count <= 60 else { return false }
+        if isNumberedChineseChapterTitle(text) {
+            return true
+        }
         let range = NSRange(text.startIndex..., in: text)
         return regexes.contains { regex in
             regex.firstMatch(in: text, options: [], range: range) != nil
         }
+    }
+
+    private static func isNumberedChineseChapterTitle(_ text: String) -> Bool {
+        guard text.first == "第" else { return false }
+        let numerals = CharacterSet(charactersIn: "零一二三四五六七八九十百千万0123456789")
+        let suffixes: Set<Character> = ["章", "节", "回", "卷", "集", "部", "篇"]
+        var foundNumeral = false
+
+        let remainder = text.dropFirst()
+        for index in remainder.indices {
+            let character = remainder[index]
+            if suffixes.contains(character) {
+                let nextIndex = remainder.index(after: index)
+                return foundNumeral && (
+                    nextIndex == remainder.endIndex || remainder[nextIndex].isWhitespace
+                )
+            }
+            guard character.unicodeScalars.allSatisfy({ numerals.contains($0) }) else {
+                return false
+            }
+            foundNumeral = true
+        }
+        return false
     }
 
     private static func appendChapter(

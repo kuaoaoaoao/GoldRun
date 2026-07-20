@@ -10,10 +10,11 @@ struct CalendarView: View {
     @State private var selectedDateBirthdays: [Birthday] = []
     @State private var showYearMonthPicker = false
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var settings = AppSettings.shared
 
     private let calendar = Calendar.current
     private var weekdaySymbols: [String] {
-        let lang = AppSettings.shared.language
+        let lang = settings.language
         switch lang {
         case .english:
             return ["S", "M", "T", "W", "T", "F", "S"]
@@ -134,10 +135,10 @@ struct CalendarView: View {
 
     private var weekdayHeaderView: some View {
         HStack(spacing: 0) {
-            ForEach(weekdaySymbols, id: \.self) { symbol in
+            ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { index, symbol in
                 Text(symbol)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(symbol == "日" || symbol == "六" ?
+                    .foregroundStyle(index == 0 || index == 6 ?
                         AppTheme.critical.opacity(0.7) :
                         AppTheme.textSecondary(colorScheme))
                     .frame(maxWidth: .infinity)
@@ -387,8 +388,17 @@ struct CalendarView: View {
 
     private var monthYearText: String {
         let formatter = DateFormatter()
-        let lang = AppSettings.shared.language
-        formatter.dateFormat = lang == .english ? "MMM yyyy" : "yyyy年M月"
+        let lang = settings.language
+        switch lang {
+        case .english:
+            formatter.dateFormat = "MMM yyyy"
+        case .japanese:
+            formatter.dateFormat = "yyyy年M月"
+        case .korean:
+            formatter.dateFormat = "yyyy년 M월"
+        case .chinese:
+            formatter.dateFormat = "yyyy年M月"
+        }
         formatter.locale = Locale(identifier: lang.rawValue)
         return formatter.string(from: currentMonth)
     }
@@ -404,8 +414,17 @@ struct CalendarView: View {
 
     private var selectedDateFormatted: String {
         let formatter = DateFormatter()
-        let lang = AppSettings.shared.language
-        formatter.dateFormat = lang == .english ? "EEEE, MMM d, yyyy" : "yyyy年M月d日 EEEE"
+        let lang = settings.language
+        switch lang {
+        case .english:
+            formatter.dateFormat = "EEEE, MMM d, yyyy"
+        case .japanese:
+            formatter.dateFormat = "yyyy年M月d日 EEEE"
+        case .korean:
+            formatter.dateFormat = "yyyy년 M월 d일 EEEE"
+        case .chinese:
+            formatter.dateFormat = "yyyy年M月d日 EEEE"
+        }
         formatter.locale = Locale(identifier: lang.rawValue)
         return formatter.string(from: selectedDate)
     }

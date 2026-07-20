@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ReaderSettingsSheet: View {
+    @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var settings = ReaderSettings.shared
     @ObservedObject private var speech = NovelSpeechManager.shared
     @Environment(\.dismiss) private var dismiss
@@ -8,10 +9,10 @@ struct ReaderSettingsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("阅读设置")
+                Text(LocalizedString.novel("reading_settings", lang: appSettings.language))
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
-                Button("完成") {
+                Button(LocalizedString.common("done", lang: appSettings.language)) {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -23,7 +24,7 @@ struct ReaderSettingsSheet: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    settingsSection("阅读模式") {
+                    settingsSection(LocalizedString.novel("reading_mode", lang: appSettings.language)) {
                         HStack(spacing: 10) {
                             ForEach(ReadingMode.allCases) { mode in
                                 modeButton(mode)
@@ -31,7 +32,7 @@ struct ReaderSettingsSheet: View {
                         }
                     }
 
-                    settingsSection("字体大小") {
+                    settingsSection(LocalizedString.novel("font_size", lang: appSettings.language)) {
                         HStack(spacing: 14) {
                             Text("A")
                                 .font(.system(size: 12))
@@ -47,7 +48,7 @@ struct ReaderSettingsSheet: View {
                         }
                     }
 
-                    settingsSection("行间距") {
+                    settingsSection(LocalizedString.novel("line_spacing", lang: appSettings.language)) {
                         HStack(spacing: 14) {
                             Image(systemName: "text.justify")
                                 .foregroundStyle(.secondary)
@@ -59,7 +60,7 @@ struct ReaderSettingsSheet: View {
                         }
                     }
 
-                    settingsSection("阅读主题") {
+                    settingsSection(LocalizedString.novel("reading_theme", lang: appSettings.language)) {
                         HStack(spacing: 14) {
                             ForEach(ReaderTheme.allCases) { theme in
                                 themeButton(theme)
@@ -67,9 +68,9 @@ struct ReaderSettingsSheet: View {
                         }
                     }
 
-                    settingsSection("语音朗读") {
+                    settingsSection(LocalizedString.speech("voice_reading", lang: appSettings.language)) {
                         VStack(spacing: 12) {
-                            LabeledContent("语速") {
+                            LabeledContent(LocalizedString.speech("rate", lang: appSettings.language)) {
                                 HStack {
                                     Slider(value: $speech.rate, in: 0...1, step: 0.05)
                                     Text(speechRateLabel)
@@ -79,16 +80,16 @@ struct ReaderSettingsSheet: View {
                                 }
                             }
 
-                            LabeledContent("音量") {
+                            LabeledContent(LocalizedString.speech("volume", lang: appSettings.language)) {
                                 Slider(value: $speech.volume, in: 0...1, step: 0.05)
                             }
 
-                            Toggle("朗读时自动滚动", isOn: $speech.autoScroll)
-                            Toggle("章节结束后自动继续", isOn: $speech.autoContinue)
+                            Toggle(LocalizedString.speech("auto_scroll", lang: appSettings.language), isOn: $speech.autoScroll)
+                            Toggle(LocalizedString.speech("auto_continue", lang: appSettings.language), isOn: $speech.autoContinue)
                         }
                     }
 
-                    settingsSection("预览效果") {
+                    settingsSection(LocalizedString.novel("preview_effect", lang: appSettings.language)) {
                         previewCard
                     }
                 }
@@ -155,9 +156,9 @@ struct ReaderSettingsSheet: View {
 
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("第一章 初入江湖")
+            Text(LocalizedString.novel("preview_title", lang: appSettings.language))
                 .font(.system(size: max(settings.fontSize - 2, 12), weight: .semibold, design: .serif))
-            Text("少年背负长剑，踏上了漫漫江湖路。远方群山连绵，云雾缭绕间隐约可见古寺的飞檐。")
+            Text(LocalizedString.novel("preview_body", lang: appSettings.language))
                 .font(.system(size: max(settings.fontSize - 2, 12), design: .serif))
                 .lineSpacing(settings.lineSpacing)
         }

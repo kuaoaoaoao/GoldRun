@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3f0efe66-915b-427a-af1c-f91fc20a98d8" name="更改" comment="feat(birthday): 添加完整农历生日管理和视图支持&#10;&#10;- 新增生日模型 Birthday，支持农历日期、闰月及备注信息&#10;- 实现生日管理器 BirthdayManager，支持增删改查及本地持久化&#10;- 添加生日添加及编辑视图 BirthdayAddView，支持农历日期选择和备注填写&#10;- 实现生日列表视图 BirthdayListView，支持生日展示、编辑及删除操作&#10;- 提供生日详情弹窗 BirthdayDetailView，展示选定日期的生日提醒&#10;- 实现本地化字符串管理，支持多语言显示（简体中文、英文、日语、韩语）&#10;- 多处界面细节优化，提升生日管理交互体验&#10;- 移除.idea中不必要的配置，优化项目管理状态&#10;- 新增应用设置管理 AppSettings，管理语言与监控模块显示配置" />
+    <list default="true" id="3f0efe66-915b-427a-af1c-f91fc20a98d8" name="更改" comment="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/coolRun.dmg" beforeDir="false" afterPath="$PROJECT_DIR$/coolRun.dmg" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -15,6 +18,11 @@
       <option value="directory" />
       <option value="repository" />
     </option>
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_/Users/kuao/Documents/work/ownerWork/XCodeWork/coolRun" value="3EqPHC3NSqnjjuubjXDGK1gRHU9" />
+    </persistenceIdMap>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -44,6 +52,21 @@
   &quot;associatedIndex&quot;: 1
 }</component>
   <component name="ProjectId" id="3EqPHC3NSqnjjuubjXDGK1gRHU9" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Agent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_id" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="BACKGROUND" />
+        <option name="worktreeMode" value="WORKSPACE" />
+      </template>
+    </option>
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -55,6 +78,7 @@
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;copilot.chat.legacySessionMetadata.migrated&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;/Users/kuao/Documents/work/ownerWork/XCodeWork/coolRun/coolRun&quot;,
@@ -91,6 +115,12 @@
       <workItem from="1781322941779" duration="2375000" />
       <workItem from="1781490088323" duration="355000" />
       <workItem from="1782021159141" duration="155000" />
+      <workItem from="1782021466588" duration="685000" />
+      <workItem from="1782263055470" duration="640000" />
+      <workItem from="1782696700757" duration="4870000" />
+      <workItem from="1782799022013" duration="63000" />
+      <workItem from="1782979420587" duration="3501000" />
+      <workItem from="1783224250896" duration="5781000" />
     </task>
     <task id="LOCAL-00001" summary="feat(app): 添加系统监控面板和电池管理新功能&#10;&#10;- 实现包含CPU、内存、存储、电池和网络信息的系统监控面板&#10;- 新增电池电量指示视图，支持不同显示样式和充电状态&#10;- 集成电池服务，支持通过XPC获取和管理电池及适配器数据&#10;- 添加充电管理器，自动控制电池充电行为并监听系统设置变化&#10;- 在macOS应用入口处添加AppDelegate支持和设置窗口占位&#10;- 更新AppIcon资源，支持不同尺寸和平台的图标文件&#10;- 引入高级设置界面，允许用户切换硬件电池百分比显示选项&#10;- 优化项目配置，添加代码签名权限(Entitlements)支持&#10;- 增加多处UI细节和动画优雅展示电池及系统状态信息">
       <option name="closed" value="true" />
@@ -220,7 +250,23 @@
       <option name="project" value="LOCAL" />
       <updated>1782021267814</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="feat(birthday): 添加完整农历生日管理和视图支持&#10;&#10;- 新增生日模型 Birthday，支持农历日期、闰月及备注信息&#10;- 实现生日管理器 BirthdayManager，支持增删改查及本地持久化&#10;- 添加生日添加及编辑视图 BirthdayAddView，支持农历日期选择和备注填写&#10;- 实现生日列表视图 BirthdayListView，支持生日展示、编辑及删除操作&#10;- 提供生日详情弹窗 BirthdayDetailView，展示选定日期的生日提醒&#10;- 实现本地化字符串管理，支持多语言显示（简体中文、英文、日语、韩语）&#10;- 多处界面细节优化，提升生日管理交互体验&#10;- 移除.idea中不必要的配置，优化项目管理状态&#10;- 新增应用设置管理 AppSettings，管理语言与监控模块显示配置">
+      <option name="closed" value="true" />
+      <created>1782021504174</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1782021504174</updated>
+    </task>
+    <task id="LOCAL-00018" summary="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态">
+      <option name="closed" value="true" />
+      <created>1782731825741</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1782731825741</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -252,6 +298,7 @@
     <MESSAGE value="chore(app): 更新macOS应用配置与首页界面优化&#10;&#10;- 添加CodeResources代码签名资源文件和PkgInfo文件&#10;- 新增Info.plist配置，设置应用基本属性和系统版本要求&#10;- 调整Xcode项目部署目标版本为macOS 15.0&#10;- 优化首页样式及内容排版，增强响应式支持&#10;- 修改导航栏样式并重构英雄区和功能展示区布局&#10;- 添加Star History图表展示项目动态&#10;- 更新README与首页文案，更清晰表达产品定位和功能亮点&#10;- 丰富首页内容，新增适合目标用户群的介绍模块&#10;- 优化meta标签，提升页面SEO和社交分享效果" />
     <MESSAGE value="chore(coolRun): 移除风扇状态功能及相关代码&#10;&#10;- 从ContentView中删除风扇显示模块&#10;- 移除FanSection及FanGauge等风扇相关视图组件&#10;- 删除SMCReader中风扇读数及相关接口实现&#10;- 移除SystemMetrics中风扇数据结构定义&#10;- SystemSampler中停止采样风扇数据&#10;- 更新Info.plist添加代码签名资源文件和PkgInfo文件&#10;- 调整macOS部署目标版本为15.0&#10;- 修改首页及README，删除所有风扇相关描述及UI元素&#10;- 优化首页样式及内容排版，增强响应式支持" />
     <MESSAGE value="feat(birthday): 添加完整农历生日管理和视图支持&#10;&#10;- 新增生日模型 Birthday，支持农历日期、闰月及备注信息&#10;- 实现生日管理器 BirthdayManager，支持增删改查及本地持久化&#10;- 添加生日添加及编辑视图 BirthdayAddView，支持农历日期选择和备注填写&#10;- 实现生日列表视图 BirthdayListView，支持生日展示、编辑及删除操作&#10;- 提供生日详情弹窗 BirthdayDetailView，展示选定日期的生日提醒&#10;- 实现本地化字符串管理，支持多语言显示（简体中文、英文、日语、韩语）&#10;- 多处界面细节优化，提升生日管理交互体验&#10;- 移除.idea中不必要的配置，优化项目管理状态&#10;- 新增应用设置管理 AppSettings，管理语言与监控模块显示配置" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat(birthday): 添加完整农历生日管理和视图支持&#10;&#10;- 新增生日模型 Birthday，支持农历日期、闰月及备注信息&#10;- 实现生日管理器 BirthdayManager，支持增删改查及本地持久化&#10;- 添加生日添加及编辑视图 BirthdayAddView，支持农历日期选择和备注填写&#10;- 实现生日列表视图 BirthdayListView，支持生日展示、编辑及删除操作&#10;- 提供生日详情弹窗 BirthdayDetailView，展示选定日期的生日提醒&#10;- 实现本地化字符串管理，支持多语言显示（简体中文、英文、日语、韩语）&#10;- 多处界面细节优化，提升生日管理交互体验&#10;- 移除.idea中不必要的配置，优化项目管理状态&#10;- 新增应用设置管理 AppSettings，管理语言与监控模块显示配置" />
+    <MESSAGE value="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态" />
   </component>
 </project>

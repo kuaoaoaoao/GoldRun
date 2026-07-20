@@ -39,10 +39,10 @@ struct NovelLibraryView: View {
                                     ])
                                 }
                                 .contextMenu {
-                                    Button("打开阅读") {
+                                    Button(LocalizedString.novel("open_read")) {
                                         selectedBook = book
                                     }
-                                    Button("删除", role: .destructive) {
+                                    Button(LocalizedString.novel("delete"), role: .destructive) {
                                         bookToDelete = book
                                         showDeleteConfirm = true
                                     }
@@ -65,25 +65,25 @@ struct NovelLibraryView: View {
             NovelReaderView(bookId: book.id)
                 .frame(minWidth: 760, minHeight: 580)
         }
-        .alert("导入失败", isPresented: $showImportError) {
-            Button("好") {
+        .alert(LocalizedString.novel("import_failed"), isPresented: $showImportError) {
+            Button(LocalizedString.common("ok")) {
                 importError = nil
             }
         } message: {
             Text(importError ?? "")
         }
-        .alert("确认删除", isPresented: $showDeleteConfirm) {
-            Button("取消", role: .cancel) {
+        .alert(LocalizedString.novel("confirm_delete"), isPresented: $showDeleteConfirm) {
+            Button(LocalizedString.common("cancel"), role: .cancel) {
                 bookToDelete = nil
             }
-            Button("删除", role: .destructive) {
+            Button(LocalizedString.novel("delete"), role: .destructive) {
                 if let bookToDelete {
                     library.removeBook(bookId: bookToDelete.id)
                 }
                 bookToDelete = nil
             }
         } message: {
-            Text("确定要删除「\(bookToDelete?.title ?? "")」吗？此操作不可恢复。")
+            Text(LocalizedString.novel("delete_warning") + (bookToDelete?.title ?? "") + LocalizedString.novel("delete_warning_suffix"))
         }
     }
 
@@ -94,9 +94,9 @@ struct NovelLibraryView: View {
                 .foregroundStyle(AppTheme.healthy)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("小说阅读")
+                Text(LocalizedString.novel("novel_reader"))
                     .font(.system(size: 18, weight: .semibold))
-                Text("\(library.books.count) 本书")
+                Text("\(library.books.count) \(LocalizedString.novel("books_count"))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -104,7 +104,7 @@ struct NovelLibraryView: View {
             Spacer()
 
             Button(action: { showingImporter = true }) {
-                Label("导入小说", systemImage: "plus")
+                Label(LocalizedString.novel("import_novel"), systemImage: "plus")
             }
             .keyboardShortcut("o", modifiers: [.command])
         }
@@ -114,12 +114,12 @@ struct NovelLibraryView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("书架空空如也", systemImage: "book.closed")
+            Label(LocalizedString.novel("empty_library"), systemImage: "book.closed")
         } description: {
-            Text("导入 txt 小说后，coolRun 会记住阅读进度、目录和书签。")
+            Text(LocalizedString.novel("empty_library_hint"))
         } actions: {
             Button(action: { showingImporter = true }) {
-                Label("导入小说", systemImage: "plus")
+                Label(LocalizedString.novel("import_novel"), systemImage: "plus")
             }
             .keyboardShortcut("o", modifiers: [.command])
         }

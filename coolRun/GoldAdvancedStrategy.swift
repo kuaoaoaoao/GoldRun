@@ -1,5 +1,25 @@
 import Foundation
 
+enum GoldStrategyVersion {
+    nonisolated static let current = "gold-rules-2026.07.17.2"
+}
+
+struct GoldStrategyCalibration: Equatable, Sendable {
+    nonisolated static let neutral = GoldStrategyCalibration(
+        confidenceMultiplier: 1,
+        exposureMultiplier: 1,
+        note: "样本积累中，暂不自动调参"
+    )
+
+    let confidenceMultiplier: Double
+    let exposureMultiplier: Double
+    let note: String
+
+    var isNeutral: Bool {
+        abs(confidenceMultiplier - 1) < 0.001 && abs(exposureMultiplier - 1) < 0.001
+    }
+}
+
 enum MarketRegime: String, CaseIterable, Sendable {
     case strongUptrend = "强势上涨"
     case weakUptrend = "温和上涨"
@@ -7,7 +27,28 @@ enum MarketRegime: String, CaseIterable, Sendable {
     case weakDowntrend = "温和下跌"
     case strongDowntrend = "强势下跌"
 
-    nonisolated var strategyLabel: String {
+    var displayName: String {
+        switch self {
+        case .strongUptrend: return LocalizedString.gold("strong_uptrend")
+        case .weakUptrend: return LocalizedString.gold("weak_uptrend")
+        case .ranging: return LocalizedString.gold("ranging")
+        case .weakDowntrend: return LocalizedString.gold("weak_downtrend")
+        case .strongDowntrend: return LocalizedString.gold("strong_downtrend")
+        }
+    }
+
+    var strategyLabel: String {
+        switch self {
+        case .strongUptrend, .weakUptrend:
+            LocalizedString.gold("trend_follow")
+        case .ranging:
+            LocalizedString.gold("mean_reversion")
+        case .weakDowntrend, .strongDowntrend:
+            LocalizedString.gold("defensive")
+        }
+    }
+
+    nonisolated var fallbackStrategyLabel: String {
         switch self {
         case .strongUptrend, .weakUptrend:
             "趋势跟随"
@@ -24,6 +65,15 @@ enum VolatilityRegime: String, Sendable {
     case normal = "正常波动"
     case high = "高波动"
     case extreme = "极端波动"
+
+    var displayName: String {
+        switch self {
+        case .low: return LocalizedString.gold("vol_low")
+        case .normal: return LocalizedString.gold("vol_normal")
+        case .high: return LocalizedString.gold("vol_high")
+        case .extreme: return LocalizedString.gold("vol_extreme")
+        }
+    }
 }
 
 struct MarketRegimeReport: Sendable {
@@ -73,11 +123,15 @@ struct RiskSummary: Sendable {
 }
 
 struct GoldAdvancedStrategyReport: Sendable {
+    let strategyVersion: String
     let regime: MarketRegimeReport
     let meanReversion: MeanReversionReport?
     let forecast: MonteCarloForecast?
     let grid: GridStrategyPlan?
     let risk: RiskSummary
+    let technicalOpportunity: Double
+    let marketContext: GoldMarketContext?
+    let calibration: GoldStrategyCalibration
     let compositeDirection: SignalDirection
     let confidence: Double
     let beginnerAction: String
@@ -96,7 +150,9 @@ enum GoldAdvancedStrategy {
     nonisolated static func analyze(
         records: [GoldPriceRecord],
         snapshot: TechnicalSnapshot,
-        signal: TradingSignal?
+        signal: TradingSignal?,
+        marketContext: GoldMarketContext? = nil,
+        calibration: GoldStrategyCalibration = .neutral
     ) -> GoldAdvancedStrategyReport? {
         let prices = records.map(\.price)
         guard prices.count >= 20, prices.last != nil else { return nil }
@@ -104,32 +160,45 @@ enum GoldAdvancedStrategy {
         let regime = detectRegime(prices: prices)
         let meanReversion = analyzeMeanReversion(prices: prices)
         let forecast = simulateMonteCarlo(prices: prices, forecastSteps: 7, simulations: 700)
+        let technicalOpportunity = scoreTechnicalOpportunity(prices: prices, snapshot: snapshot)
         let grid = buildGridPlan(prices: prices, snapshot: snapshot, regime: regime)
         let risk = buildRiskSummary(
             prices: prices,
             regime: regime,
             signal: signal,
-            forecast: forecast
+            forecast: forecast,
+            technicalOpportunity: technicalOpportunity,
+            marketContext: marketContext,
+            calibration: calibration
         )
         let composite = buildCompositeDecision(
             regime: regime,
             meanReversion: meanReversion,
             forecast: forecast,
-            signal: signal
+            signal: signal,
+            technicalOpportunity: technicalOpportunity,
+            marketContext: marketContext,
+            calibration: calibration
         )
         let beginner = buildBeginnerGuidance(
             regime: regime,
             risk: risk,
             forecast: forecast,
-            composite: composite
+            composite: composite,
+            technicalOpportunity: technicalOpportunity,
+            marketContext: marketContext
         )
 
         return GoldAdvancedStrategyReport(
+            strategyVersion: GoldStrategyVersion.current,
             regime: regime,
             meanReversion: meanReversion,
             forecast: forecast,
             grid: grid,
             risk: risk,
+            technicalOpportunity: technicalOpportunity,
+            marketContext: marketContext,
+            calibration: calibration,
             compositeDirection: composite.direction,
             confidence: composite.confidence,
             beginnerAction: beginner.action,
@@ -298,7 +367,10 @@ enum GoldAdvancedStrategy {
         prices: [Double],
         regime: MarketRegimeReport,
         signal: TradingSignal?,
-        forecast: MonteCarloForecast?
+        forecast: MonteCarloForecast?,
+        technicalOpportunity: Double,
+        marketContext: GoldMarketContext?,
+        calibration: GoldStrategyCalibration
     ) -> RiskSummary {
         let volatilityPenalty: Double
         switch regime.volatilityRegime {
@@ -323,7 +395,35 @@ enum GoldAdvancedStrategy {
             probabilityMultiplier = 0.75
         }
 
-        let suggestedExposure = min(max(0.03, 0.28 * signalMultiplier * volatilityPenalty * probabilityMultiplier), 0.35)
+        let opportunityMultiplier: Double
+        if technicalOpportunity >= 35 {
+            opportunityMultiplier = 1.20
+        } else if technicalOpportunity >= 20 {
+            opportunityMultiplier = 1.12
+        } else if technicalOpportunity <= -35 {
+            opportunityMultiplier = 0.65
+        } else if technicalOpportunity <= -20 {
+            opportunityMultiplier = 0.82
+        } else {
+            opportunityMultiplier = 1.0
+        }
+
+        let contextMultiplier: Double
+        switch marketContext?.overallScore ?? 0 {
+        case 35...:
+            contextMultiplier = 1.12
+        case 18..<35:
+            contextMultiplier = 1.06
+        case ...(-35):
+            contextMultiplier = 0.72
+        case -35..<(-18):
+            contextMultiplier = 0.86
+        default:
+            contextMultiplier = 1.0
+        }
+
+        let rawExposure = 0.28 * signalMultiplier * volatilityPenalty * probabilityMultiplier * opportunityMultiplier * contextMultiplier
+        let suggestedExposure = min(max(0.03, rawExposure * calibration.exposureMultiplier), 0.35)
         let maxSingleMoveRisk = calculateATR(prices: prices, period: 14).map { atr in
             min(max(atr / (prices.last ?? atr), 0.002), 0.05)
         } ?? 0.015
@@ -357,7 +457,10 @@ enum GoldAdvancedStrategy {
         regime: MarketRegimeReport,
         meanReversion: MeanReversionReport?,
         forecast: MonteCarloForecast?,
-        signal: TradingSignal?
+        signal: TradingSignal?,
+        technicalOpportunity: Double,
+        marketContext: GoldMarketContext?,
+        calibration: GoldStrategyCalibration
     ) -> (direction: SignalDirection, confidence: Double, summary: String) {
         var buyScore = 0.0
         var sellScore = 0.0
@@ -388,6 +491,32 @@ enum GoldAdvancedStrategy {
             }
         }
 
+        switch technicalOpportunity {
+        case 45...:
+            buyScore += 0.18
+        case 25..<45:
+            buyScore += 0.12
+        case 12..<25:
+            buyScore += 0.06
+        case ...(-45):
+            sellScore += 0.18
+        case -45..<(-25):
+            sellScore += 0.12
+        case -25..<(-12):
+            sellScore += 0.06
+        default:
+            break
+        }
+
+        if let context = marketContext {
+            let weightedContext = abs(context.overallScore) / 100 * 0.24
+            if context.overallScore >= 12 {
+                buyScore += weightedContext
+            } else if context.overallScore <= -12 {
+                sellScore += weightedContext
+            }
+        }
+
         if let forecast {
             if forecast.probabilityAboveCurrent > 0.58 {
                 buyScore += 0.15
@@ -396,7 +525,7 @@ enum GoldAdvancedStrategy {
             }
         }
 
-        let netScore = buyScore - sellScore
+        let netScore = (buyScore - sellScore) * calibration.confidenceMultiplier
         let direction: SignalDirection
         if abs(netScore) < 0.12 {
             direction = .hold
@@ -405,7 +534,7 @@ enum GoldAdvancedStrategy {
         }
 
         let confidence = min(abs(netScore), 1)
-        let summary = "\(regime.regime.rawValue)，优先采用\(regime.regime.strategyLabel)"
+        let summary = "\(regime.regime.rawValue)，优先采用\(regime.regime.fallbackStrategyLabel)"
         return (direction, confidence, summary)
     }
 
@@ -413,7 +542,9 @@ enum GoldAdvancedStrategy {
         regime: MarketRegimeReport,
         risk: RiskSummary,
         forecast: MonteCarloForecast?,
-        composite: (direction: SignalDirection, confidence: Double, summary: String)
+        composite: (direction: SignalDirection, confidence: Double, summary: String),
+        technicalOpportunity: Double,
+        marketContext: GoldMarketContext?
     ) -> (action: String, reason: String, tone: BeginnerTone) {
         if regime.volatilityRegime == .extreme || regime.regime == .strongDowntrend {
             return (
@@ -424,12 +555,25 @@ enum GoldAdvancedStrategy {
         }
 
         if case .buy = composite.direction,
-           composite.confidence >= 0.36,
-           risk.suggestedExposure >= 0.08 {
+           composite.confidence >= 0.30,
+           risk.suggestedExposure >= 0.06 {
             let probabilityText = forecast.map { "，模拟上涨概率约 \(Int($0.probabilityAboveCurrent * 100))%" } ?? ""
+            let contextText = marketContextText(marketContext)
             return (
                 "可小额分批观察",
-                "多项信号偏正面\(probabilityText)。不适合一次买太多，先用小仓位试探更稳。",
+                "多项信号偏正面\(probabilityText)\(contextText)。不适合一次买太多，先用小仓位试探更稳。",
+                .positive
+            )
+        }
+
+        if technicalOpportunity >= 25,
+           regime.regime != .strongDowntrend,
+           regime.volatilityRegime != .extreme,
+           (marketContext?.overallScore ?? 0) > -35 {
+            let contextText = marketContextText(marketContext)
+            return (
+                "可按定投小额买入",
+                "技术评分偏正面\(contextText)，但趋势确认还不够强。更适合用固定预算的一小部分分批买，而不是一次性重仓。",
                 .positive
             )
         }
@@ -448,6 +592,74 @@ enum GoldAdvancedStrategy {
             "当前信号不够统一，价格可能上也可能下。没有把握时，先等下一轮数据更友好。",
             .cautious
         )
+    }
+
+    private nonisolated static func marketContextText(_ context: GoldMarketContext?) -> String {
+        guard let context else { return "" }
+        if context.overallScore >= 18 {
+            return "，宏观新闻也偏正面"
+        }
+        if context.overallScore <= -18 {
+            return "，但宏观新闻偏谨慎"
+        }
+        return "，宏观新闻暂偏中性"
+    }
+
+    private nonisolated static func scoreTechnicalOpportunity(
+        prices: [Double],
+        snapshot: TechnicalSnapshot
+    ) -> Double {
+        guard let currentPrice = prices.last, currentPrice > 0 else { return 0 }
+        var score = 0.0
+
+        if let sma60 = snapshot.sma60, sma60 > 0 {
+            let deviation = (currentPrice - sma60) / sma60
+            switch deviation {
+            case ..<(-0.06): score += 14
+            case -0.06..<(-0.025): score += 8
+            case 0.05..<0.10: score -= 6
+            case 0.10...: score -= 12
+            default: break
+            }
+        } else if let sma20 = snapshot.sma20, sma20 > 0 {
+            let deviation = (currentPrice - sma20) / sma20
+            switch deviation {
+            case ..<(-0.025): score += 10
+            case -0.025..<(-0.01): score += 5
+            case 0.018..<0.035: score -= 5
+            case 0.035...: score -= 10
+            default: break
+            }
+        }
+
+        if let rsi = snapshot.rsi14 {
+            switch rsi {
+            case ..<25: score += 15
+            case 25..<35: score += 9
+            case 35..<42: score += 4
+            case 65..<75: score -= 5
+            case 75...: score -= 12
+            default: break
+            }
+        }
+
+        if let histogram = snapshot.macdHistogram {
+            score += histogram > 0 ? 8 : -8
+        }
+
+        if let upper = snapshot.bollingerUpper, let lower = snapshot.bollingerLower {
+            let range = upper - lower
+            let position = range > 0 ? min(max((currentPrice - lower) / range, 0), 1) : 0.5
+            switch position {
+            case ..<0.08: score += 12
+            case 0.08..<0.25: score += 6
+            case 0.75..<0.92: score -= 6
+            case 0.92...: score -= 12
+            default: break
+            }
+        }
+
+        return score.clamped(to: -100...100)
     }
 
     private nonisolated static func calculateTrendScore(prices: [Double]) -> Double {

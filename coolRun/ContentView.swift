@@ -7,6 +7,7 @@ enum ViewMode: String, CaseIterable {
     case gold
     case calendar
     case novel
+    case english
 
     var icon: String {
         switch self {
@@ -14,15 +15,17 @@ enum ViewMode: String, CaseIterable {
         case .gold: return "chart.line.uptrend.xyaxis"
         case .calendar: return "calendar"
         case .novel: return "book.pages"
+        case .english: return "character.book.closed"
         }
     }
 
     var displayName: String {
         switch self {
         case .monitor: return LocalizedString.calendar("monitor")
-        case .gold: return "金价"
+        case .gold: return LocalizedString.goldPrice("gold_price")
         case .calendar: return LocalizedString.calendar("calendar")
-        case .novel: return "小说"
+        case .novel: return LocalizedString.novel("novel")
+        case .english: return LocalizedString.english("english")
         }
     }
 }
@@ -55,6 +58,8 @@ struct ContentView: View {
                 CalendarView()
             case .novel:
                 MenuBarNovelReaderView()
+            case .english:
+                EnglishLearningView()
             }
         }
         .padding(8)

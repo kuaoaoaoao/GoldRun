@@ -4,6 +4,7 @@ struct NovelReaderView: View {
     let bookId: NovelBook.ID
 
     @ObservedObject private var library = NovelLibraryManager.shared
+    @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var settings = ReaderSettings.shared
     @ObservedObject private var speech = NovelSpeechManager.shared
     @Environment(\.dismiss) private var dismiss
@@ -83,7 +84,7 @@ struct NovelReaderView: View {
                     ReaderSettingsSheet()
                 }
             } else {
-                ContentUnavailableView("书籍不存在", systemImage: "book.closed", description: Text("这本书可能已经被删除。"))
+                ContentUnavailableView(LocalizedString.novel("book_not_found"), systemImage: "book.closed", description: Text(LocalizedString.novel("book_deleted_hint")))
             }
         }
     }
@@ -93,18 +94,18 @@ struct NovelReaderView: View {
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle")
             }
-            .help("关闭")
+            .help(LocalizedString.novel("close"))
 
             Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showChapters.toggle() } }) {
                 Image(systemName: showChapters ? "sidebar.left.close" : "sidebar.left")
             }
-            .help("目录")
+            .help(LocalizedString.novel("toc"))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(book.title)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                Text(currentChapter?.title ?? "无章节")
+                Text(currentChapter?.title ?? LocalizedString.novel("no_chapter"))
                     .font(.caption)
                     .foregroundStyle(settings.theme.secondaryColor)
                     .lineLimit(1)
@@ -121,22 +122,22 @@ struct NovelReaderView: View {
             Button(action: addBookmark) {
                 Image(systemName: "bookmark.badge.plus")
             }
-            .help("添加书签")
+            .help(LocalizedString.novel("add_bookmark"))
 
             Button(action: { startSpeech(book: book) }) {
                 Image(systemName: speech.currentBookID == book.id && speech.state == .playing ? "speaker.wave.2.fill" : "speaker.wave.2")
             }
-            .help("从当前位置朗读")
+            .help(LocalizedString.novel("read_aloud"))
 
             Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showBookmarks.toggle() } }) {
                 Image(systemName: showBookmarks ? "bookmark.fill" : "bookmark")
             }
-            .help("书签")
+            .help(LocalizedString.novel("bookmark"))
 
             Button(action: { showSettings = true }) {
                 Image(systemName: "textformat.size")
             }
-            .help("阅读设置")
+            .help(LocalizedString.novel("reading_settings"))
         }
         .buttonStyle(.plain)
         .font(.system(size: 15, weight: .medium))
@@ -155,7 +156,7 @@ struct NovelReaderView: View {
                 pageReadingView(chapter: chapter)
             }
         } else {
-            ContentUnavailableView("没有可阅读的内容", systemImage: "doc.text")
+            ContentUnavailableView(LocalizedString.novel("no_content"), systemImage: "doc.text")
                 .foregroundStyle(settings.theme.secondaryColor)
         }
     }
@@ -273,12 +274,12 @@ struct NovelReaderView: View {
             Spacer()
 
             Button(action: previousChapter) {
-                Label("上一章", systemImage: "chevron.left")
+                Label(LocalizedString.novel("prev_chapter"), systemImage: "chevron.left")
             }
             .disabled(currentChapterIndex <= 0)
 
             Button(action: nextChapter) {
-                Label("下一章", systemImage: "chevron.right")
+                Label(LocalizedString.novel("next_chapter"), systemImage: "chevron.right")
             }
             .disabled(currentChapterIndex >= book.chapters.count - 1)
         }
@@ -291,17 +292,17 @@ struct NovelReaderView: View {
     private var progressText: String {
         guard let chapter = currentChapter else { return "0%" }
         let progress = Double(currentParagraphIndex) / Double(max(chapter.paragraphs.count - 1, 1))
-        return "本章 \(Int(progress * 100))%"
+        return "\(LocalizedString.novel("chapter_progress")) \(Int(progress * 100))%"
     }
 
     private func chapterSidebar(book: NovelBook) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("目录")
+                Text(LocalizedString.novel("toc"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(settings.theme.textColor)
                 Spacer()
-                Text("\(book.chapters.count) 章")
+                Text("\(book.chapters.count) \(LocalizedString.novel("chapters_count"))")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(settings.theme.secondaryColor)
             }
@@ -376,7 +377,7 @@ struct NovelReaderView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text("书签")
+                    Text(LocalizedString.novel("bookmark"))
                         .font(.system(size: 14, weight: .semibold))
                     Spacer()
                     Button(action: addBookmark) {
@@ -390,7 +391,7 @@ struct NovelReaderView: View {
                 Divider().opacity(0.15)
 
                 if book.bookmarks.isEmpty {
-                    ContentUnavailableView("暂无书签", systemImage: "bookmark.slash")
+                    ContentUnavailableView(LocalizedString.novel("empty_bookmarks", lang: appSettings.language), systemImage: "bookmark.slash")
                         .foregroundStyle(settings.theme.secondaryColor)
                 } else {
                     ScrollView {
@@ -401,10 +402,10 @@ struct NovelReaderView: View {
                                         jumpToBookmark(bookmark)
                                     }
                                     .contextMenu {
-                                        Button("跳转") {
+                                        Button(LocalizedString.novel("jump", lang: appSettings.language)) {
                                             jumpToBookmark(bookmark)
                                         }
-                                        Button("删除", role: .destructive) {
+                                        Button(LocalizedString.common("delete", lang: appSettings.language), role: .destructive) {
                                             library.removeBookmark(bookId: book.id, bookmarkId: bookmark.id)
                                         }
                                     }
@@ -577,7 +578,7 @@ private struct BookmarkRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(book.chapters[safe: bookmark.chapterIndex]?.title ?? "未知章节")
+            Text(book.chapters[safe: bookmark.chapterIndex]?.title ?? LocalizedString.novel("unknown_chapter"))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(AppTheme.healthy)
                 .lineLimit(1)

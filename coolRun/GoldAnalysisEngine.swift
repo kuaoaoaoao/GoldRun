@@ -54,14 +54,28 @@ enum TradingSignalEngine {
             }
         }
 
+        let trendBias = buyScore - sellScore
+
         if let rsi = snapshot.rsi14 {
             switch rsi {
             case ..<30:
-                buyScore += rsi < 20 ? 0.30 : 0.22
-                reasons.append("RSI \(rsi.analysisNumber) 进入超卖区域")
+                let score = rsi < 20 ? 0.30 : 0.22
+                if trendBias < -0.12 {
+                    buyScore += 0.10
+                    reasons.append("RSI \(rsi.analysisNumber) 已超卖，但趋势仍偏弱，先看企稳")
+                } else {
+                    buyScore += score
+                    reasons.append("RSI \(rsi.analysisNumber) 进入超卖区域，存在低位修复机会")
+                }
             case 70...:
-                sellScore += rsi > 80 ? 0.30 : 0.22
-                reasons.append("RSI \(rsi.analysisNumber) 进入超买区域")
+                let score = rsi > 80 ? 0.30 : 0.22
+                if trendBias > 0.12 {
+                    sellScore += 0.10
+                    reasons.append("RSI \(rsi.analysisNumber) 已超买，趋势仍强但不宜追太急")
+                } else {
+                    sellScore += score
+                    reasons.append("RSI \(rsi.analysisNumber) 进入超买区域，需留意回落")
+                }
             case 45...55:
                 reasons.append("RSI \(rsi.analysisNumber) 接近中性")
             default:

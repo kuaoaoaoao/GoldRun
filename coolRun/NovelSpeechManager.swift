@@ -145,6 +145,7 @@ final class NovelSpeechManager: NSObject, ObservableObject {
     }
 
     func startReading(book: NovelBook, chapterIndex: Int, paragraphIndex: Int = 0) {
+        EnglishLearningManager.shared.stop()
         stop()
 
         isPausedByUser = false

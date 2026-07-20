@@ -7,6 +7,15 @@ final class GoldPriceStore {
     static let shared = GoldPriceStore()
 
     private(set) var records: [GoldPriceRecord] = []
+    // 数据健康状态
+    private(set) var dataHealth: DataHealthStatus = .healthy
+    private(set) var lastPriceUpdate: Date?
+    private(set) var priceUpdateInterval: TimeInterval?
+    // 数据异常检测参数
+    private let maxPriceJumpRatio: Double = 0.05  // 单次最大允许跳价幅度（5%）
+    private let staleDataThreshold: TimeInterval = 300  // 5分钟未更新视为数据陈旧
+    private let minPrice: Double = 100  // 合理价格下限（元/克）
+    private let maxPrice: Double = 2000  // 合理价格上限（元/克）
 
     @ObservationIgnored private let fileURL: URL
     @ObservationIgnored private let encoder = JSONEncoder()
@@ -30,13 +39,42 @@ final class GoldPriceStore {
     }
 
     func addPrice(_ price: Double, timestamp: Date = Date(), source: String = "CZB-JCJ") {
-        guard price > 0 else { return }
-
-        if let last = records.last,
-           abs(last.price - price) < 0.0001,
-           timestamp.timeIntervalSince(last.timestamp) < 10 {
+        // 1. 基本有效性检查
+        guard price > minPrice, price < maxPrice else {
+            dataHealth = .invalidPrice(price)
             return
         }
+
+        // 2. 检查数据新鲜度
+        let now = Date()
+        if let last = records.last {
+            let interval = timestamp.timeIntervalSince(last.timestamp)
+            if interval < 0 {
+                // 时间戳倒流（时钟回拨），使用当前时间
+                dataHealth = .stale(now.timeIntervalSince(last.timestamp))
+                return
+            }
+            priceUpdateInterval = interval
+            
+            // 3. 检查是否重复价格（10秒内价格变化小于 0.0001）
+            if abs(last.price - price) < 0.0001,
+               interval < 10 {
+                return
+            }
+            
+            // 4. 检查跳价幅度（基于历史波动率动态调整）
+            let jumpRatio = abs(price - last.price) / last.price
+            if jumpRatio > maxPriceJumpRatio {
+                dataHealth = .priceJump(jumpRatio)
+                // 仍然记录，但标记为异常
+            } else {
+                dataHealth = .healthy
+            }
+        } else {
+            dataHealth = .healthy
+        }
+        
+        lastPriceUpdate = timestamp
 
         records.append(GoldPriceRecord(price: price, timestamp: timestamp, source: source))
 
@@ -45,6 +83,36 @@ final class GoldPriceStore {
         }
 
         scheduleSave()
+    }
+
+    // 检查数据新鲜度（供 UI 调用）
+    func checkFreshness() {
+        guard let lastUpdate = lastPriceUpdate ?? records.last?.timestamp else {
+            dataHealth = .stale(TimeInterval.greatestFiniteMagnitude)
+            return
+        }
+        let age = Date().timeIntervalSince(lastUpdate)
+        if age > staleDataThreshold {
+            dataHealth = .stale(age)
+        }
+    }
+
+    // 获取最近价格年龄（秒）
+    var lastPriceAge: TimeInterval? {
+        guard let lastUpdate = lastPriceUpdate ?? records.last?.timestamp else { return nil }
+        return Date().timeIntervalSince(lastUpdate)
+    }
+    
+    // 多数据源价格对比（占位，后续接入真实多源）
+    func crossValidatePrice(_ price: Double, from source: String) -> DataValidationResult {
+        // 当前仅做基本范围检查
+        if price < minPrice || price > maxPrice {
+            return .outOfRange
+        }
+        
+        // TODO: 接入上海金、XAUUSD、汇率后实现真实多源校验
+        // 目前仅返回基于单一来源的验证结果
+        return .singleSourceOnly
     }
 
     func recordsSince(_ date: Date) -> [GoldPriceRecord] {
@@ -141,4 +209,39 @@ final class GoldPriceStore {
             try? data.write(to: fileURL, options: .atomic)
         }.value
     }
+}
+
+// MARK: - Data Health Status
+
+enum DataHealthStatus: Equatable {
+    case healthy
+    case stale(TimeInterval)  // 数据陈旧，传入距上次更新的秒数
+    case priceJump(Double)    // 价格跳变幅度
+    case invalidPrice(Double) // 明显错误价格
+
+    var description: String {
+        switch self {
+        case .healthy:
+            return LocalizedString.gold("data_healthy")
+        case .stale(let age):
+            return String(format: LocalizedString.gold("data_stale_format"), Int(age))
+        case .priceJump(let ratio):
+            return String(format: LocalizedString.gold("data_jump_format"), String(format: "%.1f%%", ratio * 100))
+        case .invalidPrice(let price):
+            return String(format: LocalizedString.gold("data_invalid_format"), String(format: "%.2f", price))
+        }
+    }
+
+    var isHealthy: Bool {
+        if case .healthy = self { return true }
+        return false
+    }
+}
+
+enum DataValidationResult {
+    case valid
+    case outOfRange
+    case stale
+    case singleSourceOnly
+    case multiSourceMismatch(Double, Double)  // 不同来源价格差异过大
 }

@@ -47,7 +47,8 @@ final class SystemMonitorViewModel {
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 self?.refresh()
-                try? await Task.sleep(for: .seconds(1))
+                let refreshInterval = AppSettings.shared.systemRefreshRate.duration
+                try? await Task.sleep(for: refreshInterval)
             }
         }
     }

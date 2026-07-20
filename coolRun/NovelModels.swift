@@ -73,8 +73,8 @@ enum ReadingMode: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .scroll: return "滚动"
-        case .page: return "翻页"
+        case .scroll: return LocalizedString.novel("scroll")
+        case .page: return LocalizedString.novel("page")
         }
     }
 
@@ -97,11 +97,11 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .light: return "明亮"
-        case .warm: return "暖色"
-        case .sepia: return "复古"
-        case .dark: return "暗夜"
-        case .ink: return "水墨"
+        case .light: return LocalizedString.novel("theme_light")
+        case .warm: return LocalizedString.novel("theme_warm")
+        case .sepia: return LocalizedString.novel("theme_sepia")
+        case .dark: return LocalizedString.novel("theme_dark")
+        case .ink: return LocalizedString.novel("theme_ink")
         }
     }
 

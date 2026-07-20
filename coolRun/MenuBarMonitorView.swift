@@ -1,19 +1,23 @@
 import SwiftUI
 
 struct MenuBarMonitorView: View {
-    @State private var viewModel = SystemMonitorViewModel()
+    @State private var viewModel: SystemMonitorViewModel
     @State private var viewMode: ViewMode = .monitor
     @Binding var isPinned: Bool
     @Environment(\.colorScheme) private var colorScheme
 
-    init(isPinned: Binding<Bool> = .constant(false)) {
+    init(
+        viewModel: SystemMonitorViewModel,
+        isPinned: Binding<Bool> = .constant(false)
+    ) {
+        _viewModel = State(initialValue: viewModel)
         _isPinned = isPinned
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                viewModePicker
+            HStack(spacing: 8) {
+                viewModeCarousel
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.16)) {
@@ -31,7 +35,7 @@ struct MenuBarMonitorView: View {
                 }
                 .contentShape(Rectangle())
                 .buttonStyle(.plain)
-                .help(isPinned ? "取消固定悬浮窗" : "固定悬浮窗")
+                .help(isPinned ? LocalizedString.speech("unpin_popover") : LocalizedString.speech("pin_popover"))
             }
             .padding(.bottom, 6)
 
@@ -53,6 +57,8 @@ struct MenuBarMonitorView: View {
                 CalendarView()
             case .novel:
                 MenuBarNovelReaderView()
+            case .english:
+                EnglishLearningView()
             }
         }
         .frame(width: 268)
@@ -67,49 +73,108 @@ struct MenuBarMonitorView: View {
                 }
             }
         }
-        .onAppear { viewModel.start() }
-        .onDisappear { viewModel.stop() }
     }
 
-    // MARK: - 视图切换标签
+    // MARK: - 视图切换
 
-    private var viewModePicker: some View {
+    private var viewModeCarousel: some View {
         HStack(spacing: 4) {
-            ForEach(ViewMode.allCases, id: \.self) { mode in
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewMode = mode
-                    }
-                }) {
+            carouselStepButton(systemName: "chevron.left") {
+                selectAdjacentViewMode(offset: -1)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
-                        Image(systemName: mode.icon)
-                            .font(.system(size: 10, weight: .medium))
-                        Text(mode.displayName)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .foregroundStyle(viewMode == mode ? AppTheme.healthy : AppTheme.textSecondary(colorScheme))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 6)
-                    .background {
-                        if viewMode == mode {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(AppTheme.healthy.opacity(0.15))
+                        ForEach(ViewMode.allCases, id: \.self) { mode in
+                            viewModeButton(mode)
+                                .id(mode)
                         }
                     }
-                    .contentShape(Rectangle())
+                    .padding(.horizontal, 2)
                 }
-                .buttonStyle(.plain)
+                .frame(height: 28)
+                .onAppear {
+                    proxy.scrollTo(viewMode, anchor: .center)
+                }
+                .onChange(of: viewMode) { _, newMode in
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        proxy.scrollTo(newMode, anchor: .center)
+                    }
+                }
+            }
+
+            carouselStepButton(systemName: "chevron.right") {
+                selectAdjacentViewMode(offset: 1)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
+        .padding(4)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
         }
+        .help(viewMode.displayName)
+    }
+
+    private func viewModeButton(_ mode: ViewMode) -> some View {
+        Button {
+            selectViewMode(mode)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: mode.icon)
+                    .font(.system(size: 10, weight: .semibold))
+
+                Text(mode.displayName)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(height: 24)
+            .padding(.horizontal, 7)
+            .foregroundStyle(viewMode == mode ? AppTheme.healthy : AppTheme.textSecondary(colorScheme))
+            .background {
+                if viewMode == mode {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(AppTheme.healthy.opacity(0.15))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(mode.displayName)
+    }
+
+    private func carouselStepButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .frame(width: 22, height: 24)
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.035))
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(systemName == "chevron.left" ? "Previous" : "Next")
+    }
+
+    private func selectAdjacentViewMode(offset: Int) {
+        let modes = Array(ViewMode.allCases)
+        guard let currentIndex = modes.firstIndex(of: viewMode), !modes.isEmpty else { return }
+        let nextIndex = (currentIndex + offset + modes.count) % modes.count
+        selectViewMode(modes[nextIndex])
+    }
+
+    private func selectViewMode(_ mode: ViewMode) {
+        guard viewMode != mode else { return }
+        withAnimation(.easeInOut(duration: 0.18)) {
+            viewMode = mode
+        }
+        Analytics.capture(.viewTabSwitched, properties: [
+            "tab": mode.rawValue,
+        ])
     }
 }

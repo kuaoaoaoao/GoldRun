@@ -44,6 +44,15 @@ enum CandlePeriod: String, CaseIterable, Codable, Sendable {
         case .day1: 86400
         }
     }
+
+    var displayName: String {
+        switch self {
+        case .minute5: return LocalizedString.gold("5min")
+        case .minute15: return LocalizedString.gold("15min")
+        case .hour1: return LocalizedString.gold("1hour")
+        case .day1: return LocalizedString.gold("1day")
+        }
+    }
 }
 
 struct TechnicalSnapshot: Sendable {
@@ -97,6 +106,17 @@ enum RSIState: String, Sendable {
     case neutral = "中性"
     case overbought = "超买"
     case extremelyOverbought = "极度超买"
+
+    var displayName: String {
+        switch self {
+        case .warmingUp: return LocalizedString.gold("warming_up")
+        case .extremelyOversold: return LocalizedString.gold("extremely_oversold")
+        case .oversold: return LocalizedString.gold("oversold")
+        case .neutral: return LocalizedString.gold("neutral")
+        case .overbought: return LocalizedString.gold("overbought")
+        case .extremelyOverbought: return LocalizedString.gold("extremely_overbought")
+        }
+    }
 }
 
 enum MACDState: String, Sendable {
@@ -105,6 +125,16 @@ enum MACDState: String, Sendable {
     case bullish = "看多"
     case bearish = "看空"
     case bearishStrong = "强势看空"
+
+    var displayName: String {
+        switch self {
+        case .warmingUp: return LocalizedString.gold("warming_up")
+        case .bullishStrong: return LocalizedString.gold("bullish_strong")
+        case .bullish: return LocalizedString.gold("bullish")
+        case .bearish: return LocalizedString.gold("bearish")
+        case .bearishStrong: return LocalizedString.gold("bearish_strong")
+        }
+    }
 }
 
 struct TradingSignal: Identifiable, Sendable {
@@ -126,9 +156,9 @@ enum SignalDirection: Sendable {
 
     var label: String {
         switch self {
-        case .buy: "偏多"
-        case .sell: "偏空"
-        case .hold: "观望"
+        case .buy: LocalizedString.gold("buy")
+        case .sell: LocalizedString.gold("sell")
+        case .hold: LocalizedString.gold("hold")
         }
     }
 }
@@ -138,6 +168,15 @@ enum SignalStrength: String, Sendable {
     case medium = "中"
     case weak = "弱"
     case neutral = "观望"
+
+    var displayName: String {
+        switch self {
+        case .strong: return LocalizedString.gold("strong")
+        case .medium: return LocalizedString.gold("medium")
+        case .weak: return LocalizedString.gold("weak")
+        case .neutral: return LocalizedString.gold("hold")
+        }
+    }
 }
 
 struct PriceStatistics: Sendable {
@@ -153,10 +192,10 @@ struct PriceStatistics: Sendable {
     let lastUpdateDate: Date?
 
     var trendDescription: String {
-        if changePercent > 0.5 { return "强势上涨" }
-        if changePercent > 0.1 { return "温和上涨" }
-        if changePercent < -0.5 { return "强势下跌" }
-        if changePercent < -0.1 { return "温和下跌" }
-        return "横盘整理"
+        if changePercent > 0.5 { return LocalizedString.gold("strong_up") }
+        if changePercent > 0.1 { return LocalizedString.gold("mild_up") }
+        if changePercent < -0.5 { return LocalizedString.gold("strong_down") }
+        if changePercent < -0.1 { return LocalizedString.gold("mild_down") }
+        return LocalizedString.gold("sideways")
     }
 }

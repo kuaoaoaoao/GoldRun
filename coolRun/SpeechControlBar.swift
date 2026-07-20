@@ -19,7 +19,7 @@ struct SpeechControlBar: View {
                 Spacer()
 
                 HStack(spacing: 14) {
-                    iconButton("backward.end.fill", help: "上一句", action: speech.skipBackward)
+                    iconButton("backward.end.fill", help: LocalizedString.speech("previous_sentence"), action: speech.skipBackward)
                         .disabled(!speech.isActive(for: book.id))
 
                     Button(action: playPauseTapped) {
@@ -34,13 +34,13 @@ struct SpeechControlBar: View {
                     }
                     .contentShape(Rectangle())
                     .buttonStyle(.plain)
-                    .help(speech.state == .playing ? "暂停朗读" : "开始朗读")
+                    .help(speech.state == .playing ? LocalizedString.speech("pause_reading") : LocalizedString.speech("start_reading"))
 
-                    iconButton("forward.end.fill", help: "下一句", action: speech.skipForward)
+                    iconButton("forward.end.fill", help: LocalizedString.speech("next_sentence"), action: speech.skipForward)
                         .disabled(!speech.isActive(for: book.id))
 
                     if speech.isActive(for: book.id) {
-                        iconButton("stop.fill", help: "停止朗读", action: speech.stop)
+                        iconButton("stop.fill", help: LocalizedString.speech("stop_reading"), action: speech.stop)
                     }
                 }
 
@@ -51,7 +51,7 @@ struct SpeechControlBar: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(theme.secondaryColor)
 
-                    iconButton("waveform", help: "语音设置") {
+                    iconButton("waveform", help: LocalizedString.speech("voice_settings")) {
                         showVoiceSettings = true
                     }
                 }
@@ -111,7 +111,7 @@ struct SpeechControlBar: View {
     private var displaySentence: String {
         guard speech.currentBookID == book.id,
               !speech.currentSentenceText.isEmpty else {
-            return "点击播放开始语音朗读"
+            return LocalizedString.speech("start_hint")
         }
 
         let text = speech.currentSentenceText
@@ -121,10 +121,15 @@ struct SpeechControlBar: View {
     private var displayDetail: String {
         guard speech.currentBookID == book.id,
               let info = speech.progressInfo else {
-            return "使用系统语音合成朗读当前章节"
+            return LocalizedString.speech("system_voice_hint")
         }
 
-        return "第 \(info.chapterIndex + 1) 章 · 第 \(info.sentenceIndex + 1)/\(info.totalSentences) 句"
+        return String(
+            format: LocalizedString.speech("chapter_sentence_format"),
+            info.chapterIndex + 1,
+            info.sentenceIndex + 1,
+            info.totalSentences
+        )
     }
 
     private var playPauseIcon: String {
@@ -180,10 +185,10 @@ struct VoiceSettingsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("语音朗读")
+                Text(LocalizedString.speech("voice_reading"))
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
-                Button("完成") {
+                Button(LocalizedString.common("done")) {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -194,14 +199,14 @@ struct VoiceSettingsSheet: View {
             Divider()
 
             Form {
-                Picker("语音", selection: $speech.voiceIdentifier) {
-                    Text("系统默认中文").tag("")
+                Picker(LocalizedString.speech("voice"), selection: $speech.voiceIdentifier) {
+                    Text(LocalizedString.speech("default_chinese_voice")).tag("")
                     ForEach(voices, id: \.identifier) { voice in
                         Text("\(voice.name) · \(voice.language)").tag(voice.identifier)
                     }
                 }
 
-                LabeledContent("语速") {
+                LabeledContent(LocalizedString.speech("rate")) {
                     HStack {
                         Slider(value: $speech.rate, in: 0...1, step: 0.05)
                         Text(rateLabel)
@@ -210,16 +215,16 @@ struct VoiceSettingsSheet: View {
                     }
                 }
 
-                LabeledContent("音调") {
+                LabeledContent(LocalizedString.speech("pitch")) {
                     Slider(value: $speech.pitch, in: 0...1, step: 0.05)
                 }
 
-                LabeledContent("音量") {
+                LabeledContent(LocalizedString.speech("volume")) {
                     Slider(value: $speech.volume, in: 0...1, step: 0.05)
                 }
 
-                Toggle("朗读时自动滚动", isOn: $speech.autoScroll)
-                Toggle("章节结束后自动继续", isOn: $speech.autoContinue)
+                Toggle(LocalizedString.speech("auto_scroll"), isOn: $speech.autoScroll)
+                Toggle(LocalizedString.speech("auto_continue"), isOn: $speech.autoContinue)
             }
             .formStyle(.grouped)
             .padding(16)

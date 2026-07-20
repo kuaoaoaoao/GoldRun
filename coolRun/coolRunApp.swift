@@ -19,7 +19,8 @@ struct coolRunApp: App {
     init() {
         Analytics.configure(
             projectToken: ProcessInfo.processInfo.environment["POSTHOG_API_KEY"] ?? posthogApiKey,
-            host: ProcessInfo.processInfo.environment["POSTHOG_HOST"] ?? posthogHost
+            host: ProcessInfo.processInfo.environment["POSTHOG_HOST"] ?? posthogHost,
+            enabled: AppSettings.shared.analyticsEnabled
         )
     }
 

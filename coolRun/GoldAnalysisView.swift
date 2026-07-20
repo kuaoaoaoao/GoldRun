@@ -9,14 +9,26 @@ final class GoldAnalysisViewModel {
     private(set) var snapshot: TechnicalSnapshot?
     private(set) var signal: TradingSignal?
     private(set) var advancedReport: GoldAdvancedStrategyReport?
+    private(set) var marketContext: GoldMarketContext?
     private(set) var candles: [GoldCandlestick] = []
     private(set) var isLoading = false
+    private(set) var isMarketContextLoading = false
 
+    private let marketContextService = GoldMarketContextService()
+    private let learningStore = GoldPredictionLearningStore.shared
     private var analysisTask: Task<Void, Never>?
+    private var marketContextTask: Task<Void, Never>?
     private var lastRecordsSignature = ""
 
     func refresh(records: [GoldPriceRecord], candlePeriod: CandlePeriod) {
-        let signature = makeSignature(records: records, candlePeriod: candlePeriod)
+        let contextSnapshot = marketContext
+        let calibration = learningStore.summary.strategyCalibration
+        let signature = makeSignature(
+            records: records,
+            candlePeriod: candlePeriod,
+            marketContext: contextSnapshot,
+            calibration: calibration
+        )
         guard signature != lastRecordsSignature else { return }
 
         lastRecordsSignature = signature
@@ -29,22 +41,47 @@ final class GoldAnalysisViewModel {
         let recordsSnapshot = Array(records)
         analysisTask = Task(priority: .userInitiated) { [weak self] in
             let result = await Task.detached(priority: .userInitiated) {
-                Self.makeResult(records: recordsSnapshot, candlePeriod: candlePeriod)
+                Self.makeResult(
+                    records: recordsSnapshot,
+                    candlePeriod: candlePeriod,
+                    marketContext: contextSnapshot,
+                    calibration: calibration
+                )
             }.value
 
             guard !Task.isCancelled else { return }
-            self?.apply(result)
+            self?.apply(result, sourceRecords: recordsSnapshot)
+        }
+    }
+
+    func refreshMarketContext(records: [GoldPriceRecord], candlePeriod: CandlePeriod) {
+        guard !isMarketContextLoading else { return }
+        isMarketContextLoading = true
+        marketContextTask?.cancel()
+
+        let service = marketContextService
+        marketContextTask = Task { [weak self] in
+            let context = try? await service.fetchContext()
+            guard !Task.isCancelled else { return }
+
+            self?.marketContext = context
+            self?.isMarketContextLoading = false
+            self?.lastRecordsSignature = ""
+            self?.refresh(records: records, candlePeriod: candlePeriod)
         }
     }
 
     func cancel() {
         analysisTask?.cancel()
         analysisTask = nil
+        marketContextTask?.cancel()
+        marketContextTask = nil
         lastRecordsSignature = ""
         isLoading = false
+        isMarketContextLoading = false
     }
 
-    private func apply(_ result: GoldAnalysisResult) {
+    private func apply(_ result: GoldAnalysisResult, sourceRecords: [GoldPriceRecord]) {
         displayRecords = result.displayRecords
         statistics = result.statistics
         snapshot = result.snapshot
@@ -52,18 +89,32 @@ final class GoldAnalysisViewModel {
         advancedReport = result.advancedReport
         candles = result.candles
         isLoading = false
+
+        learningStore.observe(
+            report: result.advancedReport,
+            currentPrice: result.statistics?.currentPrice,
+            timestamp: result.statistics?.lastUpdateDate,
+            priceRecords: sourceRecords
+        )
     }
 
-    private func makeSignature(records: [GoldPriceRecord], candlePeriod: CandlePeriod) -> String {
+    private func makeSignature(
+        records: [GoldPriceRecord],
+        candlePeriod: CandlePeriod,
+        marketContext: GoldMarketContext?,
+        calibration: GoldStrategyCalibration
+    ) -> String {
         guard let last = records.last else {
-            return "empty-\(candlePeriod.rawValue)"
+            return "empty-\(candlePeriod.rawValue)-\(marketContext?.updatedAt.timeIntervalSince1970 ?? 0)-\(calibration.confidenceMultiplier)-\(calibration.exposureMultiplier)"
         }
-        return "\(records.count)-\(last.timestamp.timeIntervalSince1970)-\(last.price)-\(candlePeriod.rawValue)"
+        return "\(records.count)-\(last.timestamp.timeIntervalSince1970)-\(last.price)-\(candlePeriod.rawValue)-\(marketContext?.updatedAt.timeIntervalSince1970 ?? 0)-\(marketContext?.overallScore ?? 0)-\(calibration.confidenceMultiplier)-\(calibration.exposureMultiplier)"
     }
 
     private nonisolated static func makeResult(
         records: [GoldPriceRecord],
-        candlePeriod: CandlePeriod
+        candlePeriod: CandlePeriod,
+        marketContext: GoldMarketContext?,
+        calibration: GoldStrategyCalibration
     ) -> GoldAnalysisResult {
         let displayRecords = makeDisplayRecords(records: records)
         let statistics = GoldAnalysisEngine.makeStatistics(records: displayRecords)
@@ -85,7 +136,9 @@ final class GoldAnalysisViewModel {
             advancedReport = GoldAdvancedStrategy.analyze(
                 records: displayRecords,
                 snapshot: snapshot,
-                signal: signal
+                signal: signal,
+                marketContext: marketContext,
+                calibration: calibration
             )
         } else {
             advancedReport = nil
@@ -179,12 +232,69 @@ private struct GoldAnalysisResult: Sendable {
 struct GoldAnalysisView: View {
     @State private var store = GoldPriceStore.shared
     @State private var viewModel = GoldAnalysisViewModel()
+    @State private var learningStore = GoldPredictionLearningStore.shared
+    @ObservedObject private var appSettings = AppSettings.shared
     @State private var candlePeriod: CandlePeriod = .minute5
+    @State private var selectedTab: AnalysisTab = .analysis
     @AppStorage("goldHoldingGramsText") private var holdingGramsText = ""
     @AppStorage("goldHoldingAverageCostText") private var holdingAverageCostText = ""
     @Environment(\.colorScheme) private var colorScheme
+    
+    enum AnalysisTab: String {
+        case analysis = "analysis"
+        case review = "review"
+        
+        func title(lang: AppLanguage) -> String {
+            switch self {
+            case .analysis: return LocalizedString.gold("analysis_tab", lang: lang)
+            case .review: return LocalizedString.gold("review_tab", lang: lang)
+            }
+        }
+    }
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Tab 切换器
+            tabPicker
+            
+            TabView(selection: $selectedTab) {
+                analysisContent
+                    .tag(AnalysisTab.analysis)
+                PredictionReviewView()
+                    .tag(AnalysisTab.review)
+            }
+        }
+    }
+    
+    private var tabPicker: some View {
+        HStack(spacing: 0) {
+            ForEach([AnalysisTab.analysis, .review], id: \.self) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    Text(tab.title(lang: appSettings.language))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(selectedTab == tab ? tint : AppTheme.textSecondary(colorScheme))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background {
+                            if selectedTab == tab {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(tint.opacity(colorScheme == .dark ? 0.18 : 0.14))
+                            } else {
+                                Color.clear
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .background(panelBackground)
+    }
+    
+    private var analysisContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 8) {
                 if let statistics = viewModel.statistics {
@@ -217,8 +327,19 @@ struct GoldAnalysisView: View {
                     if viewModel.isLoading {
                         loadingCard
                     } else if let advancedReport = viewModel.advancedReport {
-                        BeginnerGuidanceCard(report: advancedReport)
+                        BeginnerGuidanceCard(
+                            report: advancedReport,
+                            learningSummary: learningStore.summary
+                        )
                         AdvancedStrategyCard(report: advancedReport)
+                        MarketContextCard(
+                            context: advancedReport.marketContext,
+                            isLoading: viewModel.isMarketContextLoading
+                        )
+                        PredictionLearningCard(
+                            summary: learningStore.summary,
+                            records: learningStore.records
+                        )
                         BeginnerGlossaryCard()
                     }
 
@@ -233,6 +354,7 @@ struct GoldAnalysisView: View {
         }
         .task {
             viewModel.refresh(records: store.records, candlePeriod: candlePeriod)
+            viewModel.refreshMarketContext(records: store.records, candlePeriod: candlePeriod)
         }
         .onChange(of: store.records) { _, records in
             viewModel.refresh(records: records, candlePeriod: candlePeriod)
@@ -244,6 +366,14 @@ struct GoldAnalysisView: View {
         .onChange(of: holdingAverageCostText) { _, _ in capturePositionIfValid() }
         .onDisappear {
             viewModel.cancel()
+        }
+    }
+    
+    private var tint: Color {
+        switch viewModel.advancedReport?.compositeDirection {
+        case .buy: return AppTheme.healthy
+        case .sell: return AppTheme.critical
+        default: return Color(red: 0.88, green: 0.57, blue: 0.16)
         }
     }
 
@@ -283,7 +413,7 @@ struct GoldAnalysisView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("浙商积存金")
+                    Text(LocalizedString.gold("source_name", lang: appSettings.language))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(AppTheme.textSecondary(colorScheme))
                     Text("¥\(statistics.currentPrice.goldPriceNumber)/g")
@@ -295,19 +425,58 @@ struct GoldAnalysisView: View {
                 Spacer(minLength: 8)
 
                 ChangeBadge(change: statistics.change, percent: statistics.changePercent)
+                
+                // 数据健康状态指示
+                if store.dataHealth.isHealthy == false {
+                    healthIndicator
+                }
             }
 
+            // 数据更新时间
+            HStack(spacing: 6) {
+                if let age = store.lastPriceAge {
+                    Label(String(format: LocalizedString.gold("seconds_ago_format", lang: appSettings.language), Int(age)), systemImage: "clock")
+                        .font(.system(size: 9))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
+                if let interval = store.priceUpdateInterval {
+                    Text(String(format: LocalizedString.gold("refresh_interval_format", lang: appSettings.language), interval.singleDigitNumber))
+                        .font(.system(size: 9))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.6))
+                }
+            }
+            .padding(.bottom, 2)
+            
             HStack(spacing: 8) {
-                GoldMetric(label: "高", value: statistics.periodHigh.goldPriceNumber)
-                GoldMetric(label: "低", value: statistics.periodLow.goldPriceNumber)
-                GoldMetric(label: "均", value: statistics.periodAverage.goldPriceNumber)
+                GoldMetric(label: LocalizedString.gold("high", lang: appSettings.language), value: statistics.periodHigh.goldPriceNumber)
+                GoldMetric(label: LocalizedString.gold("low", lang: appSettings.language), value: statistics.periodLow.goldPriceNumber)
+                GoldMetric(label: LocalizedString.gold("avg", lang: appSettings.language), value: statistics.periodAverage.goldPriceNumber)
             }
         }
         .padding(10)
         .background(panelBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
-
+    
+    private var healthIndicator: some View {
+        let health = store.dataHealth
+        let (color, icon) = {
+            switch health {
+            case .healthy: return (AppTheme.healthy, "checkmark.circle")
+            case .stale: return (Color(red: 0.88, green: 0.57, blue: 0.16), "clock.badge.exclamationmark")
+            case .priceJump: return (Color.orange, "arrow.up.arrow.down.circle")
+            case .invalidPrice: return (AppTheme.critical, "xmark.octagon")
+            }
+        }()
+        
+        return Label(health.description, systemImage: icon)
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
     private var periodPicker: some View {
         HStack(spacing: 4) {
             ForEach(CandlePeriod.allCases, id: \.self) { period in
@@ -341,7 +510,7 @@ struct GoldAnalysisView: View {
             let visibleCandles = viewModel.candles.suffix(28)
             let maximumChange = max(visibleCandles.map { abs($0.changePercent) }.max() ?? 0.01, 0.01)
             if visibleCandles.isEmpty {
-                Text("等待生成 K 线")
+                Text(LocalizedString.gold("waiting_candle", lang: appSettings.language))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
                     .frame(maxWidth: .infinity, minHeight: 42)
@@ -368,10 +537,10 @@ struct GoldAnalysisView: View {
             ProgressView()
                 .controlSize(.small)
             VStack(alignment: .leading, spacing: 2) {
-                Text("正在生成金价分析")
+                Text(LocalizedString.gold("generating_analysis", lang: appSettings.language))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(AppTheme.textPrimary(colorScheme))
-                Text("先切换进来，策略和图表稍后自动出现。")
+                Text(LocalizedString.gold("analysis_hint", lang: appSettings.language))
                     .font(.system(size: 10))
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
             }
@@ -389,15 +558,15 @@ struct GoldAnalysisView: View {
                 IndicatorPill(title: "MACD", value: snapshot.macdHistogram?.signedShortNumber ?? "--", detail: snapshot.macdState.rawValue)
             }
             HStack(spacing: 6) {
-                IndicatorPill(title: "SMA20", value: snapshot.sma20?.goldPriceNumber ?? "--", detail: "均线")
-                IndicatorPill(title: "波动", value: snapshot.volatility?.percentNumber ?? "--", detail: "年化")
+                IndicatorPill(title: "SMA20", value: snapshot.sma20?.goldPriceNumber ?? "--", detail: LocalizedString.gold("sma", lang: appSettings.language))
+                IndicatorPill(title: LocalizedString.gold("volatility", lang: appSettings.language), value: snapshot.volatility?.percentNumber ?? "--", detail: LocalizedString.gold("annualized", lang: appSettings.language))
             }
         }
     }
 
     private func dataFooter(statistics: PriceStatistics) -> some View {
         HStack {
-            Label("\(statistics.recordCount) 条", systemImage: "tray.full")
+            Label(String(format: LocalizedString.gold("items_count_format", lang: appSettings.language), statistics.recordCount), systemImage: "tray.full")
             Spacer()
             if let lastUpdateDate = statistics.lastUpdateDate {
                 Text(lastUpdateDate, style: .time)
@@ -413,10 +582,10 @@ struct GoldAnalysisView: View {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(amber)
-            Text("等待下一次金价刷新")
+            Text(LocalizedString.gold("waiting_refresh", lang: appSettings.language))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(AppTheme.textPrimary(colorScheme))
-            Text("获取到价格后会自动开始记录历史和生成分析。")
+            Text(LocalizedString.gold("refresh_hint", lang: appSettings.language))
                 .font(.system(size: 11))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(AppTheme.textSecondary(colorScheme))
@@ -549,18 +718,18 @@ private struct GoldPositionCard: View {
 
     private var statusText: String {
         guard let advice else {
-            return hasInput ? "检查输入" : "未填写"
+            return hasInput ? LocalizedString.gold("check_input") : LocalizedString.gold("not_filled")
         }
 
-        if advice.profitLoss > 0 { return "浮盈" }
-        if advice.profitLoss < 0 { return "浮亏" }
-        return "持平"
+        if advice.profitLoss > 0 { return LocalizedString.gold("floating_profit") }
+        if advice.profitLoss < 0 { return LocalizedString.gold("floating_loss") }
+        return LocalizedString.gold("break_even")
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Label("我的黄金", systemImage: "person.crop.circle.badge.checkmark")
+                Label(LocalizedString.gold("my_gold"), systemImage: "person.crop.circle.badge.checkmark")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(AppTheme.textPrimary(colorScheme))
                 Spacer(minLength: 6)
@@ -574,14 +743,14 @@ private struct GoldPositionCard: View {
 
             HStack(spacing: 6) {
                 PositionInputField(
-                    title: "持有克数",
-                    placeholder: "如 12.5",
+                    title: LocalizedString.gold("holding_grams"),
+                    placeholder: LocalizedString.gold("example_grams"),
                     suffix: "g",
                     text: $gramsText
                 )
                 PositionInputField(
-                    title: "买入均价",
-                    placeholder: "如 580",
+                    title: LocalizedString.gold("average_cost"),
+                    placeholder: LocalizedString.gold("example_price"),
                     suffix: "¥/g",
                     text: $averageCostText
                 )
@@ -590,10 +759,10 @@ private struct GoldPositionCard: View {
             if let advice {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
-                        PositionMetric(title: "成本", value: "¥\(advice.costBasis.moneyNumber)")
-                        PositionMetric(title: "现值", value: "¥\(advice.marketValue.moneyNumber)")
+                        PositionMetric(title: LocalizedString.gold("cost"), value: "¥\(advice.costBasis.moneyNumber)")
+                        PositionMetric(title: LocalizedString.gold("market_value"), value: "¥\(advice.marketValue.moneyNumber)")
                         PositionMetric(
-                            title: advice.profitLoss >= 0 ? "赚了" : "亏了",
+                            title: advice.profitLoss >= 0 ? LocalizedString.gold("profit") : LocalizedString.gold("loss"),
                             value: "\(advice.profitLoss.signedMoneyNumber)"
                         )
                     }
@@ -636,7 +805,7 @@ private struct GoldPositionCard: View {
                     }
                 }
             } else {
-                Text(hasInput ? "请输入大于 0 的克数和买入均价，系统会按当前金价计算盈亏。" : "填入你现在持有多少克、平均多少钱买入，就能看到专属持仓建议。")
+                Text(hasInput ? LocalizedString.gold("position_input_invalid") : LocalizedString.gold("position_input_hint"))
                     .font(.system(size: 10))
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
                     .fixedSize(horizontal: false, vertical: true)
@@ -745,9 +914,9 @@ private struct SignalCardView: View {
                let stopLoss = signal.suggestedStopLoss,
                let takeProfit = signal.suggestedTakeProfit {
                 HStack(spacing: 6) {
-                    GoldMetric(label: "入场", value: entry.goldPriceNumber)
-                    GoldMetric(label: "止损", value: stopLoss.goldPriceNumber)
-                    GoldMetric(label: "止盈", value: takeProfit.goldPriceNumber)
+                    GoldMetric(label: LocalizedString.gold("entry"), value: entry.goldPriceNumber)
+                    GoldMetric(label: LocalizedString.gold("stop_loss"), value: stopLoss.goldPriceNumber)
+                    GoldMetric(label: LocalizedString.gold("take_profit"), value: takeProfit.goldPriceNumber)
                 }
             }
         }
@@ -763,6 +932,7 @@ private struct SignalCardView: View {
 
 private struct BeginnerGuidanceCard: View {
     let report: GoldAdvancedStrategyReport
+    let learningSummary: GoldPredictionLearningSummary
     @Environment(\.colorScheme) private var colorScheme
 
     private var tint: Color {
@@ -781,14 +951,41 @@ private struct BeginnerGuidanceCard: View {
         }
     }
 
+    private var evidenceLines: [String] {
+        var lines = [
+            "\(LocalizedString.gold("market_state")): \(report.regime.regime.displayName), ADX \(report.regime.adx.shortNumber), \(LocalizedString.gold("volatility")) \(report.regime.volatilityRegime.displayName)",
+            "\(LocalizedString.gold("technical_score")): \(report.technicalOpportunity.signedShortNumber), \(LocalizedString.gold("suggested_position")) \(report.risk.suggestedExposure.percentNumber)",
+            "\(LocalizedString.gold("strategy_version")): \(report.strategyVersion), \(report.calibration.note)"
+        ]
+
+        if let forecast = report.forecast {
+            lines.append("\(LocalizedString.gold("simulation_steps")): \(forecast.probabilityAboveCurrent.percentNumber), P50 \(forecast.p50.goldPriceNumber)")
+        }
+
+        if let context = report.marketContext {
+            lines.append("\(LocalizedString.gold("macro_news_analysis")): \(context.tone.title), \(LocalizedString.gold("total_predictions")) \(context.overallScore.signedShortNumber)")
+        } else {
+            lines.append(LocalizedString.gold("macro_unavailable"))
+        }
+
+        if learningSummary.validatedCount > 0 {
+            let hitRate = learningSummary.hitRate?.percentNumber ?? "--"
+            lines.append("\(LocalizedString.gold("validated")): \(learningSummary.validatedCount), \(LocalizedString.gold("hit")) \(hitRate)")
+        } else {
+            lines.append(LocalizedString.l(AppSettings.shared.language, en: "Historical samples are still accumulating.", zh: "历史验证：样本仍在积累，暂不作为强依据", ja: "履歴サンプルはまだ蓄積中です。", ko: "과거 검증 샘플을 아직 쌓는 중입니다."))
+        }
+
+        return lines
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
-                Label("新手结论", systemImage: iconName)
+                Label(LocalizedString.gold("beginner_conclusion"), systemImage: iconName)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(tint)
                 Spacer(minLength: 6)
-                Text("\(Int(report.confidence * 100))%把握")
+                Text("\(Int(report.confidence * 100))%\(LocalizedString.gold("confidence"))")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(tint)
@@ -805,10 +1002,25 @@ private struct BeginnerGuidanceCard: View {
                 .foregroundStyle(AppTheme.textSecondary(colorScheme))
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 6) {
-                PlainLanguageChip(text: "建议仓位 \(report.risk.suggestedExposure.percentNumber)", tint: tint)
-                PlainLanguageChip(text: report.regime.regime.rawValue, tint: tint)
+            VStack(alignment: .leading, spacing: 5) {
+                Label(LocalizedString.gold("evidence"), systemImage: "list.bullet.clipboard")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(AppTheme.textPrimary(colorScheme))
+
+                ForEach(evidenceLines, id: \.self) { line in
+                    EvidenceLine(text: line)
+                }
             }
+            .padding(8)
+            .background(colorScheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.36))
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+            HStack(spacing: 6) {
+                PlainLanguageChip(text: "\(LocalizedString.gold("suggested_position")) \(report.risk.suggestedExposure.percentNumber)", tint: tint)
+                PlainLanguageChip(text: report.regime.regime.displayName, tint: tint)
+            }
+
+            ReferenceNotice()
         }
         .padding(10)
         .background(tint.opacity(colorScheme == .dark ? 0.13 : 0.10))
@@ -836,6 +1048,39 @@ private struct PlainLanguageChip: View {
     }
 }
 
+private struct EvidenceLine: View {
+    let text: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.85))
+
+            Text(text)
+                .font(.system(size: 10))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct ReferenceNotice: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Label(
+            LocalizedString.gold("reference_notice"),
+            systemImage: "info.circle"
+        )
+        .font(.system(size: 9))
+        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.88))
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 1)
+    }
+}
+
 private struct AdvancedStrategyCard: View {
     let report: GoldAdvancedStrategyReport
     @Environment(\.colorScheme) private var colorScheme
@@ -848,10 +1093,25 @@ private struct AdvancedStrategyCard: View {
         }
     }
 
+    private func technicalOpportunityDetail(_ score: Double) -> String {
+        switch score {
+        case 35...:
+            return LocalizedString.l(AppSettings.shared.language, en: "Opportunity is clear enough for small batches, not heavy chasing.", zh: "机会较明显，适合小额分批，不适合重仓追入", ja: "機会は比較的明確。小口分割向きで、重い追随買いには不向きです。", ko: "기회가 비교적 뚜렷해 소액 분할에는 적합하지만 무거운 추격 매수는 피하는 편이 좋습니다.")
+        case 15..<35:
+            return LocalizedString.l(AppSettings.shared.language, en: "Opportunity is mildly positive; watch for batch-entry conditions.", zh: "机会偏正面，可观察分批条件", ja: "やや前向き。分割エントリー条件を観察できます。", ko: "기회가 약간 긍정적입니다. 분할 진입 조건을 지켜볼 수 있습니다.")
+        case ...(-35):
+            return LocalizedString.l(AppSettings.shared.language, en: "Risk is high; control the urge to buy first.", zh: "风险偏高，先控制买入冲动", ja: "リスクが高めです。まず買いたい衝動を抑えましょう。", ko: "위험이 높은 편입니다. 먼저 매수 충동을 조절하세요.")
+        case -35..<(-15):
+            return LocalizedString.l(AppSettings.shared.language, en: "Conditions are weak; wait for a better level.", zh: "条件偏弱，等待更好位置", ja: "条件は弱め。より良い位置を待ちましょう。", ko: "조건이 약합니다. 더 좋은 자리를 기다리세요.")
+        default:
+            return LocalizedString.l(AppSettings.shared.language, en: "Opportunity and risk are roughly balanced.", zh: "机会和风险接近平衡", ja: "機会とリスクはおおむね均衡しています。", ko: "기회와 위험이 대체로 균형입니다.")
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             AdvancedStrategyHeader(
-                title: report.regime.regime.rawValue,
+                title: report.regime.regime.displayName,
                 strategy: report.regime.regime.strategyLabel,
                 tint: tint
             )
@@ -862,49 +1122,56 @@ private struct AdvancedStrategyCard: View {
 
             HStack(spacing: 6) {
                 StrategyMetric(
-                    title: "趋势强度",
+                    title: LocalizedString.gold("trend_strength"),
                     value: report.regime.adx.shortNumber,
-                    detail: report.regime.volatilityRegime.rawValue,
-                    help: "越高说明价格越像沿着一个方向走。"
+                    detail: report.regime.volatilityRegime.displayName,
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Higher values mean price is moving more clearly in one direction.", zh: "越高说明价格越像沿着一个方向走。", ja: "値が高いほど、価格が一方向に動きやすいことを示します。", ko: "값이 높을수록 가격이 한 방향으로 움직이는 경향이 강합니다.")
                 )
                 StrategyMetric(
-                    title: "趋势黏性",
+                    title: LocalizedString.gold("trend_stickiness"),
                     value: report.regime.hurstExponent.threeDigitNumber,
                     detail: "Hurst",
-                    help: "接近 0.5 表示方向不明显，高于 0.5 更容易延续趋势。"
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Near 0.5 means direction is unclear. Above 0.5 suggests stronger trend persistence.", zh: "接近 0.5 表示方向不明显，高于 0.5 更容易延续趋势。", ja: "0.5に近いほど方向感が薄く、0.5を上回るほどトレンド継続性が高まります。", ko: "0.5에 가까우면 방향성이 약하고, 0.5보다 높으면 추세 지속성이 강합니다.")
                 )
                 StrategyMetric(
-                    title: "建议仓位",
+                    title: LocalizedString.gold("suggested_position"),
                     value: report.risk.suggestedExposure.percentNumber,
                     detail: report.risk.riskLevel,
-                    help: "不是让你必须买，而是如果要参与，建议资金占比别超过这个量级。"
+                    help: LocalizedString.l(AppSettings.shared.language, en: "This is not a buy instruction. If participating, keep exposure around or below this level.", zh: "不是让你必须买，而是如果要参与，建议资金占比别超过这个量级。", ja: "購入指示ではありません。参加する場合、この水準以下の資金比率に抑える目安です。", ko: "매수 지시가 아닙니다. 참여한다면 이 수준 이하의 비중을 권장합니다.")
                 )
             }
 
+            StrategyRow(
+                title: LocalizedString.gold("technical_score"),
+                value: report.technicalOpportunity.signedShortNumber,
+                detail: technicalOpportunityDetail(report.technicalOpportunity),
+                help: LocalizedString.l(AppSettings.shared.language, en: "Combines moving average deviation, RSI, MACD and Bollinger position. Positive scores favor small batches; negative scores call for caution.", zh: "借鉴多因子策略里的技术评分思路，综合均线偏离、RSI、MACD 和布林带位置。正分偏适合小额分批，负分偏谨慎。", ja: "移動平均からの乖離、RSI、MACD、ボリンジャーバンド位置を組み合わせたスコアです。プラスは小口分割、マイナスは慎重寄りです。", ko: "이동평균 괴리, RSI, MACD, 볼린저 위치를 종합한 점수입니다. 양수는 소액 분할, 음수는 신중함을 뜻합니다.")
+            )
+
             if let meanReversion = report.meanReversion {
                 StrategyRow(
-                    title: "均值回归",
+                    title: LocalizedString.gold("mean_reversion_label"),
                     value: meanReversion.zScore.signedShortNumber,
                     detail: meanReversion.summary,
-                    help: "可以理解成价格离最近平均价有多远。离得太远时，可能会往平均价靠。"
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Think of it as how far price is from its recent average. Large gaps may pull back toward the average.", zh: "可以理解成价格离最近平均价有多远。离得太远时，可能会往平均价靠。", ja: "価格が最近の平均からどれだけ離れているかを見る指標です。離れすぎると平均に戻る可能性があります。", ko: "가격이 최근 평균에서 얼마나 떨어졌는지 보는 지표입니다. 너무 멀어지면 평균으로 돌아올 수 있습니다.")
                 )
             }
 
             if let forecast = report.forecast {
                 StrategyRow(
-                    title: "7步模拟",
+                    title: LocalizedString.gold("simulation_steps"),
                     value: forecast.probabilityAboveCurrent.percentNumber,
-                    detail: "中位 \(forecast.p50.goldPriceNumber)，区间 \(forecast.p10.goldPriceNumber)-\(forecast.p90.goldPriceNumber)",
-                    help: "用历史波动随机跑很多次，看看短期大概落在哪个价格区间。不是预测承诺。"
+                    detail: LocalizedString.l(AppSettings.shared.language, en: "Median \(forecast.p50.goldPriceNumber), range \(forecast.p10.goldPriceNumber)-\(forecast.p90.goldPriceNumber)", zh: "中位 \(forecast.p50.goldPriceNumber)，区间 \(forecast.p10.goldPriceNumber)-\(forecast.p90.goldPriceNumber)", ja: "中央値 \(forecast.p50.goldPriceNumber)、範囲 \(forecast.p10.goldPriceNumber)-\(forecast.p90.goldPriceNumber)", ko: "중앙값 \(forecast.p50.goldPriceNumber), 범위 \(forecast.p10.goldPriceNumber)-\(forecast.p90.goldPriceNumber)"),
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Runs many random paths from historical volatility to estimate a short-term range. It is not a promise.", zh: "用历史波动随机跑很多次，看看短期大概落在哪个价格区间。不是预测承诺。", ja: "過去の変動率で多数のランダム経路を試し、短期レンジを見積もります。予測の保証ではありません。", ko: "과거 변동성으로 여러 경로를 시뮬레이션해 단기 범위를 추정합니다. 예측 보장이 아닙니다.")
                 )
             }
 
             if let grid = report.grid {
                 StrategyRow(
-                    title: grid.isSuitable ? "网格适配" : "网格谨慎",
-                    value: "\(grid.gridCount)格",
-                    detail: "\(grid.lowerPrice.goldPriceNumber)-\(grid.upperPrice.goldPriceNumber)，间距 \(grid.spacing.goldPriceNumber)",
-                    help: "网格适合价格来回震荡时分批买卖；单边大涨大跌时容易失效。"
+                    title: grid.isSuitable ? LocalizedString.gold("grid_fit") : LocalizedString.gold("grid_caution"),
+                    value: String(format: LocalizedString.l(AppSettings.shared.language, en: "%d grids", zh: "%d格", ja: "%dグリッド", ko: "%d칸"), grid.gridCount),
+                    detail: LocalizedString.l(AppSettings.shared.language, en: "\(grid.lowerPrice.goldPriceNumber)-\(grid.upperPrice.goldPriceNumber), step \(grid.spacing.goldPriceNumber)", zh: "\(grid.lowerPrice.goldPriceNumber)-\(grid.upperPrice.goldPriceNumber)，间距 \(grid.spacing.goldPriceNumber)", ja: "\(grid.lowerPrice.goldPriceNumber)-\(grid.upperPrice.goldPriceNumber)、間隔 \(grid.spacing.goldPriceNumber)", ko: "\(grid.lowerPrice.goldPriceNumber)-\(grid.upperPrice.goldPriceNumber), 간격 \(grid.spacing.goldPriceNumber)"),
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Grid works best in sideways movement and can fail during one-way rallies or selloffs.", zh: "网格适合价格来回震荡时分批买卖；单边大涨大跌时容易失效。", ja: "グリッドは横ばい相場での分割売買に向き、一方向の大きな上昇・下落では機能しにくくなります。", ko: "그리드는 횡보장에서 분할 매매에 적합하며 일방향 급등락에서는 잘 맞지 않을 수 있습니다.")
                 )
             }
 
@@ -947,7 +1214,272 @@ private struct AdvancedStrategyHeader: View {
                 .background {
                     Capsule()
                         .fill(tint.opacity(0.14))
+            }
+        }
+    }
+
+}
+
+private struct MarketContextCard: View {
+    let context: GoldMarketContext?
+    let isLoading: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var tint: Color {
+        switch context?.tone ?? .neutral {
+        case .bullish: AppTheme.healthy
+        case .neutral: Color(red: 0.88, green: 0.57, blue: 0.16)
+        case .bearish: AppTheme.critical
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label(context?.tone.title ?? LocalizedString.gold("macro_news_analysis"), systemImage: "newspaper")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+
+                Spacer(minLength: 6)
+
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Text(context?.overallScore.signedShortNumber ?? "--")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(tint)
                 }
+            }
+
+            if let context {
+                if context.isFromCache || context.isPartial {
+                    Label(contextStatusText(context), systemImage: context.isFromCache ? "clock.badge.checkmark" : "exclamationmark.triangle")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(context.isFromCache ? tint : AppTheme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 6) {
+                    StrategyMetric(
+                        title: LocalizedString.gold("macro"),
+                        value: context.macroScore.signedShortNumber,
+                        detail: macroDetail(context.macro),
+                        help: LocalizedString.l(AppSettings.shared.language, en: "Uses U.S. 10-year Treasury yield changes. Falling yields usually support gold; rising yields usually pressure it.", zh: "当前先使用美国 10 年期国债收益率变化。收益率下行通常利好黄金，上行通常压制黄金。", ja: "米10年債利回りの変化を使用します。利回り低下は通常金に追い風、上昇は逆風です。", ko: "미국 10년물 국채 금리 변화를 사용합니다. 금리 하락은 보통 금에 우호적이고 상승은 압박 요인입니다.")
+                    )
+                    StrategyMetric(
+                        title: LocalizedString.gold("news"),
+                        value: context.newsScore.signedShortNumber,
+                        detail: String(format: LocalizedString.gold("items_count_format"), context.newsItems.count),
+                        help: LocalizedString.l(AppSettings.shared.language, en: "Reads RSS headlines about gold, USD, the Fed and yields, then scores sentiment with keywords.", zh: "读取黄金、美元、美联储、收益率相关 RSS 标题，用关键词做轻量情绪评分。", ja: "金、ドル、FRB、利回りに関するRSS見出しを読み、キーワードで軽量なセンチメント評価を行います。", ko: "금, 달러, 연준, 금리 관련 RSS 제목을 읽고 키워드로 간단한 심리를 점수화합니다.")
+                    )
+                }
+
+                ForEach(Array(context.reasons.prefix(3)), id: \.self) { reason in
+                    Label(reason, systemImage: "circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text(isLoading ? LocalizedString.gold("macro_loading") : LocalizedString.gold("macro_unavailable"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(10)
+        .background(colorScheme == .dark ? Color.black.opacity(0.25) : Color.white.opacity(0.48))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        }
+    }
+
+    private func macroDetail(_ macro: GoldMacroSnapshot?) -> String {
+        guard let macro, let yield = macro.tenYearYield else { return LocalizedString.gold("treasury_10y") }
+        if let change = macro.tenYearYieldChangeBps {
+            return "\(yield.shortNumber)% \(change.signedShortNumber)bp"
+        }
+        return "\(yield.shortNumber)%"
+    }
+
+    private func contextStatusText(_ context: GoldMarketContext) -> String {
+        if let missing = context.missingDataDescription {
+            return String(format: context.isFromCache ? LocalizedString.gold("cached_data_format") : LocalizedString.gold("partial_data_format"), missing)
+        }
+        return context.isFromCache ? LocalizedString.gold("cached_15min") : LocalizedString.gold("macro_partial")
+    }
+}
+
+private struct PredictionLearningCard: View {
+    let summary: GoldPredictionLearningSummary
+    let records: [GoldPredictionLearningRecord]
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var calibration: GoldStrategyCalibration {
+        summary.strategyCalibration
+    }
+
+    private var recentRecords: [GoldPredictionLearningRecord] {
+        Array(records.sorted { $0.createdAt > $1.createdAt }.prefix(3))
+    }
+
+    private var tint: Color {
+        guard let hitRate = summary.hitRate, summary.validatedCount >= 8 else {
+            return Color(red: 0.88, green: 0.57, blue: 0.16)
+        }
+
+        if hitRate >= 0.62 { return AppTheme.healthy }
+        if hitRate <= 0.42 { return AppTheme.critical }
+        return Color(red: 0.88, green: 0.57, blue: 0.16)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label(LocalizedString.gold("prediction_learning"), systemImage: "target")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+
+                Spacer(minLength: 6)
+
+                Text(summary.hitRate?.percentNumber ?? "--")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(tint)
+            }
+
+            HStack(spacing: 6) {
+                StrategyMetric(
+                    title: LocalizedString.gold("validated"),
+                    value: "\(summary.validatedCount)",
+                    detail: String(format: LocalizedString.gold("pending_count_format"), summary.pendingCount),
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Each strategy sample is recorded and checked against the real gold price about 30 minutes later.", zh: "每次策略形成后会记录一个样本，约 30 分钟后用真实金价验证方向和误差。", ja: "戦略が形成されるたびにサンプルを記録し、約30分後に実際の金価格で方向と誤差を検証します。", ko: "전략이 만들어질 때마다 샘플을 기록하고 약 30분 뒤 실제 금 가격으로 방향과 오차를 검증합니다.")
+                )
+                StrategyMetric(
+                    title: LocalizedString.gold("average_error"),
+                    value: summary.averageAbsoluteError?.percentNumber ?? "--",
+                    detail: LocalizedString.gold("minutes_30"),
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Average gap between predicted and actual return. Lower means the short-term forecast is closer to reality.", zh: "预测收益率和实际收益率之间的平均差距，越低说明短线预测越贴近现实。", ja: "予測リターンと実績リターンの平均差です。低いほど短期予測が現実に近いことを示します。", ko: "예측 수익률과 실제 수익률의 평균 차이입니다. 낮을수록 단기 예측이 현실에 가깝습니다.")
+                )
+                StrategyMetric(
+                    title: LocalizedString.gold("bias"),
+                    value: summary.averagePredictionBias?.signedPercentNumber ?? "--",
+                    detail: LocalizedString.gold("prediction_minus_actual"),
+                    help: LocalizedString.l(AppSettings.shared.language, en: "Positive means the model is optimistic; negative means conservative. With few samples it is only observed, not auto-tuned.", zh: "正数表示模型偏乐观，负数表示偏保守。样本少时只做观察，不自动调参。", ja: "正の値は楽観寄り、負の値は保守寄りです。サンプルが少ない間は観察のみで自動調整しません。", ko: "양수는 모델이 낙관적, 음수는 보수적임을 뜻합니다. 샘플이 적을 때는 관찰만 하고 자동 조정하지 않습니다.")
+                )
+            }
+
+            Text(summary.calibrationText)
+                .font(.system(size: 10))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !calibration.isNeutral {
+                Label(
+                    String(
+                        format: LocalizedString.gold("calibration_applied_format"),
+                        calibration.confidenceMultiplier.twoDigitNumber,
+                        calibration.exposureMultiplier.twoDigitNumber
+                    ),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(tint)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !recentRecords.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(LocalizedString.gold("recent_prediction_review"), systemImage: "clock.arrow.circlepath")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(AppTheme.textPrimary(colorScheme))
+
+                    ForEach(recentRecords) { record in
+                        PredictionRecordRow(record: record)
+                    }
+                }
+                .padding(8)
+                .background(colorScheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.34))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
+        }
+        .padding(10)
+        .background(colorScheme == .dark ? Color.black.opacity(0.25) : Color.white.opacity(0.48))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        }
+    }
+}
+
+private struct PredictionRecordRow: View {
+    let record: GoldPredictionLearningRecord
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var directionText: String {
+        switch record.predictedDirection {
+        case "buy": return LocalizedString.gold("buy")
+        case "sell": return LocalizedString.gold("sell")
+        default: return LocalizedString.gold("hold")
+        }
+    }
+
+    private var statusText: String {
+        switch record.status {
+        case .pending:
+            return LocalizedString.gold("pending")
+        case .validated:
+            if record.wasDirectionalHit == true { return LocalizedString.gold("hit") }
+            if record.wasDirectionalHit == false { return LocalizedString.gold("miss") }
+            return LocalizedString.gold("validated")
+        }
+    }
+
+    private var tint: Color {
+        if record.status == .pending {
+            return Color(red: 0.88, green: 0.57, blue: 0.16)
+        }
+        return record.wasDirectionalHit == true ? AppTheme.healthy : AppTheme.critical
+    }
+
+    private var detailText: String {
+        if let actualReturn = record.actualReturn {
+            return "\(String(format: LocalizedString.gold("actual_return_format"), actualReturn.signedPercentNumber)) · \(record.strategyVersion)"
+        }
+        return String(format: LocalizedString.gold("waiting_result_format"), record.strategyVersion)
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text(directionText)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 28, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(statusText)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                    Text(record.createdAt, style: .time)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
+
+                Text(detailText)
+                    .font(.system(size: 9))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            Spacer(minLength: 0)
         }
     }
 }
@@ -1035,18 +1567,18 @@ private struct BeginnerGlossaryCard: View {
     var body: some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 7) {
-                GlossaryLine(term: "RSI", explanation: "看价格是不是涨太快或跌太快。70 以上偏贵，30 以下偏便宜。")
-                GlossaryLine(term: "MACD", explanation: "看短期和中期力量谁更强。为正偏强，为负偏弱。")
-                GlossaryLine(term: "趋势强度", explanation: "数值越高，说明价格越像在沿一个方向走。")
-                GlossaryLine(term: "均值回归", explanation: "价格离平均价太远时，可能会慢慢靠回去。")
-                GlossaryLine(term: "网格", explanation: "适合震荡行情，分成很多小格，低一点买、高一点卖。")
-                GlossaryLine(term: "建议仓位", explanation: "如果要参与，建议用多少比例资金；不是一定要买。")
-                GlossaryLine(term: "买入均价", explanation: "你每克黄金平均花了多少钱。它是判断赚亏和回本价的基础。")
-                GlossaryLine(term: "浮盈浮亏", explanation: "按当前金价临时算出来的赚亏；没卖出前还会变化。")
+                GlossaryLine(term: "RSI", explanation: LocalizedString.l(AppSettings.shared.language, en: "Shows whether price may have risen or fallen too quickly. Above 70 is expensive; below 30 is cheap.", zh: "看价格是不是涨太快或跌太快。70 以上偏贵，30 以下偏便宜。", ja: "価格が上がり過ぎ・下がり過ぎかを見る指標です。70以上は割高、30以下は割安寄りです。", ko: "가격이 너무 빨리 오르거나 내렸는지 봅니다. 70 이상은 비싼 편, 30 이하는 싼 편입니다."))
+                GlossaryLine(term: "MACD", explanation: LocalizedString.l(AppSettings.shared.language, en: "Compares short-term and medium-term momentum. Positive is stronger; negative is weaker.", zh: "看短期和中期力量谁更强。为正偏强，为负偏弱。", ja: "短期と中期の勢いを比べます。プラスは強め、マイナスは弱めです。", ko: "단기와 중기 힘을 비교합니다. 양수는 강하고 음수는 약합니다."))
+                GlossaryLine(term: LocalizedString.gold("trend_strength"), explanation: LocalizedString.l(AppSettings.shared.language, en: "Higher values mean price is moving more like a trend.", zh: "数值越高，说明价格越像在沿一个方向走。", ja: "数値が高いほど、価格が一方向に動く傾向が強いことを示します。", ko: "값이 높을수록 가격이 한 방향으로 움직이는 추세가 강합니다."))
+                GlossaryLine(term: LocalizedString.gold("mean_reversion_label"), explanation: LocalizedString.l(AppSettings.shared.language, en: "When price is far from its average, it may slowly move back toward it.", zh: "价格离平均价太远时，可能会慢慢靠回去。", ja: "価格が平均から離れすぎると、ゆっくり平均へ戻る可能性があります。", ko: "가격이 평균에서 너무 멀면 천천히 평균으로 돌아갈 수 있습니다."))
+                GlossaryLine(term: LocalizedString.l(AppSettings.shared.language, en: "Grid", zh: "网格", ja: "グリッド", ko: "그리드"), explanation: LocalizedString.l(AppSettings.shared.language, en: "Works better in sideways markets by splitting trades into small levels: buy lower, sell higher.", zh: "适合震荡行情，分成很多小格，低一点买、高一点卖。", ja: "横ばい相場向きで、細かい水準に分けて安く買い、高く売る考え方です。", ko: "횡보장에 적합하며 여러 작은 구간으로 나누어 낮게 사고 높게 파는 방식입니다."))
+                GlossaryLine(term: LocalizedString.gold("suggested_position"), explanation: LocalizedString.l(AppSettings.shared.language, en: "Suggested capital share if you participate. It is not a must-buy signal.", zh: "如果要参与，建议用多少比例资金；不是一定要买。", ja: "参加する場合の資金比率の目安です。必ず買うという意味ではありません。", ko: "참여한다면 어느 정도 비중이 좋은지 제안합니다. 반드시 사라는 뜻은 아닙니다."))
+                GlossaryLine(term: LocalizedString.gold("average_cost"), explanation: LocalizedString.l(AppSettings.shared.language, en: "How much you paid per gram on average. It is the basis for profit and break-even.", zh: "你每克黄金平均花了多少钱。它是判断赚亏和回本价的基础。", ja: "1グラムあたり平均でいくら払ったかです。損益と損益分岐点の基準になります。", ko: "그램당 평균 얼마에 샀는지입니다. 손익과 본전 가격 판단의 기준입니다."))
+                GlossaryLine(term: "\(LocalizedString.gold("floating_profit"))/\(LocalizedString.gold("floating_loss"))", explanation: LocalizedString.l(AppSettings.shared.language, en: "Temporary profit or loss calculated from current price. It can change before you sell.", zh: "按当前金价临时算出来的赚亏；没卖出前还会变化。", ja: "現在価格で一時的に計算した損益です。売却前は変動します。", ko: "현재 금 가격으로 임시 계산한 손익입니다. 팔기 전까지 계속 변할 수 있습니다."))
             }
             .padding(.top, 6)
         } label: {
-            Label("看不懂这些词？", systemImage: "book")
+            Label(LocalizedString.l(AppSettings.shared.language, en: "Need help with these terms?", zh: "看不懂这些词？", ja: "用語がわかりにくいですか？", ko: "이 용어들이 어렵나요?"), systemImage: "book")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(AppTheme.textPrimary(colorScheme))
         }
@@ -1155,6 +1687,10 @@ private extension Double {
         formatted(.number.precision(.fractionLength(1)))
     }
 
+    var twoDigitNumber: String {
+        formatted(.number.precision(.fractionLength(2)))
+    }
+
     var threeDigitNumber: String {
         formatted(.number.precision(.fractionLength(3)))
     }
@@ -1175,6 +1711,10 @@ private extension Double {
         formatted(.percent.precision(.fractionLength(1)))
     }
 
+    var signedPercentNumber: String {
+        formatted(.percent.sign(strategy: .always()).precision(.fractionLength(1)))
+    }
+
     var moneyNumber: String {
         formatted(.number.precision(.fractionLength(2)))
     }
@@ -1185,5 +1725,9 @@ private extension Double {
 
     var signedCompactPercentText: String {
         formatted(.percent.sign(strategy: .always()).precision(.fractionLength(1)))
+    }
+
+    var singleDigitNumber: String {
+        formatted(.number.precision(.fractionLength(0)))
     }
 }

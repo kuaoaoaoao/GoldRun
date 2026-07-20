@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct MenuBarNovelReaderView: View {
     @ObservedObject private var library = NovelLibraryManager.shared
+    @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var settings = ReaderSettings.shared
     @ObservedObject private var speech = NovelSpeechManager.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -27,7 +28,7 @@ struct MenuBarNovelReaderView: View {
     }
 
     private var currentParagraph: String {
-        guard let currentChapter else { return "导入 txt 小说后，可以把这块固定在菜单栏里边看边工作。" }
+        guard let currentChapter else { return LocalizedString.novel("default_menu_hint", lang: appSettings.language) }
         return currentChapter.paragraphs[safe: currentParagraphIndex] ?? currentChapter.title
     }
 
@@ -77,8 +78,8 @@ struct MenuBarNovelReaderView: View {
             allowsMultipleSelection: false,
             onCompletion: handleFileImport
         )
-        .alert("导入失败", isPresented: $showImportError) {
-            Button("好") {
+        .alert(LocalizedString.novel("import_failed", lang: appSettings.language), isPresented: $showImportError) {
+            Button(LocalizedString.common("ok", lang: appSettings.language)) {
                 importError = nil
             }
         } message: {
@@ -93,7 +94,7 @@ struct MenuBarNovelReaderView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(AppTheme.healthy)
 
-                Picker("小说", selection: selectedBookBinding) {
+                Picker(LocalizedString.novel("novel", lang: appSettings.language), selection: selectedBookBinding) {
                     ForEach(library.books) { book in
                         Text(book.title)
                             .tag(book.id.uuidString)
@@ -108,7 +109,7 @@ struct MenuBarNovelReaderView: View {
                 }
                 .contentShape(Rectangle())
                 .buttonStyle(.plain)
-                .help("导入 txt 小说")
+                .help(LocalizedString.novel("import_txt_help", lang: appSettings.language))
             }
 
             Text(book.title)
@@ -125,7 +126,11 @@ struct MenuBarNovelReaderView: View {
                 .tint(AppTheme.healthy)
 
             HStack {
-                Text("第 \(min(currentChapterIndex + 1, max(book.chapters.count, 1))) / \(max(book.chapters.count, 1)) 章")
+                Text(String(
+                    format: LocalizedString.novel("chapter_counter_format", lang: appSettings.language),
+                    min(currentChapterIndex + 1, max(book.chapters.count, 1)),
+                    max(book.chapters.count, 1)
+                ))
                 Spacer()
                 Text("\(Int(readingProgress(book: book) * 100))%")
             }
@@ -136,19 +141,19 @@ struct MenuBarNovelReaderView: View {
 
     private func chapterControls(book: NovelBook) -> some View {
         HStack(spacing: 6) {
-            compactButton("chevron.left", help: "上一章") {
+            compactButton("chevron.left", help: LocalizedString.novel("prev_chapter", lang: appSettings.language)) {
                 moveChapter(by: -1, book: book)
             }
             .disabled(currentChapterIndex <= 0)
 
-            Text(currentChapter?.title ?? "无章节")
+            Text(currentChapter?.title ?? LocalizedString.novel("no_chapter", lang: appSettings.language))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(AppTheme.textPrimary(colorScheme))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
 
-            compactButton("chevron.right", help: "下一章") {
+            compactButton("chevron.right", help: LocalizedString.novel("next_chapter", lang: appSettings.language)) {
                 moveChapter(by: 1, book: book)
             }
             .disabled(currentChapterIndex >= book.chapters.count - 1)
@@ -169,17 +174,17 @@ struct MenuBarNovelReaderView: View {
             .frame(height: 142)
 
             HStack(spacing: 6) {
-                compactButton("arrow.up", help: "上一段") {
+                compactButton("arrow.up", help: LocalizedString.common("previous", lang: appSettings.language)) {
                     moveParagraph(by: -1, book: book)
                 }
                 .disabled(currentParagraphIndex <= 0 && currentChapterIndex <= 0)
 
-                Text("段落 \(currentParagraphIndex + 1)")
+                Text(String(format: LocalizedString.novel("paragraph_counter_format", lang: appSettings.language), currentParagraphIndex + 1))
                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
                     .frame(maxWidth: .infinity)
 
-                compactButton("arrow.down", help: "下一段") {
+                compactButton("arrow.down", help: LocalizedString.common("next", lang: appSettings.language)) {
                     moveParagraph(by: 1, book: book)
                 }
                 .disabled(isAtEnd(of: book))
@@ -198,13 +203,13 @@ struct MenuBarNovelReaderView: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("可从当前段落开始朗读，适合把窗口固定后听书。")
+                Text(LocalizedString.novel("read_from_here_hint", lang: appSettings.language))
                     .font(.system(size: 10))
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
             }
 
             HStack(spacing: 8) {
-                compactButton("backward.end.fill", help: "上一句") {
+                compactButton("backward.end.fill", help: LocalizedString.speech("previous_sentence", lang: appSettings.language)) {
                     speech.skipBackward()
                 }
                 .disabled(!speech.isActive(for: book.id))
@@ -218,14 +223,14 @@ struct MenuBarNovelReaderView: View {
                 }
                 .contentShape(Rectangle())
                 .buttonStyle(.plain)
-                .help(speech.currentBookID == book.id && speech.state == .playing ? "暂停朗读" : "开始朗读")
+                .help(speech.currentBookID == book.id && speech.state == .playing ? LocalizedString.speech("pause_reading", lang: appSettings.language) : LocalizedString.speech("start_reading", lang: appSettings.language))
 
-                compactButton("forward.end.fill", help: "下一句") {
+                compactButton("forward.end.fill", help: LocalizedString.speech("next_sentence", lang: appSettings.language)) {
                     speech.skipForward()
                 }
                 .disabled(!speech.isActive(for: book.id))
 
-                compactButton("stop.fill", help: "停止朗读") {
+                compactButton("stop.fill", help: LocalizedString.speech("stop_reading", lang: appSettings.language)) {
                     speech.stop()
                 }
                 .disabled(!speech.isActive(for: book.id))
@@ -238,7 +243,7 @@ struct MenuBarNovelReaderView: View {
                 }
                 .toggleStyle(.button)
                 .controlSize(.small)
-                .help("朗读时自动跟随")
+                .help(LocalizedString.speech("auto_scroll", lang: appSettings.language))
             }
         }
     }
@@ -249,18 +254,18 @@ struct MenuBarNovelReaderView: View {
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(AppTheme.healthy)
 
-            Text("还没有导入小说")
+            Text(LocalizedString.novel("empty_menu_title", lang: appSettings.language))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(AppTheme.textPrimary(colorScheme))
 
-            Text("导入 txt 后，可以固定这个菜单栏窗口，一边工作一边看小说或听朗读。")
+            Text(LocalizedString.novel("empty_menu_hint", lang: appSettings.language))
                 .font(.system(size: 10))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(AppTheme.textSecondary(colorScheme))
                 .fixedSize(horizontal: false, vertical: true)
 
             Button(action: { showingImporter = true }) {
-                Label("导入 txt", systemImage: "plus")
+                Label(LocalizedString.novel("import_txt", lang: appSettings.language), systemImage: "plus")
             }
             .controlSize(.small)
         }

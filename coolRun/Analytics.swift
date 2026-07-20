@@ -33,8 +33,8 @@ enum Analytics {
         "profit_percent",
     ]
 
-    static func configure(projectToken: String, host: String) {
-        guard isEnabled else {
+    static func configure(projectToken: String, host: String, enabled: Bool) {
+        guard isEnvironmentEnabled else {
             logger.info("PostHog analytics disabled by environment")
             return
         }
@@ -56,8 +56,24 @@ enum Analytics {
 
         let config = PostHogConfig(projectToken: trimmedProjectToken, host: trimmedHost)
         config.captureApplicationLifecycleEvents = true
+        config.optOut = !enabled
         PostHogSDK.shared.setup(config)
         state.markConfigured()
+
+        if enabled {
+            PostHogSDK.shared.optIn()
+        } else {
+            PostHogSDK.shared.optOut()
+        }
+    }
+
+    static func setEnabled(_ enabled: Bool) {
+        guard isEnvironmentEnabled, state.isConfigured else { return }
+        if enabled {
+            PostHogSDK.shared.optIn()
+        } else {
+            PostHogSDK.shared.optOut()
+        }
     }
 
     static func capture(
@@ -65,13 +81,15 @@ enum Analytics {
         properties: [String: Any] = [:],
         minimumInterval: TimeInterval? = nil
     ) {
-        guard isEnabled, state.isConfigured else { return }
+        guard isEnvironmentEnabled,
+              AppSettings.shared.analyticsEnabled,
+              state.isConfigured else { return }
         guard state.shouldCapture(event, minimumInterval: minimumInterval) else { return }
 
         PostHogSDK.shared.capture(event.rawValue, properties: sanitized(properties))
     }
 
-    private static var isEnabled: Bool {
+    private static var isEnvironmentEnabled: Bool {
         ProcessInfo.processInfo.environment[disabledEnvironmentKey] != "1"
     }
 

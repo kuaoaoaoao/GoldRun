@@ -8,11 +8,16 @@ coolRun is a macOS menu bar utility that displays system monitoring metrics (CPU
 
 ## Build & Run
 
-Open `coolRun.xcodeproj` in Xcode, select the `coolRun` scheme with target `My Mac`, and click Run. There are no tests, no linter configuration, and no CLI build commands — all building is done through Xcode.
+Open `coolRun.xcodeproj` in Xcode, select the `coolRun` scheme with target `My Mac`, and click Run. The project includes a `coolRunTests` unit-test target; there is currently no linter configuration.
 
 To build from command line (if needed):
 ```bash
 xcodebuild -project coolRun.xcodeproj -scheme coolRun -configuration Debug build
+```
+
+To run unit tests:
+```bash
+xcodebuild -project coolRun.xcodeproj -scheme coolRun -destination 'platform=macOS' test
 ```
 
 To create a DMG for distribution:

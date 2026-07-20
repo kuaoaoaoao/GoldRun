@@ -69,11 +69,18 @@ struct UptimeMetrics: Equatable {
         let days = Int(uptime) / 86400
         let hours = (Int(uptime) % 86400) / 3600
         let minutes = (Int(uptime) % 3600) / 60
+        let lang = AppSettings.shared.language
 
         var parts: [String] = []
-        if days > 0 { parts.append("\(days)天") }
-        if hours > 0 { parts.append("\(hours)小时") }
-        if minutes > 0 || parts.isEmpty { parts.append("\(minutes)分钟") }
+        if lang == .chinese {
+            if days > 0 { parts.append("\(days)天") }
+            if hours > 0 { parts.append("\(hours)小时") }
+            if minutes > 0 || parts.isEmpty { parts.append("\(minutes)分钟") }
+        } else {
+            if days > 0 { parts.append("\(days)d") }
+            if hours > 0 { parts.append("\(hours)h") }
+            if minutes > 0 || parts.isEmpty { parts.append("\(minutes)m") }
+        }
         return parts.joined(separator: " ")
     }
 
@@ -82,16 +89,24 @@ struct UptimeMetrics: Equatable {
         let days = Int(uptime) / 86400
         let hours = (Int(uptime) % 86400) / 3600
         let minutes = (Int(uptime) % 3600) / 60
+        let lang = AppSettings.shared.language
 
-        if days > 0 {
-            // 超过1天：只显示天和小时
-            return "\(days)天\(hours)时"
-        } else if hours > 0 {
-            // 超过1小时：显示小时和分钟
-            return "\(hours)时\(minutes)分"
+        if lang == .chinese {
+            if days > 0 {
+                return "\(days)天\(hours)时"
+            } else if hours > 0 {
+                return "\(hours)时\(minutes)分"
+            } else {
+                return "\(minutes)分"
+            }
         } else {
-            // 不足1小时：只显示分钟
-            return "\(minutes)分"
+            if days > 0 {
+                return "\(days)d \(hours)h"
+            } else if hours > 0 {
+                return "\(hours)h \(minutes)m"
+            } else {
+                return "\(minutes)m"
+            }
         }
     }
 }
