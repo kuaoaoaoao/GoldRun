@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import UserNotifications
 
 // MARK: - 设置分类
 
@@ -24,6 +25,23 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         }
     }
 
+    func subtitle(lang: AppLanguage) -> String {
+        switch self {
+        case .general:
+            return LocalizedString.l(lang, en: "Language, startup and privacy", zh: "语言、启动与隐私", ja: "言語、起動、プライバシー", ko: "언어, 시작 및 개인정보")
+        case .monitors:
+            return LocalizedString.l(lang, en: "Choose metrics and sampling speed", zh: "选择指标与采样速度", ja: "指標とサンプリング速度", ko: "지표 및 샘플링 속도")
+        case .menubar:
+            return LocalizedString.l(lang, en: "Control the menu bar at a glance", zh: "控制菜单栏的显示方式", ja: "メニューバーの表示を管理", ko: "메뉴 막대 표시 관리")
+        case .english:
+            return LocalizedString.l(lang, en: "Voice, content and study goals", zh: "语音、内容与学习目标", ja: "音声、教材、学習目標", ko: "음성, 콘텐츠 및 학습 목표")
+        case .data:
+            return LocalizedString.l(lang, en: "Backup, restore and updates", zh: "备份、恢复与更新", ja: "バックアップ、復元、更新", ko: "백업, 복원 및 업데이트")
+        case .about:
+            return LocalizedString.l(lang, en: "Version and project information", zh: "版本与项目信息", ja: "バージョンとプロジェクト情報", ko: "버전 및 프로젝트 정보")
+        }
+    }
+
     var icon: String {
         switch self {
         case .general: return "gear"
@@ -43,90 +61,144 @@ struct SettingsView: View {
     @ObservedObject private var textbookStore = EnglishTextbookStore.shared
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
     @State private var selectedCategory: SettingsCategory = .general
+    // 系统通知权限被拒时在到价提醒开关下提示，避免用户以为开了就能收到
+    @State private var notificationPermissionDenied = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶部 Header
-            headerSection
+        HStack(spacing: 0) {
+            settingsSidebar
 
             Divider()
-                .padding(.horizontal, 20)
 
-            // 分类标签栏
-            categoryTabBar
+            VStack(spacing: 0) {
+                contentHeader
 
-            Divider()
-                .padding(.horizontal, 20)
+                Divider()
 
-            // 内容区域
-            ScrollView {
-                VStack(spacing: 16) {
-                    switch selectedCategory {
-                    case .general:
-                        generalContent
-                    case .monitors:
-                        monitorsContent
-                    case .menubar:
-                        menubarContent
-                    case .english:
-                        englishContent
-                    case .data:
-                        dataContent
-                    case .about:
-                        aboutContent
+                ScrollView {
+                    VStack(spacing: 14) {
+                        switch selectedCategory {
+                        case .general:
+                            generalContent
+                        case .monitors:
+                            monitorsContent
+                        case .menubar:
+                            menubarContent
+                        case .english:
+                            englishContent
+                        case .data:
+                            dataContent
+                        case .about:
+                            aboutContent
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(20)
                 }
-                .padding(20)
             }
         }
-        .frame(width: 420, height: 520)
-        .background(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .controlBackgroundColor))
+        .frame(width: 720, height: 560)
+        .background {
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                AppTheme.canvas(colorScheme)
+            }
+        }
     }
 
-    // MARK: - Header
+    // MARK: - Sidebar
 
-    private var headerSection: some View {
-        HStack(spacing: 16) {
-            // App Icon with shadow
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+    private var settingsSidebar: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 11) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .shadow(color: .black.opacity(0.14), radius: 5, y: 2)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("coolRun")
-                    .font(.title2.weight(.bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("coolRun")
+                        .font(.headline)
+                    Text("v\(AppVersion.current.displayText)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
 
-                Text("v\(AppVersion.current.displayText)")
+            VStack(spacing: 4) {
+                ForEach(SettingsCategory.allCases) { category in
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            selectedCategory = category
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: category.icon)
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(width: 20)
+
+                            Text(category.displayName(lang: settings.language))
+                                .font(.subheadline.weight(selectedCategory == category ? .semibold : .regular))
+
+                            Spacer()
+                        }
+                        .foregroundStyle(
+                            selectedCategory == category
+                                ? AppTheme.accent
+                                : AppTheme.textSecondary(colorScheme)
+                        )
+                        .padding(.horizontal, 10)
+                        .frame(height: 34)
+                        .background {
+                            if selectedCategory == category {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(AppTheme.accent.opacity(colorScheme == .dark ? 0.20 : 0.12))
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Spacer()
+
+            Text(LocalizedString.l(
+                settings.language,
+                en: "Menu bar toolkit",
+                zh: "菜单栏效率工具箱",
+                ja: "メニューバーツールキット",
+                ko: "메뉴 막대 도구 모음"
+            ))
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+        }
+        .padding(14)
+        .frame(width: 184)
+        .background(AppTheme.chromeSurface(colorScheme))
+    }
+
+    private var contentHeader: some View {
+        HStack(spacing: 12) {
+            Image(systemName: selectedCategory.icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 34, height: 34)
+                .background(AppTheme.accent.opacity(colorScheme == .dark ? 0.19 : 0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(selectedCategory.displayName(lang: settings.language))
+                    .font(.title3.weight(.semibold))
+                Text(selectedCategory.subtitle(lang: settings.language))
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-
-    // MARK: - 分类标签栏
-
-    private var categoryTabBar: some View {
-        HStack(spacing: 4) {
-            ForEach(SettingsCategory.allCases) { category in
-                CategoryTab(
-                    category: category,
-                    isSelected: selectedCategory == category,
-                    lang: settings.language
-                ) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedCategory = category
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .frame(height: 68)
     }
 
     // MARK: - 通用设置内容
@@ -364,28 +436,163 @@ struct SettingsView: View {
 
             SettingsCard(
                 icon: "arrow.triangle.2.circlepath",
-                title: LocalizedString.settings("gold_updates"),
-                description: LocalizedString.settings("gold_updates_desc")
+                title: LocalizedString.settings("gold_data_alerts"),
+                description: LocalizedString.settings("gold_data_alerts_desc")
             ) {
-                HStack(spacing: 10) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20)
-                    Text(LocalizedString.settings("refresh_every"))
-                        .font(.system(size: 13))
-                    Spacer()
-                    Picker("", selection: $settings.goldRefreshRate) {
-                        ForEach(GoldRefreshRate.allCases) { rate in
-                            Text(rate.displayName(lang: settings.language)).tag(rate)
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(LocalizedString.settings("refresh_every"))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: $settings.goldRefreshRate) {
+                            ForEach(GoldRefreshRate.allCases) { rate in
+                                Text(rate.displayName(lang: settings.language)).tag(rate)
+                            }
                         }
+                        .labelsHidden()
+                        .frame(width: 130)
                     }
-                    .labelsHidden()
-                    .frame(width: 130)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+
+                    Divider().padding(.horizontal, 14)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "slider.horizontal.3")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(LocalizedString.settings("gold_auto_calibration"))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Toggle("", isOn: $settings.goldAutoCalibrationEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+
+                    Text(LocalizedString.settings("gold_auto_calibration_note"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 8)
+
+                    Divider().padding(.horizontal, 14)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "bell.badge")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(LocalizedString.settings("gold_alert"))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Toggle("", isOn: $settings.goldAlertEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .onChange(of: settings.goldAlertEnabled) { _, enabled in
+                                if enabled {
+                                    // 等授权弹窗有结果后再查权限，当场拒绝也能立即显示提示
+                                    GoldPriceAlertManager.shared.requestAuthorizationIfNeeded {
+                                        refreshNotificationPermission()
+                                    }
+                                }
+                            }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .onAppear { refreshNotificationPermission() }
+
+                    if settings.goldAlertEnabled {
+                        // 通知权限被拒时提示，否则提醒开了也收不到
+                        if notificationPermissionDenied {
+                            Label(LocalizedString.settings("notification_permission_denied"), systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.orange)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 2)
+                        }
+
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.up.to.line")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 20)
+                            Text(LocalizedString.settings("gold_alert_upper"))
+                                .font(.system(size: 13))
+                            Spacer()
+                            TextField("--", text: $settings.goldAlertUpperText)
+                                .textFieldStyle(.roundedBorder)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 90)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.down.to.line")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 20)
+                            Text(LocalizedString.settings("gold_alert_lower"))
+                                .font(.system(size: 13))
+                            Spacer()
+                            TextField("--", text: $settings.goldAlertLowerText)
+                                .textFieldStyle(.roundedBorder)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 90)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+
+                        // 阈值非法/上下限倒挂时即时提示，不等保存时静默失败
+                        if let hint = goldAlertValidationHint {
+                            Text(hint)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.red)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 4)
+                        }
+
+                        Text(LocalizedString.settings("gold_alert_note"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 8)
+                    }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
             }
         }
+    }
+
+    // 查询系统通知授权状态，被拒时在设置页显示提示行
+    private func refreshNotificationPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { notifSettings in
+            let denied = notifSettings.authorizationStatus == .denied
+            DispatchQueue.main.async {
+                notificationPermissionDenied = denied
+            }
+        }
+    }
+
+    // 到价提醒阈值校验：非法输入或上下限倒挂时返回提示文案
+    private var goldAlertValidationHint: String? {
+        let upperText = settings.goldAlertUpperText.trimmingCharacters(in: .whitespaces)
+        let lowerText = settings.goldAlertLowerText.trimmingCharacters(in: .whitespaces)
+        let upper = Double(upperText)
+        let lower = Double(lowerText)
+        if (!upperText.isEmpty && (upper == nil || upper! <= 0)) ||
+            (!lowerText.isEmpty && (lower == nil || lower! <= 0)) {
+            return LocalizedString.settings("gold_alert_invalid")
+        }
+        if let upper, let lower, upper <= lower {
+            return LocalizedString.settings("gold_alert_inverted")
+        }
+        return nil
     }
 
     // MARK: - 英语学习设置内容
@@ -588,7 +795,8 @@ struct SettingsView: View {
             Button {
                 EnglishLearningManager.openSystemVoiceDownloadSettings()
             } label: {
-                Text(needsUpgrade ? LocalizedString.english("go_download") : LocalizedString.english("go_download"))
+                // 质量达标时文案改为"查看语音设置"，避免两分支同文案
+                Text(needsUpgrade ? LocalizedString.english("go_download") : LocalizedString.english("view_voice_settings"))
                     .font(.system(size: 12))
             }
             .controlSize(.small)
@@ -687,12 +895,7 @@ struct SettingsView: View {
                 Divider().padding(.horizontal, 12)
                 SettingsRow(icon: "desktopcomputer", label: LocalizedString.settings("platform"), value: "macOS 15.0+")
             }
-            .background(cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(cardBorder, lineWidth: 0.5)
-            )
+            .appCardSurface(cornerRadius: 12, showsShadow: false)
 
             // 链接
             VStack(spacing: 0) {
@@ -708,60 +911,8 @@ struct SettingsView: View {
                     url: AppLinks.releases
                 )
             }
-            .background(cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(cardBorder, lineWidth: 0.5)
-            )
+            .appCardSurface(cornerRadius: 12, showsShadow: false)
         }
-    }
-
-    // MARK: - Helpers
-
-    private var cardBackground: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.06)
-            : Color.white.opacity(0.8)
-    }
-
-    private var cardBorder: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color.black.opacity(0.06)
-    }
-}
-
-// MARK: - 分类标签组件
-
-private struct CategoryTab: View {
-    let category: SettingsCategory
-    let isSelected: Bool
-    let lang: AppLanguage
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-
-                Text(category.displayName(lang: lang))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .contentShape(Rectangle())
-            .padding(.vertical, 8)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.1))
-                }
-            }
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -776,38 +927,40 @@ private struct SettingsCard<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // 标题
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 20)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.accent)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        AppTheme.accent.opacity(colorScheme == .dark ? 0.18 : 0.11),
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    )
 
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.headline)
 
                 Spacer()
             }
 
-            // 描述
             Text(description)
-                .font(.system(size: 12))
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .padding(.leading, 28)
 
-            // 内容
             content()
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.white.opacity(0.6))
+                        .fill(AppTheme.elevatedSurface(colorScheme))
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04), lineWidth: 0.5)
+                        .stroke(AppTheme.stroke(colorScheme), lineWidth: 0.5)
                 )
         }
+        .padding(14)
+        .appCardSurface(cornerRadius: 12, showsShadow: false)
     }
 }
 
@@ -817,6 +970,8 @@ private struct DataBackupCard: View {
     @State private var exportSuccess = false
     @State private var importSuccess = false
     @State private var statusMessage: String?
+    // 当前状态消息是否为失败（红色展示）
+    @State private var isErrorMessage = false
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var settings = AppSettings.shared
 
@@ -850,7 +1005,13 @@ private struct DataBackupCard: View {
                         let success = DataMigrationManager.shared.exportAllData()
                         if success {
                             statusMessage = LocalizedString.settings("export_success")
+                            isErrorMessage = false
                             exportSuccess = true
+                            clearMessageAfterDelay()
+                        } else if let error = DataMigrationManager.shared.lastErrorMessage {
+                            // 取消不提示，真失败才显示红色消息
+                            statusMessage = error
+                            isErrorMessage = true
                             clearMessageAfterDelay()
                         }
                     } label: {
@@ -874,7 +1035,12 @@ private struct DataBackupCard: View {
                         let success = DataMigrationManager.shared.importData()
                         if success {
                             statusMessage = LocalizedString.settings("import_success")
+                            isErrorMessage = false
                             importSuccess = true
+                            clearMessageAfterDelay()
+                        } else if let error = DataMigrationManager.shared.lastErrorMessage {
+                            statusMessage = error
+                            isErrorMessage = true
                             clearMessageAfterDelay()
                         }
                     } label: {
@@ -899,16 +1065,16 @@ private struct DataBackupCard: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
 
-                // 状态消息
+                // 状态消息（成功绿色 / 失败红色）
                 if let message = statusMessage {
                     Divider().padding(.horizontal, 14)
                     HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: isErrorMessage ? "xmark.circle.fill" : "checkmark.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(isErrorMessage ? Color.red : Color.green)
                         Text(message)
                             .font(.system(size: 12))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(isErrorMessage ? Color.red : Color.green)
                         Spacer()
                     }
                     .padding(.horizontal, 14)
@@ -1330,19 +1496,25 @@ private struct MenuBarDisplayRow: View {
                     Text(mode.displayName(lang: settings.language))
                         .font(.system(size: 13))
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                        .truncationMode(.tail)
 
                     Text(modeDescription)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .truncationMode(.tail)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer()
 
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.accentColor)
-                }
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.clear)
+                    .frame(width: 18)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
@@ -1366,6 +1538,8 @@ private struct MenuBarDisplayRow: View {
             return LocalizedString.l(settings.language, en: "Compact novel reader entry", zh: "显示小说阅读入口", ja: "小説リーダーへの入口を表示", ko: "소설 읽기 입구 표시")
         case .english:
             return LocalizedString.l(settings.language, en: "Current word or spoken sentence", zh: "显示当前单词或正在朗读的句子", ja: "現在の単語または読み上げ中の文を表示", ko: "현재 단어나 읽는 문장 표시")
+        case .codex:
+            return LocalizedString.l(settings.language, en: "Codex quota remaining", zh: "显示 Codex 剩余额度", ja: "Codex の残り使用量を表示", ko: "Codex 잔여 사용량 표시")
         }
     }
 }

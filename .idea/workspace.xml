@@ -4,10 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3f0efe66-915b-427a-af1c-f91fc20a98d8" name="更改" comment="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/coolRun.dmg" beforeDir="false" afterPath="$PROJECT_DIR$/coolRun.dmg" afterDir="false" />
-    </list>
+    <list default="true" id="3f0efe66-915b-427a-af1c-f91fc20a98d8" name="更改" comment="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -121,6 +118,7 @@
       <workItem from="1782799022013" duration="63000" />
       <workItem from="1782979420587" duration="3501000" />
       <workItem from="1783224250896" duration="5781000" />
+      <workItem from="1784509429362" duration="82000" />
     </task>
     <task id="LOCAL-00001" summary="feat(app): 添加系统监控面板和电池管理新功能&#10;&#10;- 实现包含CPU、内存、存储、电池和网络信息的系统监控面板&#10;- 新增电池电量指示视图，支持不同显示样式和充电状态&#10;- 集成电池服务，支持通过XPC获取和管理电池及适配器数据&#10;- 添加充电管理器，自动控制电池充电行为并监听系统设置变化&#10;- 在macOS应用入口处添加AppDelegate支持和设置窗口占位&#10;- 更新AppIcon资源，支持不同尺寸和平台的图标文件&#10;- 引入高级设置界面，允许用户切换硬件电池百分比显示选项&#10;- 优化项目配置，添加代码签名权限(Entitlements)支持&#10;- 增加多处UI细节和动画优雅展示电池及系统状态信息">
       <option name="closed" value="true" />
@@ -266,7 +264,15 @@
       <option name="project" value="LOCAL" />
       <updated>1782731825741</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="feat(i18n): 增加多语言支持及本地化字符串封装&#10;&#10;- 将字符串显示方法改为支持传入语言参数，默认使用应用设置语言&#10;- 新增多组本地化字符串方法，覆盖菜单栏、电池状态、内存压力、数据管理、金价、日历等&#10;- 生日添加视图与列表支持语言切换，动态返回对应语言的月份和日期名称&#10;- 日历视图支持多语言的星期和月份名称，所有静态文本改用本地化封装&#10;- 监控页各指标名称及状态文本改用本地化，支持根据语言环境动态展示&#10;- 设置视图节假日数据管理界面及菜单栏显示文本本地化&#10;- 统一增加语言配置的观察绑定，确保UI动态响应语言变化&#10;- 格式化显示日期根据当前语言调整日期格式和地区设置&#10;- 修复与语言相关的文本硬编码，全部替换为本地化调用&#10;- 使金价相关提示根据语言提示限频、网络错误等状态">
+      <option name="closed" value="true" />
+      <created>1784509477185</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1784509477185</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

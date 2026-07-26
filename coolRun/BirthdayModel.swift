@@ -113,6 +113,10 @@ class BirthdayManager {
     private func saveBirthdays(_ birthdays: [Birthday]) {
         if let data = try? JSONEncoder().encode(birthdays) {
             userDefaults.set(data, forKey: storageKey)
+            // 镜像到 iCloud，供手表/其他端读取（未开 iCloud 能力时会优雅降级）。
+            if let json = String(data: data, encoding: .utf8) {
+                CloudSyncStore.shared.pushBirthdaysJSON(json)
+            }
         }
     }
 }

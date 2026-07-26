@@ -7,10 +7,14 @@ final class GoldPriceStore {
     static let shared = GoldPriceStore()
 
     private(set) var records: [GoldPriceRecord] = []
+    // 官方最新行情（含昨收/涨跌/休市，由 MacAppDelegate 刷新时写入）
+    var latestQuote: GoldPriceQuote?
     // 数据健康状态
     private(set) var dataHealth: DataHealthStatus = .healthy
     private(set) var lastPriceUpdate: Date?
     private(set) var priceUpdateInterval: TimeInterval?
+    // 最近一次拉取是否失败（仅内存态，供空态区分"等待首次数据"与"网络失败"）
+    var lastFetchFailed = false
     // 数据异常检测参数
     private let maxPriceJumpRatio: Double = 0.05  // 单次最大允许跳价幅度（5%）
     private let staleDataThreshold: TimeInterval = 300  // 5分钟未更新视为数据陈旧
@@ -27,11 +31,7 @@ final class GoldPriceStore {
     @ObservationIgnored private var saveGeneration = 0
 
     private init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        let directory = (appSupport ?? FileManager.default.temporaryDirectory)
-            .appendingPathComponent("coolRun", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        fileURL = directory.appendingPathComponent("gold_price_history.json")
+        fileURL = GoldDataStorage.fileURL(named: "gold_price_history.json")
 
         encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
@@ -103,16 +103,89 @@ final class GoldPriceStore {
         return Date().timeIntervalSince(lastUpdate)
     }
     
-    // 多数据源价格对比（占位，后续接入真实多源）
+    // 多数据源交叉校验：与各平台价格中位数对比
     func crossValidatePrice(_ price: Double, from source: String) -> DataValidationResult {
-        // 当前仅做基本范围检查
         if price < minPrice || price > maxPrice {
             return .outOfRange
         }
-        
-        // TODO: 接入上海金、XAUUSD、汇率后实现真实多源校验
-        // 目前仅返回基于单一来源的验证结果
         return .singleSourceOnly
+    }
+
+    // 基于多平台报价校验主源价格：偏离中位数超过 1% 视为异常
+    func crossValidatePrice(_ price: Double, against sources: [GoldMultiSourcePrice]) -> DataValidationResult {
+        if price < minPrice || price > maxPrice {
+            return .outOfRange
+        }
+        let prices = sources.map(\.price).sorted()
+        guard !prices.isEmpty else { return .singleSourceOnly }
+
+        let median: Double
+        if prices.count % 2 == 0 {
+            median = (prices[prices.count / 2 - 1] + prices[prices.count / 2]) / 2
+        } else {
+            median = prices[prices.count / 2]
+        }
+        guard median > 0 else { return .singleSourceOnly }
+
+        if abs(price - median) / median > 0.01 {
+            return .multiSourceMismatch(price, median)
+        }
+        return .valid
+    }
+
+    // 将官方分时点补进本地库，仅插入与现有记录时间差超过 60 秒的点，填补 App 未运行造成的断档
+    func mergeOfficialPrices(_ points: [GoldRemotePricePoint], source: String = "JD-official") {
+        let inserted = Self.officialRecordsToInsert(
+            points: points,
+            existing: records,
+            source: source,
+            minPrice: minPrice,
+            maxPrice: maxPrice
+        )
+        guard !inserted.isEmpty else { return }
+
+        records.append(contentsOf: inserted)
+        records.sort { $0.timestamp < $1.timestamp }
+        if records.count > maxRecords {
+            records.removeFirst(records.count - maxRecords)
+        }
+        scheduleSave()
+    }
+
+    // 筛选需插入的官方点：过滤无效价格，跳过与现有记录 60 秒内的重叠点（纯函数，便于测试）
+    nonisolated static func officialRecordsToInsert(
+        points: [GoldRemotePricePoint],
+        existing: [GoldPriceRecord],
+        source: String = "JD-official",
+        minPrice: Double = 100,
+        maxPrice: Double = 2000
+    ) -> [GoldPriceRecord] {
+        guard !points.isEmpty else { return [] }
+
+        var existingSeconds = existing.map { $0.timestamp.timeIntervalSince1970 }.sorted()
+        var inserted: [GoldPriceRecord] = []
+
+        for point in points.sorted(by: { $0.timestamp < $1.timestamp }) {
+            guard point.price > minPrice, point.price < maxPrice else { continue }
+            let seconds = point.timestamp.timeIntervalSince1970
+            // 二分查找最近的现有记录，60 秒内已有数据则跳过
+            var low = 0
+            var high = existingSeconds.count
+            while low < high {
+                let mid = (low + high) / 2
+                if existingSeconds[mid] < seconds { low = mid + 1 } else { high = mid }
+            }
+            let nearestGap = [low - 1, low]
+                .filter { $0 >= 0 && $0 < existingSeconds.count }
+                .map { abs(existingSeconds[$0] - seconds) }
+                .min() ?? .greatestFiniteMagnitude
+            guard nearestGap > 60 else { continue }
+
+            inserted.append(GoldPriceRecord(price: point.price, timestamp: point.timestamp, source: source))
+            existingSeconds.insert(seconds, at: low)
+        }
+
+        return inserted
     }
 
     func recordsSince(_ date: Date) -> [GoldPriceRecord] {
@@ -158,8 +231,27 @@ final class GoldPriceStore {
     }
 
     private func loadFromDisk() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
-        records = (try? decoder.decode([GoldPriceRecord].self, from: data)) ?? []
+        let sources = GoldDataStorage.readableFileURLs(named: fileURL.lastPathComponent)
+        var recordsByID: [UUID: GoldPriceRecord] = [:]
+        for source in sources {
+            guard let data = try? Data(contentsOf: source),
+                  let sourceRecords = try? decoder.decode([GoldPriceRecord].self, from: data) else { continue }
+            for record in sourceRecords {
+                recordsByID[record.id] = record
+            }
+        }
+
+        records = recordsByID.values.sorted { $0.timestamp < $1.timestamp }
+        if records.count > maxRecords {
+            records.removeFirst(records.count - maxRecords)
+        }
+        lastPriceUpdate = records.last?.timestamp
+
+        // Persist the merged result in the current location so future launches
+        // no longer depend on the legacy sandbox container.
+        if !records.isEmpty, sources.contains(where: { $0.standardizedFileURL != fileURL.standardizedFileURL }) {
+            saveToDisk(records: records, to: fileURL)
+        }
     }
 
     func flushToDisk() {

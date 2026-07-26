@@ -8,6 +8,9 @@ import Foundation
 /// - `middleSchool`  初中核心词
 /// - `highSchool`    高中核心词
 /// - `cet4`          大学四级高频词
+/// - `cet6`          大学六级高频词
+/// - `ielts`         雅思核心词
+/// - `toefl`         托福核心词
 ///
 /// 后续扩词：只在下方对应数组末尾追加 `Self.word(...)` 一行即可，无需改动其它文件。
 enum EnglishVocabulary {
@@ -23,6 +26,9 @@ enum EnglishVocabulary {
         case .middleSchool: return middleSchool
         case .highSchool:   return highSchool
         case .cet4:         return cet4
+        case .cet6:         return cet6
+        case .ielts:        return ielts
+        case .toefl:        return toefl
         }
     }
 
@@ -126,7 +132,26 @@ enum EnglishVocabulary {
         word(.daily, "again", "again", "/əˈɡen/", "adv.", "再次", "Please say it again.", "请再说一遍。"),
         word(.daily, "slowly", "slowly", "/ˈsloʊli/", "adv.", "慢慢地", "He speaks slowly and clearly.", "他说得又慢又清楚。"),
         word(.daily, "understand", "understand", "/ˌʌndərˈstænd/", "v.", "理解", "I understand this word.", "我理解这个单词。"),
-        word(.daily, "practice", "practice", "/ˈpræktɪs/", "n./v.", "练习", "Practice a little every day.", "每天练习一点。")
+        word(.daily, "practice", "practice", "/ˈpræktɪs/", "n./v.", "练习", "Practice a little every day.", "每天练习一点。"),
+        word(.daily, "money", "money", "/ˈmʌni/", "n.", "钱；货币", "I need some money to buy lunch.", "我需要一些钱买午饭。"),
+        word(.daily, "phone", "phone", "/foʊn/", "n.", "电话；手机", "Please call me on my phone.", "请用手机给我打电话。"),
+        word(.daily, "weather", "weather", "/ˈweðər/", "n.", "天气", "The weather is nice today.", "今天天气很好。"),
+        word(.daily, "shop", "shop", "/ʃɑːp/", "n./v.", "商店；购物", "The shop opens at nine.", "这家商店九点开门。"),
+        word(.daily, "street", "street", "/striːt/", "n.", "街道", "The store is on this street.", "那家店在这条街上。"),
+        word(.daily, "bus", "bus", "/bʌs/", "n.", "公交车", "I take the bus to work.", "我乘公交车上班。"),
+        word(.daily, "ticket", "ticket", "/ˈtɪkɪt/", "n.", "票", "I bought two movie tickets.", "我买了两张电影票。"),
+        word(.daily, "restaurant", "restaurant", "/ˈrestrɑːnt/", "n.", "餐厅", "Let us meet at the restaurant.", "我们在餐厅见面吧。"),
+        word(.daily, "hospital", "hospital", "/ˈhɑːspɪtl/", "n.", "医院", "The hospital is not far away.", "医院不远。"),
+        word(.daily, "buy", "buy", "/baɪ/", "v.", "买", "I want to buy a new bag.", "我想买一个新包。"),
+        word(.daily, "open", "open", "/ˈoʊpən/", "v./adj.", "打开；开的", "Please open the window.", "请打开窗户。"),
+        word(.daily, "close", "close", "/kloʊz/", "v.", "关闭", "Please close the door.", "请关门。"),
+        word(.daily, "wait", "wait", "/weɪt/", "v.", "等待", "Please wait a moment.", "请稍等片刻。"),
+        word(.daily, "night", "night", "/naɪt/", "n.", "夜晚", "I sleep early at night.", "我晚上睡得早。"),
+        word(.daily, "week", "week", "/wiːk/", "n.", "星期；周", "I will see you next week.", "我下周见你。"),
+        word(.daily, "year", "year", "/jɪr/", "n.", "年", "Happy New Year!", "新年快乐！"),
+        word(.daily, "love", "love", "/lʌv/", "v./n.", "爱；喜爱", "I love my hometown.", "我爱我的家乡。"),
+        word(.daily, "tired", "tired", "/ˈtaɪərd/", "adj.", "疲倦的", "I feel tired after work.", "下班后我感到累。"),
+        word(.daily, "hungry", "hungry", "/ˈhʌŋɡri/", "adj.", "饥饿的", "I am hungry. Let us eat.", "我饿了，我们吃饭吧。")
     ]
 
     // MARK: - 小学英语（基础词）
@@ -278,6 +303,117 @@ enum EnglishVocabulary {
         word(.cet4, "significant", "significant", "/sɪɡˈnɪfɪkənt/", "adj.", "重要的；显著的", "The change had a significant impact.", "这个变化产生了重要影响。"),
         word(.cet4, "sustainable", "sustainable", "/səˈsteɪnəbəl/", "adj.", "可持续的", "Sustainable growth is our goal.", "可持续增长是我们的目标。")
     ]
+
+    // MARK: - 大学六级（CET-6 高频词）
+
+    static let cet6: [EnglishLearningItem] = [
+        word(.cet6, "abolish", "abolish", "/əˈbɑːlɪʃ/", "v.", "废除；取消", "The law was abolished last year.", "这条法律去年被废除了。"),
+        word(.cet6, "accelerate", "accelerate", "/əkˈseləreɪt/", "v.", "加速；促进", "The plan will accelerate our progress.", "这个计划将加快我们的进度。"),
+        word(.cet6, "accommodate", "accommodate", "/əˈkɑːmədeɪt/", "v.", "容纳；适应", "The hotel can accommodate 500 guests.", "这家酒店可容纳500名客人。"),
+        word(.cet6, "accumulate", "accumulate", "/əˈkjuːmjəleɪt/", "v.", "积累", "He accumulated a lot of experience.", "他积累了很多经验。"),
+        word(.cet6, "acknowledge", "acknowledge", "/əkˈnɑːlɪdʒ/", "v.", "承认；鸣谢", "She acknowledged her mistake.", "她承认了自己的错误。"),
+        word(.cet6, "ambitious", "ambitious", "/æmˈbɪʃəs/", "adj.", "有雄心的", "She is an ambitious young leader.", "她是一位有雄心的年轻领导者。"),
+        word(.cet6, "appreciate", "appreciate", "/əˈpriːʃieɪt/", "v.", "欣赏；感激", "I appreciate your kind help.", "我很感激你的热心帮助。"),
+        word(.cet6, "comprehensive", "comprehensive", "/ˌkɑːmprɪˈhensɪv/", "adj.", "全面的；综合的", "We need a comprehensive plan.", "我们需要一个全面的计划。"),
+        word(.cet6, "conform", "conform", "/kənˈfɔːrm/", "v.", "遵守；符合", "All products must conform to the rules.", "所有产品都必须符合规定。"),
+        word(.cet6, "contemporary", "contemporary", "/kənˈtempəreri/", "adj.", "当代的；同时代的", "I enjoy contemporary art.", "我喜欢当代艺术。"),
+        word(.cet6, "controversial", "controversial", "/ˌkɑːntrəˈvɜːrʃəl/", "adj.", "有争议的", "It is a controversial topic.", "这是一个有争议的话题。"),
+        word(.cet6, "deliberate", "deliberate", "/dɪˈlɪbərət/", "adj.", "故意的；慎重的", "It was a deliberate decision.", "这是一个深思熟虑的决定。"),
+        word(.cet6, "discipline", "discipline", "/ˈdɪsəplɪn/", "n.", "纪律；学科", "Good discipline helps you succeed.", "良好的自律帮你成功。"),
+        word(.cet6, "distinguish", "distinguish", "/dɪˈstɪŋgwɪʃ/", "v.", "区分；辨别", "Can you distinguish the two words?", "你能区分这两个词吗？"),
+        word(.cet6, "elaborate", "elaborate", "/ɪˈlæbərət/", "adj.", "精心制作的；详细的", "She gave an elaborate explanation.", "她给出了详细的解释。"),
+        word(.cet6, "encounter", "encounter", "/ɪnˈkaʊntər/", "v./n.", "遇到；邂逅", "We encountered some problems.", "我们遇到了一些问题。"),
+        word(.cet6, "enhance", "enhance", "/ɪnˈhæns/", "v.", "提高；增强", "Music can enhance your mood.", "音乐能提升你的心情。"),
+        word(.cet6, "exaggerate", "exaggerate", "/ɪɡˈzædʒəreɪt/", "v.", "夸大", "Do not exaggerate the danger.", "不要夸大危险。"),
+        word(.cet6, "fundamental", "fundamental", "/ˌfʌndəˈmentl/", "adj.", "基本的；基础的", "Trust is fundamental to teamwork.", "信任是团队合作的基础。"),
+        word(.cet6, "inevitable", "inevitable", "/ɪnˈevɪtəbəl/", "adj.", "不可避免的", "Change is inevitable in life.", "变化在生活中是不可避免的。"),
+        word(.cet6, "integrate", "integrate", "/ˈɪntɪɡreɪt/", "v.", "整合；使结合", "We integrate new tools into our work.", "我们将新工具整合到工作中。"),
+        word(.cet6, "intense", "intense", "/ɪnˈtens/", "adj.", "强烈的；激烈的", "The competition is very intense.", "这场竞争非常激烈。"),
+        word(.cet6, "manipulate", "manipulate", "/məˈnɪpjəleɪt/", "v.", "操纵；处理", "He knows how to manipulate the data.", "他知道如何处理这些数据。"),
+        word(.cet6, "notion", "notion", "/ˈnoʊʃən/", "n.", "概念；想法", "I have no notion of what he means.", "我不明白他的意思。"),
+        word(.cet6, "obstacle", "obstacle", "/ˈɑːbstəkəl/", "n.", "障碍", "We overcame every obstacle.", "我们克服了每一个障碍。"),
+        word(.cet6, "perceive", "perceive", "/pərˈsiːv/", "v.", "感知；理解", "People perceive colors differently.", "人们对颜色的感知各不相同。"),
+        word(.cet6, "prevail", "prevail", "/prɪˈveɪl/", "v.", "盛行；胜出", "Justice will prevail in the end.", "正义最终将战胜。"),
+        word(.cet6, "prohibit", "prohibit", "/proʊˈhɪbɪt/", "v.", "禁止", "Smoking is prohibited here.", "这里禁止吸烟。"),
+        word(.cet6, "reinforce", "reinforce", "/ˌriːɪnˈfɔːrs/", "v.", "加强；强化", "Practice reinforces what you learn.", "练习能巩固你所学的内容。"),
+        word(.cet6, "reluctant", "reluctant", "/rɪˈlʌktənt/", "adj.", "不情愿的", "He was reluctant to leave.", "他不愿意离开。"),
+        word(.cet6, "subsequent", "subsequent", "/ˈsʌbsɪkwənt/", "adj.", "随后的", "Subsequent events proved him right.", "后来发生的事证明他是对的。"),
+        word(.cet6, "tremendous", "tremendous", "/trəˈmendəs/", "adj.", "巨大的；极好的", "She made tremendous progress.", "她取得了巨大的进步。"),
+        word(.cet6, "versatile", "versatile", "/ˈvɜːrsətəl/", "adj.", "多才多艺的；多用途的", "He is a versatile musician.", "他是一位多才多艺的音乐家。")
+    ]
+
+    // MARK: - 雅思（IELTS 核心词）
+
+    static let ielts: [EnglishLearningItem] = [
+        word(.ielts, "academic", "academic", "/ˌækəˈdemɪk/", "adj.", "学术的；学院的", "She writes in an academic style.", "她以学术风格写作。"),
+        word(.ielts, "adequate", "adequate", "/ˈædɪkwət/", "adj.", "足够的；适当的", "The training was adequate for the job.", "这些培训足以胜任这份工作。"),
+        word(.ielts, "allocate", "allocate", "/ˈæləkeɪt/", "v.", "分配", "We allocate time for reading daily.", "我们每天分配时间阅读。"),
+        word(.ielts, "aspect", "aspect", "/ˈæspekt/", "n.", "方面", "Let us consider every aspect.", "让我们考虑每一个方面。"),
+        word(.ielts, "benefit", "benefit", "/ˈbenɪfɪt/", "n./v.", "好处；使受益", "Exercise has many benefits.", "锻炼有很多好处。"),
+        word(.ielts, "consequence", "consequence", "/ˈkɑːnsɪkwəns/", "n.", "后果；结果", "Actions have consequences.", "行为都有后果。"),
+        word(.ielts, "considerable", "considerable", "/kənˈsɪdərəbəl/", "adj.", "相当大的", "It saved a considerable amount of time.", "这节省了相当多的时间。"),
+        word(.ielts, "constant", "constant", "/ˈkɑːnstənt/", "adj.", "持续的；不变的", "He made constant efforts to improve.", "他不断努力以求提高。"),
+        word(.ielts, "contribute", "contribute", "/kənˈtrɪbjuːt/", "v.", "贡献；促成", "Everyone can contribute ideas.", "每个人都可以贡献想法。"),
+        word(.ielts, "crucial", "crucial", "/ˈkruːʃəl/", "adj.", "关键的", "Timing is crucial for success.", "时机对成功至关重要。"),
+        word(.ielts, "cultural", "cultural", "/ˈkʌltʃərəl/", "adj.", "文化的", "Travel broadens your cultural view.", "旅行拓宽你的文化视野。"),
+        word(.ielts, "decline", "decline", "/dɪˈklaɪn/", "v./n.", "下降；拒绝", "Sales began to decline slowly.", "销售额开始缓慢下降。"),
+        word(.ielts, "demonstrate", "demonstrate", "/ˈdemənstreɪt/", "v.", "证明；演示", "The study demonstrates a clear link.", "这项研究证明了一种明确的联系。"),
+        word(.ielts, "efficient", "efficient", "/ɪˈfɪʃənt/", "adj.", "高效的", "Public transport is efficient here.", "这里的公共交通很高效。"),
+        word(.ielts, "emerge", "emerge", "/ɪˈmɜːrdʒ/", "v.", "出现；浮现", "New trends emerge every year.", "每年都会出现新趋势。"),
+        word(.ielts, "essential", "essential", "/ɪˈsenʃəl/", "adj.", "必不可少的", "Water is essential for life.", "水对生命至关重要。"),
+        word(.ielts, "establish", "establish", "/ɪˈstæblɪʃ/", "v.", "建立；创立", "They established a new company.", "他们创立了一家新公司。"),
+        word(.ielts, "evident", "evident", "/ˈevɪdənt/", "adj.", "明显的", "His talent is evident to all.", "他的才华有目共睹。"),
+        word(.ielts, "factor", "factor", "/ˈfæktər/", "n.", "因素", "Cost is an important factor.", "成本是一个重要因素。"),
+        word(.ielts, "generate", "generate", "/ˈdʒenəreɪt/", "v.", "产生；生成", "The event generated great interest.", "这个活动引发了浓厚兴趣。"),
+        word(.ielts, "impact", "impact", "/ˈɪmpækt/", "n./v.", "影响；冲击", "Technology has a huge impact on us.", "科技对我们有巨大影响。"),
+        word(.ielts, "implement", "implement", "/ˈɪmplɪment/", "v.", "实施；执行", "The city will implement a new policy.", "该市将实施一项新政策。"),
+        word(.ielts, "individual", "individual", "/ˌɪndɪˈvɪdʒuəl/", "n./adj.", "个人；个别的", "Each individual has unique needs.", "每个人都有独特的需求。"),
+        word(.ielts, "maintain", "maintain", "/meɪnˈteɪn/", "v.", "维持；保养", "It is hard to maintain a balance.", "保持平衡很难。"),
+        word(.ielts, "obtain", "obtain", "/əbˈteɪn/", "v.", "获得", "You can obtain a visa online.", "你可以在网上获得签证。"),
+        word(.ielts, "potential", "potential", "/pəˈtenʃəl/", "n./adj.", "潜力；潜在的", "She has great potential.", "她有很大的潜力。"),
+        word(.ielts, "previous", "previous", "/ˈpriːviəs/", "adj.", "先前的", "See my previous email for details.", "详情请看我之前的邮件。"),
+        word(.ielts, "reduce", "reduce", "/rɪˈduːs/", "v.", "减少", "We must reduce plastic waste.", "我们必须减少塑料垃圾。"),
+        word(.ielts, "reliable", "reliable", "/rɪˈlaɪəbəl/", "adj.", "可靠的", "He is a reliable partner.", "他是一个可靠的伙伴。"),
+        word(.ielts, "resource", "resource", "/ˈriːsɔːrs/", "n.", "资源", "Water is a precious resource.", "水是宝贵的资源。"),
+        word(.ielts, "significant", "significant", "/sɪɡˈnɪfɪkənt/", "adj.", "重要的；显著的", "There is a significant difference.", "存在显著的差异。"),
+        word(.ielts, "tendency", "tendency", "/ˈtendənsi/", "n.", "趋势；倾向", "There is a tendency to overwork.", "人们有过度工作的倾向。")
+    ]
+
+    // MARK: - 托福（TOEFL 核心词）
+
+    static let toefl: [EnglishLearningItem] = [
+        word(.toefl, "abstract", "abstract", "/ˈæbstrækt/", "adj.", "抽象的", "Math can be quite abstract.", "数学可能相当抽象。"),
+        word(.toefl, "adapt", "adapt", "/əˈdæpt/", "v.", "适应；改编", "Animals adapt to their environment.", "动物会适应它们的环境。"),
+        word(.toefl, "analyze", "analyze", "/ˈænəlaɪz/", "v.", "分析", "Scientists analyze the samples.", "科学家分析这些样本。"),
+        word(.toefl, "approximate", "approximate", "/əˈprɑːksɪmət/", "adj.", "大约的；近似的", "Give me an approximate figure.", "给我一个大致的数字。"),
+        word(.toefl, "assess", "assess", "/əˈses/", "v.", "评估", "Teachers assess student progress.", "老师评估学生的进步。"),
+        word(.toefl, "complex", "complex", "/ˈkɑːmpleks/", "adj.", "复杂的", "The human brain is very complex.", "人脑非常复杂。"),
+        word(.toefl, "component", "component", "/kəmˈpoʊnənt/", "n.", "组成部分", "Water has two components.", "水由两种成分组成。"),
+        word(.toefl, "conduct", "conduct", "/kənˈdʌkt/", "v.", "进行；实施", "They conduct research on climate.", "他们进行气候研究。"),
+        word(.toefl, "consist", "consist", "/kənˈsɪst/", "v.", "组成；在于", "The team consists of five people.", "这个团队由五个人组成。"),
+        word(.toefl, "constitute", "constitute", "/ˈkɑːnstətuːt/", "v.", "构成", "These parts constitute the whole.", "这些部分构成了整体。"),
+        word(.toefl, "derive", "derive", "/dɪˈraɪv/", "v.", "源于；获得", "The word derives from Latin.", "这个词源自拉丁语。"),
+        word(.toefl, "distinct", "distinct", "/dɪˈstɪŋkt/", "adj.", "明显的；截然不同的", "They have distinct styles.", "他们有截然不同的风格。"),
+        word(.toefl, "dominant", "dominant", "/ˈdɑːmɪnənt/", "adj.", "占主导地位的", "English is the dominant language here.", "英语是这里的主导语言。"),
+        word(.toefl, "emphasis", "emphasis", "/ˈemfəsɪs/", "n.", "强调；重点", "The course puts emphasis on writing.", "这门课注重写作。"),
+        word(.toefl, "evolve", "evolve", "/ɪˈvɑːlv/", "v.", "进化；发展", "Species evolve over time.", "物种随时间进化。"),
+        word(.toefl, "expand", "expand", "/ɪkˈspænd/", "v.", "扩展；膨胀", "Metal expands when heated.", "金属受热时会膨胀。"),
+        word(.toefl, "hypothesis", "hypothesis", "/haɪˈpɑːθəsɪs/", "n.", "假设", "The experiment tests a hypothesis.", "这个实验检验一个假设。"),
+        word(.toefl, "illustrate", "illustrate", "/ˈɪləstreɪt/", "v.", "说明；举例", "Let me illustrate with an example.", "让我举个例子说明。"),
+        word(.toefl, "initial", "initial", "/ɪˈnɪʃəl/", "adj.", "最初的", "The initial results look good.", "初步结果看起来不错。"),
+        word(.toefl, "innovation", "innovation", "/ˌɪnəˈveɪʃən/", "n.", "创新", "Innovation drives the economy.", "创新推动经济发展。"),
+        word(.toefl, "interpret", "interpret", "/ɪnˈtɜːrprɪt/", "v.", "解释；口译", "How do you interpret this result?", "你如何解读这个结果？"),
+        word(.toefl, "mechanism", "mechanism", "/ˈmekənɪzəm/", "n.", "机制；机理", "We study the defense mechanism.", "我们研究防御机制。"),
+        word(.toefl, "phenomenon", "phenomenon", "/fəˈnɑːmɪnɑːn/", "n.", "现象", "It is a natural phenomenon.", "这是一种自然现象。"),
+        word(.toefl, "precise", "precise", "/prɪˈsaɪs/", "adj.", "精确的", "We need precise measurements.", "我们需要精确的测量。"),
+        word(.toefl, "primary", "primary", "/ˈpraɪmeri/", "adj.", "主要的；初级的", "Our primary goal is safety.", "我们的首要目标是安全。"),
+        word(.toefl, "proportion", "proportion", "/prəˈpɔːrʃən/", "n.", "比例；部分", "A large proportion agreed.", "很大一部分人表示同意。"),
+        word(.toefl, "reveal", "reveal", "/rɪˈviːl/", "v.", "揭示；显示", "The data reveals a clear pattern.", "数据揭示了一个明显的规律。"),
+        word(.toefl, "species", "species", "/ˈspiːʃiːz/", "n.", "物种", "This species is very rare.", "这个物种非常稀有。"),
+        word(.toefl, "structure", "structure", "/ˈstrʌktʃər/", "n.", "结构", "The essay has a clear structure.", "这篇文章结构清晰。"),
+        word(.toefl, "substance", "substance", "/ˈsʌbstəns/", "n.", "物质", "Water is a common substance.", "水是一种常见物质。"),
+        word(.toefl, "theory", "theory", "/ˈθiːəri/", "n.", "理论", "The theory explains many facts.", "这个理论解释了很多事实。")
+    ]
 }
 
 private extension EnglishVocabulary {
@@ -349,7 +485,16 @@ private extension EnglishVocabulary {
             "EnglishVocabularyStarterSupplement",
             "EnglishVocabularySupplement",
             "EnglishVocabularyBulkSupplement",
-            "EnglishVocabularyLevelSupplement"
+            "EnglishVocabularyLevelSupplement",
+            "EnglishVocabularyDailyExpansion",
+            "EnglishVocabularyCet6Expansion",
+            "EnglishVocabularyIeltsExpansion",
+            "EnglishVocabularyToeflExpansion",
+            "EnglishVocabularyDailyMegaExpansion",
+            "EnglishVocabularySchoolMegaExpansion",
+            "EnglishVocabularyAdvancedMegaExpansion",
+            "EnglishVocabularyExamMegaExpansion",
+            "EnglishVocabularyThousandExpansion"
         ]
         for bundle in [Bundle.main, Bundle(for: EnglishVocabularyBundleToken.self)] {
             let urls = resourceNames.compactMap { bundle.url(forResource: $0, withExtension: "json") }

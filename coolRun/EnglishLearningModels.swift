@@ -50,6 +50,9 @@ enum EnglishStage: String, CaseIterable, Codable, Identifiable {
     case middleSchool = "middle_school"
     case highSchool = "high_school"
     case cet4
+    case cet6
+    case ielts
+    case toefl
 
     var id: String { rawValue }
 
@@ -60,6 +63,9 @@ enum EnglishStage: String, CaseIterable, Codable, Identifiable {
         case .middleSchool: return LocalizedString.english("stage_middle")
         case .highSchool: return LocalizedString.english("stage_high")
         case .cet4: return LocalizedString.english("stage_cet4")
+        case .cet6: return LocalizedString.english("stage_cet6")
+        case .ielts: return LocalizedString.english("stage_ielts")
+        case .toefl: return LocalizedString.english("stage_toefl")
         }
     }
 
@@ -70,6 +76,9 @@ enum EnglishStage: String, CaseIterable, Codable, Identifiable {
         case .middleSchool: return LocalizedString.english("stage_middle_short")
         case .highSchool: return LocalizedString.english("stage_high_short")
         case .cet4: return LocalizedString.english("stage_cet4_short")
+        case .cet6: return LocalizedString.english("stage_cet6_short")
+        case .ielts: return LocalizedString.english("stage_ielts_short")
+        case .toefl: return LocalizedString.english("stage_toefl_short")
         }
     }
 
@@ -80,6 +89,9 @@ enum EnglishStage: String, CaseIterable, Codable, Identifiable {
         case .middleSchool: return "graduationcap"
         case .highSchool: return "book.closed"
         case .cet4: return "medal"
+        case .cet6: return "rosette"
+        case .ielts: return "globe.europe.africa"
+        case .toefl: return "airplane"
         }
     }
 
@@ -90,6 +102,9 @@ enum EnglishStage: String, CaseIterable, Codable, Identifiable {
         case .middleSchool: return LocalizedString.english("stage_middle_desc")
         case .highSchool: return LocalizedString.english("stage_high_desc")
         case .cet4: return LocalizedString.english("stage_cet4_desc")
+        case .cet6: return LocalizedString.english("stage_cet6_desc")
+        case .ielts: return LocalizedString.english("stage_ielts_desc")
+        case .toefl: return LocalizedString.english("stage_toefl_desc")
         }
     }
 }

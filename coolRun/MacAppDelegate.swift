@@ -4,22 +4,25 @@ import SwiftUI
 import Combine
 
 @MainActor
-final class MacAppDelegate: NSObject, NSApplicationDelegate {
+final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private let contextPopover = NSPopover()
     private let viewModel = SystemMonitorViewModel()
+    private let codexViewModel = CodexMonitorViewModel.shared
     private let goldPriceService = GoldPriceService()
     private let settings = AppSettings.shared
     private let englishLearning = EnglishLearningManager.shared
     private var windowCloseObserver: NSObjectProtocol?
     private var novelWindowController: NSWindowController?
+    private var textbookWindowController: NSWindowController?
     private var iconTimer: Timer?
     private var goldPriceTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var coinPhase = 0.0
     private var goldPriceText = "--"
-    private var isPopoverPinned = false
+    private let popoverPinState = PopoverPinState()
+    private var allowsPopoverClose = false
     private var activeAnimationFramesPerSecond: Double?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -31,6 +34,8 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         if let button = statusItem.button {
             button.imagePosition = .imageLeft
             button.image = CoinIconRenderer.image(phase: coinPhase)
+            button.font = Self.statusTitleFont
+            button.lineBreakMode = .byTruncatingTail
             button.title = " \(goldPriceText)"
             button.action = #selector(handleStatusItemClick)
             button.target = self
@@ -41,22 +46,21 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 
         popover.behavior = .transient
         popover.animates = false
-        popover.contentSize = NSSize(width: 284, height: 430)
+        popover.delegate = self
+        popover.contentSize = NSSize(width: 336, height: 528)
         popover.contentViewController = NSHostingController(
             rootView: MenuBarMonitorView(
                 viewModel: viewModel,
-                isPinned: Binding(
-                    get: { [weak self] in self?.isPopoverPinned ?? false },
-                    set: { [weak self] pinned in
-                        self?.setPopoverPinned(pinned)
-                    }
-                )
+                pinState: popoverPinState,
+                onPinChange: { [weak self] pinned in
+                    self?.setPopoverPinned(pinned)
+                }
             )
         )
 
         contextPopover.behavior = .transient
         contextPopover.animates = false
-        contextPopover.contentSize = NSSize(width: 216, height: 222)
+        contextPopover.contentSize = NSSize(width: 216, height: 264)
         contextPopover.contentViewController = NSHostingController(
             rootView: StatusContextMenuView(
                 toggleEnglishPlayback: { [weak self] in
@@ -163,6 +167,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(windowCloseObserver)
         }
         viewModel.stop()
+        codexViewModel.stop()
     }
 
     @objc private func handleStatusItemClick() {
@@ -182,10 +187,12 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if popover.isShown {
-            if isPopoverPinned {
-                setPopoverPinned(false)
+            if popoverPinState.isPinned {
+                // pin 状态下点图标也给反馈：解除 pin 并收起弹窗，而不是无响应
+                closeMonitorPopover(unpin: true)
+                return
             }
-            popover.performClose(nil)
+            closeMonitorPopover()
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             Analytics.capture(.popoverOpened)
@@ -193,15 +200,16 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setPopoverPinned(_ pinned: Bool) {
-        isPopoverPinned = pinned
+        popoverPinState.isPinned = pinned
         popover.behavior = pinned ? .applicationDefined : .transient
     }
 
     private func showContextMenu() {
         guard let button = statusItem?.button else { return }
 
+        // pin 状态下也先关掉主弹窗（临时解除 pin），避免两个弹窗重叠
         if popover.isShown {
-            popover.performClose(nil)
+            closeMonitorPopover(unpin: true)
         }
         if contextPopover.isShown {
             contextPopover.performClose(nil)
@@ -211,11 +219,45 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func prepareToOpenSettings() {
-        popover.performClose(nil)
+        closeMonitorPopover(unpin: true)
         contextPopover.performClose(nil)
 
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func closeMonitorPopover(unpin: Bool = false) {
+        guard popover.isShown else {
+            if unpin {
+                setPopoverPinned(false)
+            }
+            return
+        }
+
+        if unpin {
+            setPopoverPinned(false)
+        }
+
+        allowsPopoverClose = true
+        popover.performClose(nil)
+        allowsPopoverClose = false
+    }
+
+    func popoverShouldClose(_ popover: NSPopover) -> Bool {
+        guard popover === self.popover else { return true }
+        return allowsPopoverClose || !popoverPinState.isPinned
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        guard
+            let closedPopover = notification.object as? NSPopover,
+            closedPopover === popover,
+            popoverPinState.isPinned
+        else {
+            return
+        }
+
+        setPopoverPinned(false)
     }
 
     private func openSettingsFromContextMenu() {
@@ -243,6 +285,30 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 
         let controller = NSWindowController(window: window)
         novelWindowController = controller
+        controller.showWindow(nil)
+    }
+
+    // 课本管理面板 660x520，不能在 320pt 弹窗里用 sheet 弹出，改用独立窗口（同小说书库）
+    func openEnglishTextbookManagerWindow() {
+        prepareToOpenSettings()
+
+        if let window = textbookWindowController?.window {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let hostingController = NSHostingController(rootView: EnglishTextbookManagementView(onRequestClose: { [weak self] in
+            self?.textbookWindowController?.window?.close()
+        }))
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = LocalizedString.english("textbook_management")
+        window.setContentSize(NSSize(width: 660, height: 520))
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.center()
+
+        let controller = NSWindowController(window: window)
+        textbookWindowController = controller
         controller.showWindow(nil)
     }
 
@@ -334,19 +400,31 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         case .english:
             let playback = englishLearning.state == .playing ? " ▶" : ""
             nextTitle = " \(compactStatusText(englishLearning.menuBarText, limit: 12))\(playback)"
+        case .codex:
+            nextTitle = " \(codexMenuBarText)"
         }
 
         let compactTitle = compactStatusText(nextTitle, limit: statusTitleLimit)
         if statusItem?.button?.title != compactTitle {
             statusItem?.button?.title = compactTitle
         }
+        updateStatusItemLength(for: compactTitle)
     }
 
     // 菜单栏日期文本
     private var menuBarDateText: String {
         let formatter = DateFormatter()
         formatter.locale = settings.language.locale
-        formatter.setLocalizedDateFormatFromTemplate("MMMdEEEE")
+        switch settings.language {
+        case .chinese:
+            formatter.dateFormat = "M/d E"
+        case .japanese:
+            formatter.dateFormat = "M/d E"
+        case .korean:
+            formatter.dateFormat = "M/d E"
+        case .english:
+            formatter.dateFormat = "MMM d E"
+        }
         return formatter.string(from: Date())
     }
 
@@ -377,33 +455,63 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusTitleLimit: Int {
         switch settings.menuBarDisplayMode {
-        case .goldPrice: return 12
-        case .date: return 10
+        case .goldPrice: return 18
+        case .date: return 12
         case .cpu, .memory: return 8
         case .network: return 14
         case .novel: return 5
         case .english: return 14
+        case .codex: return 10
         }
     }
 
-    private func updateStatusItemLength() {
-        let length: CGFloat
-        switch settings.menuBarDisplayMode {
-        case .goldPrice:
-            length = 86
-        case .date:
-            length = 90
-        case .cpu, .memory:
-            length = 76
-        case .network:
-            length = 122
-        case .novel:
-            length = 58
-        case .english:
-            length = 126
-        }
+    private func updateStatusItemLength(for title: String? = nil) {
+        guard let button = statusItem?.button else { return }
+        let displayTitle = title ?? button.title
+        let titleWidth = displayTitle.size(withAttributes: [.font: button.font ?? Self.statusTitleFont]).width
+        let imageWidth = button.image.map { $0.size.width + 4 } ?? 0
+        let measuredLength = ceil(titleWidth + imageWidth + 14)
+        let length = min(max(measuredLength, minimumStatusItemLength), maximumStatusItemLength)
         statusItem?.length = length
     }
+
+    private var minimumStatusItemLength: CGFloat {
+        switch settings.menuBarDisplayMode {
+        case .goldPrice: return 76
+        case .date: return 82
+        case .cpu, .memory: return 72
+        case .network: return 116
+        case .novel: return 56
+        case .english: return 92
+        case .codex: return 76
+        }
+    }
+
+    private var maximumStatusItemLength: CGFloat {
+        switch settings.menuBarDisplayMode {
+        case .goldPrice: return 132
+        case .date: return 124
+        case .cpu, .memory: return 84
+        case .network: return 136
+        case .novel: return 68
+        case .english: return 142
+        case .codex: return 104
+        }
+    }
+
+    private var codexMenuBarText: String {
+        guard case let .ready(snapshot) = codexViewModel.state,
+              let window = snapshot.limits.first?.windows.first,
+              let remaining = window.remainingPercent else {
+            return "Codex"
+        }
+        return "Codex \(remaining)%"
+    }
+
+    private static let statusTitleFont = NSFont.monospacedDigitSystemFont(
+        ofSize: NSFont.systemFontSize(for: .small),
+        weight: .regular
+    )
 
     private static let networkSpeedFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -428,9 +536,12 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private func refreshGoldPrice() async {
         do {
             let quote = try await goldPriceService.fetchCNYPerGram()
-            goldPriceText = quote.cnyPerGram.goldPriceText
-            GoldPriceStore.shared.addPrice(quote.cnyPerGram, timestamp: quote.updatedAt)
+            goldPriceText = Self.menuBarGoldText(for: quote)
+            GoldPriceStore.shared.latestQuote = quote
+            GoldPriceStore.shared.addPrice(quote.cnyPerGram, timestamp: quote.updatedAt, source: quote.source)
             GoldPriceStore.shared.checkFreshness()
+            GoldPriceStore.shared.lastFetchFailed = false
+            GoldPriceAlertManager.shared.handle(quote: quote)
             Analytics.capture(.goldPriceFetched, properties: [
                 "price_cny_per_gram": quote.cnyPerGram,
             ], minimumInterval: 60 * 60)
@@ -438,11 +549,19 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
             if goldPriceText == "--" {
                 goldPriceText = goldPriceFallbackText(for: error)
             }
+            // 失败路径也要刷新数据健康状态，避免旧数据一直显示"健康"
+            GoldPriceStore.shared.checkFreshness()
+            GoldPriceStore.shared.lastFetchFailed = true
             Analytics.capture(.goldPriceFetchFailed, properties: [
                 "error_type": String(describing: type(of: error)),
             ])
         }
         refreshIcon()
+    }
+
+    // 分析页手动刷新入口（金价模块头部按钮调用）
+    func refreshGoldPriceNow() async {
+        await refreshGoldPrice()
     }
 
     private func goldPriceFallbackText(for error: Error) -> String {
@@ -535,7 +654,7 @@ private struct StatusContextMenuView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
 
-            HStack(spacing: 4) {
+            LazyVGrid(columns: displayModeColumns, alignment: .leading, spacing: 4) {
                 ForEach(MenuBarDisplayMode.allCases) { mode in
                     Button {
                         selectDisplayMode(mode)
@@ -557,6 +676,10 @@ private struct StatusContextMenuView: View {
             .padding(.horizontal, 10)
         }
         .padding(.vertical, 6)
+    }
+
+    private var displayModeColumns: [GridItem] {
+        Array(repeating: GridItem(.fixed(28), spacing: 4), count: 4)
     }
 
     private var englishPlaybackTitle: String {
@@ -648,6 +771,18 @@ private enum CoinIconRenderer {
 private extension Double {
     var goldPriceText: String {
         "¥" + formatted(.number.precision(.fractionLength(2))) + "/g"
+    }
+}
+
+private extension MacAppDelegate {
+    // 金价模式菜单栏文本：有官方涨跌幅时附带展示，如 "¥886.16 -0.25%"
+    static func menuBarGoldText(for quote: GoldPriceQuote) -> String {
+        guard let rate = quote.changeRatePercent else {
+            return quote.cnyPerGram.goldPriceText
+        }
+        let price = "¥" + quote.cnyPerGram.formatted(.number.precision(.fractionLength(2)))
+        let percent = rate.formatted(.number.sign(strategy: .always()).precision(.fractionLength(2))) + "%"
+        return "\(price) \(percent)"
     }
 }
 #endif

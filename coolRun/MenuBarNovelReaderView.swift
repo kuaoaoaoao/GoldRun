@@ -47,12 +47,8 @@ struct MenuBarNovelReaderView: View {
             }
         }
         .padding(10)
-        .background(panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.08), lineWidth: 0.5)
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .appCardSurface(cornerRadius: 12)
         .onAppear(perform: restoreSelection)
         .onChange(of: selectedBook?.id) { _, _ in
             restoreSelection()
@@ -92,7 +88,7 @@ struct MenuBarNovelReaderView: View {
             HStack(spacing: 7) {
                 Image(systemName: "book.pages")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(AppTheme.healthy)
+                    .foregroundStyle(AppTheme.accent)
 
                 Picker(LocalizedString.novel("novel", lang: appSettings.language), selection: selectedBookBinding) {
                     ForEach(library.books) { book in
@@ -123,7 +119,7 @@ struct MenuBarNovelReaderView: View {
     private func progressStrip(book: NovelBook) -> some View {
         VStack(spacing: 5) {
             ProgressView(value: readingProgress(book: book))
-                .tint(AppTheme.healthy)
+                .tint(AppTheme.accent)
 
             HStack {
                 Text(String(
@@ -146,12 +142,27 @@ struct MenuBarNovelReaderView: View {
             }
             .disabled(currentChapterIndex <= 0)
 
-            Text(currentChapter?.title ?? LocalizedString.novel("no_chapter", lang: appSettings.language))
-                .font(.system(size: 11, weight: .semibold))
+            // 章节标题可点击，弹出章节列表直接跳转
+            Menu {
+                chapterMenuItems(book: book)
+            } label: {
+                HStack(spacing: 3) {
+                    Text(currentChapter?.title ?? LocalizedString.novel("no_chapter", lang: appSettings.language))
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 7, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
                 .foregroundStyle(AppTheme.textPrimary(colorScheme))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .help(LocalizedString.novel("toc", lang: appSettings.language))
 
             compactButton("chevron.right", help: LocalizedString.novel("next_chapter", lang: appSettings.language)) {
                 moveChapter(by: 1, book: book)
@@ -219,7 +230,7 @@ struct MenuBarNovelReaderView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 32, height: 28)
-                        .background(AppTheme.healthy, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .contentShape(Rectangle())
                 .buttonStyle(.plain)
@@ -252,7 +263,7 @@ struct MenuBarNovelReaderView: View {
         VStack(spacing: 10) {
             Image(systemName: "book.closed")
                 .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(AppTheme.healthy)
+                .foregroundStyle(AppTheme.accent)
 
             Text(LocalizedString.novel("empty_menu_title", lang: appSettings.language))
                 .font(.system(size: 13, weight: .semibold))
@@ -286,10 +297,6 @@ struct MenuBarNovelReaderView: View {
                 restoreSelection()
             }
         )
-    }
-
-    private var panelBackground: some ShapeStyle {
-        colorScheme == .dark ? Color.black.opacity(0.30) : Color.white.opacity(0.55)
     }
 
     private func compactButton(_ systemImage: String, help: String, action: @escaping () -> Void) -> some View {
@@ -334,6 +341,52 @@ struct MenuBarNovelReaderView: View {
             importError = error.localizedDescription
             showImportError = true
         }
+    }
+
+    // 章节跳转菜单：长书只列当前章节附近 ±50 章，头尾另提供快捷跳转
+    @ViewBuilder
+    private func chapterMenuItems(book: NovelBook) -> some View {
+        let total = book.chapters.count
+        if total > 0 {
+            // 防御：currentChapterIndex 可能瞬时超出新书范围，先 clamp 避免构造非法 Range
+            let safeIndex = min(max(currentChapterIndex, 0), total - 1)
+            let lower = max(safeIndex - 50, 0)
+            let upper = min(safeIndex + 50, total - 1)
+
+            if lower > 0 {
+                Button("1. \(book.chapters[0].title)") {
+                    jumpToChapter(0, book: book)
+                }
+                Divider()
+            }
+
+            ForEach(lower...upper, id: \.self) { index in
+                Button {
+                    jumpToChapter(index, book: book)
+                } label: {
+                    if index == currentChapterIndex {
+                        Label("\(index + 1). \(book.chapters[index].title)", systemImage: "checkmark")
+                    } else {
+                        Text("\(index + 1). \(book.chapters[index].title)")
+                    }
+                }
+            }
+
+            if upper < total - 1 {
+                Divider()
+                Button("\(total). \(book.chapters[total - 1].title)") {
+                    jumpToChapter(total - 1, book: book)
+                }
+            }
+        }
+    }
+
+    private func jumpToChapter(_ index: Int, book: NovelBook) {
+        guard index != currentChapterIndex else { return }
+        saveProgress()
+        currentChapterIndex = min(max(index, 0), max(book.chapters.count - 1, 0))
+        currentParagraphIndex = 0
+        saveProgress()
     }
 
     private func moveChapter(by offset: Int, book: NovelBook) {

@@ -387,6 +387,9 @@ struct BirthdayListView: View {
     @State private var birthdays: [Birthday] = []
     @State private var showAddView = false
     @State private var editingBirthday: Birthday?
+    // 行内删除：hover 时显示按钮，确认后才真删（macOS 下滑动删除几乎不可发现）
+    @State private var hoveredBirthdayID: UUID?
+    @State private var birthdayPendingDelete: Birthday?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -428,6 +431,31 @@ struct BirthdayListView: View {
             BirthdayAddView(existingBirthday: birthday) { updatedBirthday in
                 BirthdayManager.shared.updateBirthday(updatedBirthday)
                 loadBirthdays()
+            }
+        }
+        .confirmationDialog(
+            LocalizedString.l(
+                settings.language,
+                en: "Delete birthday \"\(birthdayPendingDelete?.name ?? "")\"?",
+                zh: "删除“\(birthdayPendingDelete?.name ?? "")”的生日？",
+                ja: "「\(birthdayPendingDelete?.name ?? "")」の誕生日を削除しますか？",
+                ko: "\"\(birthdayPendingDelete?.name ?? "")\"의 생일을 삭제하시겠습니까?"
+            ),
+            isPresented: Binding(
+                get: { birthdayPendingDelete != nil },
+                set: { if !$0 { birthdayPendingDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(LocalizedString.l(settings.language, en: "Delete", zh: "删除", ja: "削除", ko: "삭제"), role: .destructive) {
+                if let birthday = birthdayPendingDelete {
+                    BirthdayManager.shared.deleteBirthday(birthday)
+                    loadBirthdays()
+                }
+                birthdayPendingDelete = nil
+            }
+            Button(LocalizedString.l(settings.language, en: "Cancel", zh: "取消", ja: "キャンセル", ko: "취소"), role: .cancel) {
+                birthdayPendingDelete = nil
             }
         }
     }
@@ -528,8 +556,35 @@ struct BirthdayListView: View {
                     }
             }
             .buttonStyle(.plain)
+
+            // 删除按钮（hover 时显示，点击后弹确认）
+            if hoveredBirthdayID == birthday.id {
+                Button(action: {
+                    birthdayPendingDelete = birthday
+                }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.critical)
+                        .padding(6)
+                        .background {
+                            Circle()
+                                .fill(AppTheme.critical.opacity(0.12))
+                        }
+                }
+                .buttonStyle(.plain)
+                .help(LocalizedString.l(settings.language, en: "Delete", zh: "删除", ja: "削除", ko: "삭제"))
+            }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            // 快速跨行移动时 enter/exit 事件可能乱序，只清除自己的 hover 状态
+            if hovering {
+                hoveredBirthdayID = birthday.id
+            } else if hoveredBirthdayID == birthday.id {
+                hoveredBirthdayID = nil
+            }
+        }
     }
 
     // MARK: - 添加按钮

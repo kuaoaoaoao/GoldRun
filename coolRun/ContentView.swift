@@ -8,6 +8,7 @@ enum ViewMode: String, CaseIterable {
     case calendar
     case novel
     case english
+    case codex
 
     var icon: String {
         switch self {
@@ -16,6 +17,7 @@ enum ViewMode: String, CaseIterable {
         case .calendar: return "calendar"
         case .novel: return "book.pages"
         case .english: return "character.book.closed"
+        case .codex: return "sparkles"
         }
     }
 
@@ -26,100 +28,160 @@ enum ViewMode: String, CaseIterable {
         case .calendar: return LocalizedString.calendar("calendar")
         case .novel: return LocalizedString.novel("novel")
         case .english: return LocalizedString.english("english")
+        case .codex: return "Codex"
+        }
+    }
+
+    var keyboardShortcut: KeyEquivalent {
+        switch self {
+        case .monitor: return "1"
+        case .gold: return "2"
+        case .calendar: return "3"
+        case .novel: return "4"
+        case .english: return "5"
+        case .codex: return "6"
         }
     }
 }
 
 struct ContentView: View {
     @State private var viewModel = SystemMonitorViewModel()
-    @State private var viewMode: ViewMode = .monitor
+    // 重启后回到上次使用的模块
+    @State private var viewMode: ViewMode = ViewMode(rawValue: AppSettings.shared.lastViewModeRaw) ?? .monitor
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
-            // 视图切换标签
-            viewModePicker
+            ModuleNavigationRail(selection: $viewMode)
+                .padding(.bottom, 8)
 
-            // 内容区域
-            switch viewMode {
-            case .monitor:
-                MonitorPanel(
-                    snapshot: viewModel.snapshot,
-                    cpuHistory: viewModel.cpuHistory,
-                    memoryHistory: viewModel.memoryHistory,
-                    downloadHistory: viewModel.downloadHistory,
-                    uploadHistory: viewModel.uploadHistory,
-                    cpuTempHistory: viewModel.cpuTempHistory,
-                    gpuTempHistory: viewModel.gpuTempHistory
-                )
-            case .gold:
-                GoldAnalysisView()
-            case .calendar:
-                CalendarView()
-            case .novel:
-                MenuBarNovelReaderView()
-            case .english:
-                EnglishLearningView()
+            Group {
+                switch viewMode {
+                case .monitor:
+                    MonitorPanel(
+                        snapshot: viewModel.snapshot,
+                        cpuHistory: viewModel.cpuHistory,
+                        memoryHistory: viewModel.memoryHistory,
+                        downloadHistory: viewModel.downloadHistory,
+                        uploadHistory: viewModel.uploadHistory,
+                        cpuTempHistory: viewModel.cpuTempHistory,
+                        gpuTempHistory: viewModel.gpuTempHistory
+                    )
+                case .gold:
+                    GoldAnalysisView()
+                case .calendar:
+                    CalendarView()
+                case .novel:
+                    MenuBarNovelReaderView()
+                case .english:
+                    EnglishLearningView()
+                case .codex:
+                    CodexMonitorView()
+                }
             }
+            .id(viewMode)
+            .transition(.opacity.combined(with: .scale(scale: 0.985)))
         }
         .padding(8)
         .background {
             ZStack {
                 VisualEffectBlur(material: colorScheme == .dark ? .hudWindow : .menu, blendingMode: .behindWindow)
-                if colorScheme == .light {
-                    Color.white.opacity(0.3)
-                } else {
-                    Color.black.opacity(0.2)
-                }
+                AppTheme.canvas(colorScheme)
+                LinearGradient(
+                    colors: [
+                        AppTheme.accent.opacity(colorScheme == .dark ? 0.08 : 0.055),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .center
+                )
             }
         }
         .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
+        .onChange(of: viewMode) { _, newValue in
+            AppSettings.shared.lastViewModeRaw = newValue.rawValue
+        }
+    }
+}
+
+// MARK: - 全局模块导航
+
+struct ModuleNavigationRail<Trailing: View>: View {
+    @Binding var selection: ViewMode
+    @ViewBuilder let trailing: () -> Trailing
+    @Environment(\.colorScheme) private var colorScheme
+    @Namespace private var selectionAnimation
+
+    init(
+        selection: Binding<ViewMode>,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) {
+        _selection = selection
+        self.trailing = trailing
     }
 
-    // MARK: - 视图切换标签
-
-    private var viewModePicker: some View {
+    var body: some View {
         HStack(spacing: 4) {
             ForEach(ViewMode.allCases, id: \.self) { mode in
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewMode = mode
+                Button {
+                    guard selection != mode else { return }
+                    withAnimation(.snappy(duration: 0.22, extraBounce: 0.02)) {
+                        selection = mode
                     }
                     Analytics.capture(.viewTabSwitched, properties: [
                         "tab": mode.rawValue,
                     ])
-                }) {
+                } label: {
                     HStack(spacing: 4) {
                         Image(systemName: mode.icon)
-                            .font(.system(size: 10, weight: .medium))
-                        Text(mode.displayName)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+                            .font(.system(size: 11, weight: .semibold))
+
+                        if selection == mode {
+                            Text(mode.displayName)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .transition(.opacity.combined(with: .move(edge: .leading)))
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .foregroundStyle(viewMode == mode ? AppTheme.healthy : AppTheme.textSecondary(colorScheme))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 6)
+                    .frame(minWidth: 28, minHeight: 28)
+                    .padding(.horizontal, selection == mode ? 7 : 0)
+                    .foregroundStyle(selection == mode ? AppTheme.accent : AppTheme.textSecondary(colorScheme))
                     .background {
-                        if viewMode == mode {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(AppTheme.healthy.opacity(0.15))
+                        if selection == mode {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(AppTheme.accent.opacity(colorScheme == .dark ? 0.20 : 0.13))
+                                .matchedGeometryEffect(id: "selected-module", in: selectionAnimation)
                         }
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(mode.keyboardShortcut, modifiers: .command)
+                .help(mode.displayName)
+                .accessibilityLabel(mode.displayName)
+                .accessibilityAddTraits(selection == mode ? .isSelected : [])
             }
+
+            Spacer(minLength: 2)
+            trailing()
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
+        .padding(4)
         .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(AppTheme.chromeSurface(colorScheme))
         }
-        .padding(.bottom, 6)
+        .overlay {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(AppTheme.stroke(colorScheme), lineWidth: 0.5)
+        }
+        .shadow(color: AppTheme.shadow(colorScheme), radius: 8, y: 3)
+    }
+}
+
+extension ModuleNavigationRail where Trailing == EmptyView {
+    init(selection: Binding<ViewMode>) {
+        self.init(selection: selection) { EmptyView() }
     }
 }
 
@@ -131,62 +193,138 @@ struct MonitorPanel: View {
     var uploadHistory: MetricHistory = MetricHistory()
     var cpuTempHistory: MetricHistory = MetricHistory()
     var gpuTempHistory: MetricHistory = MetricHistory()
-    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var settings = AppSettings.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            if settings.showCPU {
-                CPUSection(
-                    metrics: snapshot.cpu,
-                    temperature: snapshot.temperature,
-                    history: cpuHistory
+        ScrollView(.vertical) {
+            LazyVStack(spacing: 8) {
+                MonitorStatusHeader(
+                    status: overallStatus,
+                    updatedAt: snapshot.updatedAt
                 )
-            }
 
-            if settings.showMemory {
-                if settings.showCPU { Separator() }
-                MemorySection(
-                    metrics: snapshot.memory,
-                    history: memoryHistory
-                )
-            }
+                if settings.showCPU || settings.showMemory {
+                    HStack(alignment: .top, spacing: 8) {
+                        if settings.showCPU {
+                            ResourceMetricCard(
+                                icon: "cpu",
+                                title: LocalizedString.monitor("cpu", lang: settings.language),
+                                value: snapshot.cpu.usage.percentText,
+                                detail: "\(snapshot.cpu.coreCount) \(LocalizedString.monitor("cores_unit", lang: settings.language))",
+                                progress: snapshot.cpu.usage,
+                                history: cpuHistory.values,
+                                tint: AppTheme.healthColor(for: snapshot.cpu.usage)
+                            )
+                        }
 
-            if settings.showStorage {
-                if settings.showCPU || settings.showMemory { Separator() }
-                StorageSection(metrics: snapshot.storage)
-            }
+                        if settings.showMemory {
+                            ResourceMetricCard(
+                                icon: "memorychip",
+                                title: LocalizedString.monitor("memory", lang: settings.language),
+                                value: snapshot.memory.usage.percentText,
+                                detail: "\(snapshot.memory.used.memoryText) / \(snapshot.memory.total.memoryText)",
+                                progress: snapshot.memory.usage,
+                                history: memoryHistory.values,
+                                tint: AppTheme.healthColor(for: snapshot.memory.usage)
+                            )
+                        }
+                    }
+                }
 
-            if settings.showBattery {
-                if settings.showCPU || settings.showMemory || settings.showStorage { Separator() }
-                BatterySection(metrics: snapshot.battery)
-            }
+                if settings.showTemperature {
+                    TemperatureSection(
+                        metrics: snapshot.temperature,
+                        cpuHistory: cpuTempHistory,
+                        gpuHistory: gpuTempHistory
+                    )
+                }
 
-            if settings.showNetwork {
-                if settings.showCPU || settings.showMemory || settings.showStorage || settings.showBattery { Separator() }
-                NetworkSection(
-                    metrics: snapshot.network,
-                    downloadHistory: downloadHistory,
-                    uploadHistory: uploadHistory
-                )
-            }
+                if showsSecondaryMetrics {
+                    VStack(spacing: 0) {
+                        if settings.showStorage {
+                            StorageSection(metrics: snapshot.storage)
+                        }
 
-            if settings.showUptime {
-                if settings.showCPU || settings.showMemory || settings.showStorage || settings.showBattery || settings.showNetwork { Separator() }
-                UptimeSection(metrics: snapshot.uptime)
+                        if settings.showBattery {
+                            if settings.showStorage { Separator() }
+                            BatterySection(metrics: snapshot.battery)
+                        }
+
+                        if settings.showNetwork {
+                            if settings.showStorage || settings.showBattery { Separator() }
+                            NetworkSection(
+                                metrics: snapshot.network,
+                                downloadHistory: downloadHistory,
+                                uploadHistory: uploadHistory
+                            )
+                        }
+
+                        if settings.showUptime {
+                            if settings.showStorage || settings.showBattery || settings.showNetwork {
+                                Separator()
+                            }
+                            UptimeSection(metrics: snapshot.uptime)
+                        }
+                    }
+                    .monitorCardSurface()
+                }
+
+                if !showsAnyMetric {
+                    ContentUnavailableView(
+                        LocalizedString.monitor("no_modules", lang: settings.language),
+                        systemImage: "gauge.with.dots.needle.0percent",
+                        description: Text(LocalizedString.monitor("no_modules_hint", lang: settings.language))
+                    )
+                    .padding(.vertical, 24)
+                    .frame(maxWidth: .infinity)
+                    .monitorCardSurface()
+                }
             }
+            .padding(1)
         }
-        .padding(.vertical, 6)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(colorScheme == .dark ? Color.black.opacity(0.3) : Color.white.opacity(0.5))
+        .scrollIndicators(.hidden)
+        .frame(maxHeight: .infinity)
+    }
+
+    private var showsSecondaryMetrics: Bool {
+        settings.showStorage || settings.showBattery || settings.showNetwork || settings.showUptime
+    }
+
+    private var showsAnyMetric: Bool {
+        settings.showCPU
+            || settings.showMemory
+            || settings.showTemperature
+            || showsSecondaryMetrics
+    }
+
+    private var overallStatus: MonitorHealthStatus {
+        let hottestTemperature: Double? = if settings.showTemperature {
+            [
+                snapshot.temperature.cpuTemperature,
+                snapshot.temperature.gpuTemperature,
+                snapshot.temperature.sensors.map(\.temperature).max()
+            ]
+            .compactMap { $0 }
+            .max()
+        } else {
+            nil
         }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.08), lineWidth: 0.5)
+
+        if (settings.showCPU && snapshot.cpu.usage >= 0.9)
+            || (settings.showMemory && snapshot.memory.usage >= 0.9)
+            || (settings.showStorage && snapshot.storage.usage >= 0.95)
+            || (hottestTemperature ?? 0) >= 95 {
+            return .critical
         }
-        .shadow(color: colorScheme == .dark ? .black.opacity(0.2) : .black.opacity(0.08), radius: 10, y: 4)
+
+        if (settings.showCPU && snapshot.cpu.usage >= 0.75)
+            || (settings.showMemory && snapshot.memory.usage >= 0.75)
+            || (settings.showStorage && snapshot.storage.usage >= 0.85)
+            || (hottestTemperature ?? 0) >= 80 {
+            return .warning
+        }
+
+        return .healthy
     }
 }
 
@@ -205,45 +343,61 @@ private struct CollapsibleSection<Header: View, Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题行 - 整行可点击
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(healthColor ?? AppTheme.icon(colorScheme))
-                    .frame(width: 20)
-
-                Text(title)
-                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
-                    .font(.system(size: 11, weight: .medium))
-                    .layoutPriority(1)
-
-                Spacer(minLength: 4)
-
-                header()
-                    .layoutPriority(2)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.6))
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minHeight: 36)
-            .contentShape(Rectangle())
-            .onTapGesture {
+            Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
                 }
-            }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(healthColor ?? AppTheme.icon(colorScheme))
+                        .frame(width: 26, height: 26)
+                        .background(
+                            (healthColor ?? AppTheme.icon(colorScheme)).opacity(0.1),
+                            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        )
 
-            // 展开内容
+                    Text(title)
+                        .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                        .font(.subheadline.weight(.medium))
+                        .layoutPriority(1)
+
+                    Spacer(minLength: 4)
+
+                    header()
+                        .layoutPriority(2)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.65))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(minHeight: 42)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(value)
+            .accessibilityHint(
+                isExpanded
+                    ? LocalizedString.monitor("collapse_hint")
+                    : LocalizedString.monitor("expand_hint")
+            )
+
             if isExpanded {
                 VStack(spacing: 2) {
                     content()
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 10)
+                .padding(.top, 2)
+                .padding(.bottom, 9)
+                .background(
+                    colorScheme == .dark
+                        ? Color.white.opacity(0.025)
+                        : Color.black.opacity(0.018)
+                )
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -252,77 +406,347 @@ private struct CollapsibleSection<Header: View, Content: View>: View {
 
 // MARK: - 各个监控区域
 
-private struct CPUSection: View {
-    let metrics: CPUMetrics
-    let temperature: TemperatureMetrics
-    var history: MetricHistory = MetricHistory()
-    @ObservedObject private var settings = AppSettings.shared
+private enum MonitorHealthStatus {
+    case healthy
+    case warning
+    case critical
 
-    var body: some View {
-        CollapsibleSection(
-            icon: "cpu",
-            title: LocalizedString.monitor("cpu", lang: settings.language),
-            value: metrics.usage.percentText,
-            healthColor: AppTheme.healthColor(for: metrics.usage)
-        ) {
-            // 标题行右侧内容
-            HStack(spacing: 6) {
-                MiniBar(value: metrics.usage, tint: AppTheme.healthColor(for: metrics.usage))
-                    .frame(width: 40, height: 10)
-                Text(metrics.usage.percentText)
-                    .foregroundStyle(AppTheme.healthColor(for: metrics.usage))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            }
-        } content: {
-            MetricRow(label: LocalizedString.monitor("core_count", lang: settings.language), value: "\(metrics.coreCount)")
-            if let temp = temperature.cpuTemperature {
-                MetricRow(label: LocalizedString.monitor("cpu_temp", lang: settings.language), value: String(format: "%.1f°C", temp))
-            }
-            if let gpuTemp = temperature.gpuTemperature {
-                MetricRow(label: LocalizedString.monitor("gpu_temp", lang: settings.language), value: String(format: "%.1f°C", gpuTemp))
-            }
-            SparklineChart(values: history.values, color: AppTheme.healthColor(for: metrics.usage))
-                .frame(height: 20)
-                .padding(.top, 2)
+    var color: Color {
+        switch self {
+        case .healthy: AppTheme.healthy
+        case .warning: AppTheme.warning
+        case .critical: AppTheme.critical
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .healthy: "checkmark.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .critical: "exclamationmark.octagon.fill"
+        }
+    }
+
+    func title(language: AppLanguage) -> String {
+        switch self {
+        case .healthy: LocalizedString.monitor("status_normal", lang: language)
+        case .warning: LocalizedString.monitor("status_elevated", lang: language)
+        case .critical: LocalizedString.monitor("status_attention", lang: language)
         }
     }
 }
 
-private struct MemorySection: View {
-    let metrics: MemoryMetrics
-    var history: MetricHistory = MetricHistory()
+private struct MonitorStatusHeader: View {
+    let status: MonitorHealthStatus
+    let updatedAt: Date
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var settings = AppSettings.shared
 
     var body: some View {
-        CollapsibleSection(
-            icon: "memorychip",
-            title: LocalizedString.monitor("memory", lang: settings.language),
-            value: metrics.usage.percentText,
-            healthColor: AppTheme.healthColor(for: metrics.usage)
-        ) {
-            HStack(spacing: 6) {
-                MiniBar(value: metrics.usage, tint: AppTheme.healthColor(for: metrics.usage))
-                    .frame(width: 40, height: 10)
-                Text(metrics.usage.percentText)
-                    .foregroundStyle(AppTheme.healthColor(for: metrics.usage))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(LocalizedString.monitor("device_status", lang: settings.language))
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.textPrimary(colorScheme))
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(AppTheme.healthy)
+                        .frame(width: 5, height: 5)
+                    Text(LocalizedString.monitor("live", lang: settings.language))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
             }
-        } content: {
-            MetricRow(label: LocalizedString.monitor("used", lang: settings.language), value: metrics.used.memoryText)
-            MetricRow(label: LocalizedString.monitor("total", lang: settings.language), value: metrics.total.memoryText)
-            MetricRow(label: LocalizedString.monitor("pressure", lang: settings.language), value: memoryPressureText)
-            SparklineChart(values: history.values, color: AppTheme.healthColor(for: metrics.usage))
-                .frame(height: 20)
-                .padding(.top, 2)
+
+            Spacer()
+
+            Label(status.title(language: settings.language), systemImage: status.icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(status.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(status.color.opacity(0.11), in: Capsule())
+                .help(updatedAt.formatted(date: .omitted, time: .standard))
+        }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
+    }
+}
+
+private struct ResourceMetricCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let detail: String
+    let progress: Double
+    let history: [Double]
+    let tint: Color
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+
+                Spacer(minLength: 2)
+
+                Circle()
+                    .fill(tint)
+                    .frame(width: 5, height: 5)
+            }
+
+            Text(value)
+                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                .monospacedDigit()
+
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            ZStack(alignment: .bottom) {
+                SparklineChart(
+                    values: history,
+                    color: tint,
+                    showGradient: true,
+                    valueRange: 0...1
+                )
+
+                ProgressPill(value: progress, tint: tint)
+                    .frame(height: 2)
+                    .opacity(0.7)
+            }
+            .frame(height: 22)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+        .monitorCardSurface()
+    }
+}
+
+private struct TemperatureSection: View {
+    let metrics: TemperatureMetrics
+    var cpuHistory: MetricHistory = MetricHistory()
+    var gpuHistory: MetricHistory = MetricHistory()
+    @State private var showsSensors = false
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Image(systemName: "thermometer.medium")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(temperatureColor)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        temperatureColor.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(LocalizedString.monitor("temperature", lang: settings.language))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.textPrimary(colorScheme))
+
+                    Text(temperatureStatusText)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(temperatureColor)
+                }
+
+                Spacer()
+
+                Text(primaryTemperatureText)
+                    .font(.system(.title2, design: .rounded, weight: .semibold))
+                    .foregroundStyle(temperatureColor)
+                    .monospacedDigit()
+            }
+
+            if hasTemperature {
+                SparklineChart(
+                    values: chartHistory,
+                    color: temperatureColor,
+                    valueRange: 30...100
+                )
+                .frame(height: 32)
+                .background {
+                    ThermalGuide()
+                }
+
+                HStack(spacing: 6) {
+                    temperatureChip(
+                        label: "CPU",
+                        value: metrics.cpuTemperature
+                    )
+                    temperatureChip(
+                        label: "GPU",
+                        value: metrics.gpuTemperature
+                    )
+
+                    Spacer(minLength: 2)
+
+                    if !metrics.sensors.isEmpty {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showsSensors.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text(
+                                    "\(metrics.sensors.count) "
+                                        + LocalizedString.monitor("sensors", lang: settings.language)
+                                )
+                                Image(systemName: "chevron.right")
+                                    .rotationEffect(.degrees(showsSensors ? 90 : 0))
+                            }
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(
+                                colorScheme == .dark
+                                    ? Color.white.opacity(0.06)
+                                    : Color.black.opacity(0.045),
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if showsSensors {
+                    VStack(spacing: 1) {
+                        ForEach(Array(sortedSensors.prefix(6).enumerated()), id: \.offset) { _, sensor in
+                            MetricRow(label: sensor.name, value: sensor.formatted)
+                        }
+                    }
+                    .padding(.top, 2)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            } else {
+                Label(
+                    LocalizedString.monitor("temperature_unavailable", lang: settings.language),
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .padding(.vertical, 5)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .monitorCardSurface()
+    }
+
+    private var availableTemperatures: [Double] {
+        [
+            metrics.cpuTemperature,
+            metrics.gpuTemperature,
+            metrics.sensors.map(\.temperature).max()
+        ]
+        .compactMap { $0 }
+    }
+
+    private var primaryTemperature: Double? {
+        metrics.cpuTemperature
+            ?? metrics.gpuTemperature
+            ?? metrics.sensors.map(\.temperature).max()
+    }
+
+    private var primaryTemperatureText: String {
+        primaryTemperature.map { String(format: "%.1f°C", $0) } ?? "--"
+    }
+
+    private var hasTemperature: Bool {
+        !availableTemperatures.isEmpty
+    }
+
+    private var hottestTemperature: Double {
+        availableTemperatures.max() ?? 0
+    }
+
+    private var temperatureColor: Color {
+        guard hasTemperature else { return AppTheme.textSecondary(colorScheme) }
+        return AppTheme.temperatureColor(for: hottestTemperature)
+    }
+
+    private var temperatureStatusText: String {
+        guard hasTemperature else {
+            return LocalizedString.monitor("unavailable", lang: settings.language)
+        }
+
+        switch hottestTemperature {
+        case ..<80:
+            return LocalizedString.monitor("thermal_normal", lang: settings.language)
+        case ..<95:
+            return LocalizedString.monitor("thermal_warm", lang: settings.language)
+        default:
+            return LocalizedString.monitor("thermal_hot", lang: settings.language)
         }
     }
 
-    private var memoryPressureText: String {
-        switch metrics.usage {
-        case 0..<0.6: LocalizedString.memoryPressure("low", lang: settings.language)
-        case 0..<0.82: LocalizedString.memoryPressure("medium", lang: settings.language)
-        default: LocalizedString.memoryPressure("high", lang: settings.language)
+    private var chartHistory: [Double] {
+        if metrics.cpuTemperature != nil {
+            return cpuHistory.values
         }
+        return gpuHistory.values
+    }
+
+    private var sortedSensors: [SensorReading] {
+        metrics.sensors.sorted { $0.temperature > $1.temperature }
+    }
+
+    private func temperatureChip(label: String, value: Double?) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            Text(value.map { String(format: "%.1f°C", $0) } ?? "--")
+                .foregroundStyle(
+                    value.map { AppTheme.temperatureColor(for: $0) }
+                        ?? AppTheme.textSecondary(colorScheme)
+                )
+                .monospacedDigit()
+        }
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(
+            colorScheme == .dark
+                ? Color.white.opacity(0.06)
+                : Color.black.opacity(0.045),
+            in: Capsule()
+        )
+    }
+}
+
+private struct ThermalGuide: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack {
+            Spacer()
+            LinearGradient(
+                colors: [
+                    AppTheme.healthy.opacity(0.3),
+                    AppTheme.warning.opacity(0.32),
+                    AppTheme.critical.opacity(0.32)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 2)
+            .clipShape(Capsule())
+        }
+        .opacity(colorScheme == .dark ? 0.8 : 1)
     }
 }
 
@@ -518,13 +942,14 @@ private struct SparklineChart: View {
     let values: [Double]
     var color: Color = .blue
     var showGradient: Bool = true
+    var valueRange: ClosedRange<Double>? = nil
 
     var body: some View {
         Canvas { context, size in
             guard values.count >= 2 else { return }
 
-            let maxValue = values.max() ?? 1.0
-            let minValue = values.min() ?? 0.0
+            let maxValue = valueRange?.upperBound ?? values.max() ?? 1.0
+            let minValue = valueRange?.lowerBound ?? values.min() ?? 0.0
             let range = maxValue - minValue
             let normalizedMax = range > 0 ? range : 1.0
 
@@ -535,7 +960,7 @@ private struct SparklineChart: View {
             var path = Path()
             for (index, value) in values.enumerated() {
                 let x = CGFloat(index) * stepX
-                let normalized = (value - minValue) / normalizedMax
+                let normalized = min(max((value - minValue) / normalizedMax, 0), 1)
                 let y = size.height - padding - CGFloat(normalized) * drawHeight
                 if index == 0 { path.move(to: CGPoint(x: x, y: y)) }
                 else { path.addLine(to: CGPoint(x: x, y: y)) }
@@ -554,7 +979,7 @@ private struct SparklineChart: View {
 
             if let lastValue = values.last {
                 let lastX = size.width
-                let normalized = (lastValue - minValue) / normalizedMax
+                let normalized = min(max((lastValue - minValue) / normalizedMax, 0), 1)
                 let lastY = size.height - padding - CGFloat(normalized) * drawHeight
                 let pointRect = CGRect(x: lastX - 2, y: lastY - 2, width: 4, height: 4)
                 context.fill(Path(ellipseIn: pointRect), with: .color(color))
@@ -647,6 +1072,21 @@ private struct ProgressPill: View {
     }
 }
 
+// MARK: - 监控卡片表面
+
+private struct MonitorCardSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .appCardSurface(cornerRadius: 11)
+    }
+}
+
+private extension View {
+    func monitorCardSurface() -> some View {
+        modifier(MonitorCardSurface())
+    }
+}
+
 // MARK: - 毛玻璃效果
 
 struct VisualEffectBlur: NSViewRepresentable {
@@ -671,7 +1111,9 @@ struct VisualEffectBlur: NSViewRepresentable {
 // MARK: - 主题
 
 enum AppTheme {
-    // 健康状态颜色 - 深浅模式通用
+    // 交互色与状态色分离，避免“选中”和“健康”语义混用。
+    static let accent = Color.accentColor
+    static let gold = Color(red: 0.86, green: 0.58, blue: 0.18)
     static let healthy = Color(red: 0.2, green: 0.78, blue: 0.4)
     static let warning = Color(red: 0.95, green: 0.65, blue: 0.15)
     static let critical = Color(red: 0.95, green: 0.3, blue: 0.3)
@@ -680,6 +1122,14 @@ enum AppTheme {
         switch usage {
         case ..<0.6: return healthy
         case ..<0.85: return warning
+        default: return critical
+        }
+    }
+
+    static func temperatureColor(for celsius: Double) -> Color {
+        switch celsius {
+        case ..<80: return healthy
+        case ..<95: return warning
         default: return critical
         }
     }
@@ -703,6 +1153,60 @@ enum AppTheme {
 
     static func progressBg(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.08)
+    }
+
+    static func canvas(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.24)
+    }
+
+    static func chromeSurface(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.075) : Color.white.opacity(0.62)
+    }
+
+    static func surface(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.black.opacity(0.24) : Color.white.opacity(0.58)
+    }
+
+    static func elevatedSurface(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.78)
+    }
+
+    static func stroke(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.11) : Color.black.opacity(0.075)
+    }
+
+    static func shadow(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.black.opacity(0.20) : Color.black.opacity(0.065)
+    }
+}
+
+struct AppCardSurface: ViewModifier {
+    let cornerRadius: CGFloat
+    let showsShadow: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(AppTheme.surface(colorScheme))
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(AppTheme.stroke(colorScheme), lineWidth: 0.5)
+            }
+            .shadow(
+                color: showsShadow ? AppTheme.shadow(colorScheme) : .clear,
+                radius: showsShadow ? 8 : 0,
+                y: showsShadow ? 3 : 0
+            )
+    }
+}
+
+extension View {
+    func appCardSurface(cornerRadius: CGFloat = 12, showsShadow: Bool = true) -> some View {
+        modifier(AppCardSurface(cornerRadius: cornerRadius, showsShadow: showsShadow))
     }
 }
 

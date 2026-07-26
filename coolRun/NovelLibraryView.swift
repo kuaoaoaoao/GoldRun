@@ -10,6 +10,7 @@ struct NovelLibraryView: View {
     @State private var importError: String?
     @State private var showDeleteConfirm = false
     @State private var showImportError = false
+    @Environment(\.colorScheme) private var colorScheme
 
     private let columns = [
         GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 18)
@@ -54,7 +55,17 @@ struct NovelLibraryView: View {
             }
         }
         .frame(minWidth: 760, minHeight: 560)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                AppTheme.canvas(colorScheme)
+                LinearGradient(
+                    colors: [AppTheme.accent.opacity(0.07), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .center
+                )
+            }
+        }
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: [.plainText, UTType(filenameExtension: "txt") ?? .plainText],
@@ -90,12 +101,17 @@ struct NovelLibraryView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: "books.vertical.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(AppTheme.healthy)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 36, height: 36)
+                .background(
+                    AppTheme.accent.opacity(colorScheme == .dark ? 0.18 : 0.11),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(LocalizedString.novel("novel_reader"))
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                 Text("\(library.books.count) \(LocalizedString.novel("books_count"))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -106,10 +122,13 @@ struct NovelLibraryView: View {
             Button(action: { showingImporter = true }) {
                 Label(LocalizedString.novel("import_novel"), systemImage: "plus")
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
             .keyboardShortcut("o", modifiers: [.command])
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 16)
+        .frame(height: 68)
+        .background(AppTheme.chromeSurface(colorScheme))
     }
 
     private var emptyState: some View {
@@ -147,6 +166,7 @@ struct NovelLibraryView: View {
 private struct BookCardView: View {
     let book: NovelBook
     let isHovering: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     private var progress: Double {
         guard !book.chapters.isEmpty else { return 0 }
@@ -194,7 +214,6 @@ private struct BookCardView: View {
             }
             .aspectRatio(0.70, contentMode: .fit)
             .shadow(color: .black.opacity(isHovering ? 0.24 : 0.12), radius: isHovering ? 10 : 5, y: isHovering ? 6 : 2)
-            .scaleEffect(isHovering ? 1.025 : 1)
 
             Text(book.title)
                 .font(.system(size: 13, weight: .medium))
@@ -212,11 +231,18 @@ private struct BookCardView: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(10)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHovering ? Color.accentColor.opacity(0.08) : Color.clear)
+        .padding(11)
+        .appCardSurface(cornerRadius: 12, showsShadow: false)
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isHovering ? AppTheme.accent.opacity(0.42) : Color.clear,
+                    lineWidth: 1
+                )
         }
+        .shadow(color: isHovering ? AppTheme.shadow(colorScheme) : .clear, radius: 10, y: 4)
+        .scaleEffect(isHovering ? 1.018 : 1)
+        .animation(.easeOut(duration: 0.16), value: isHovering)
         .contentShape(Rectangle())
     }
 }

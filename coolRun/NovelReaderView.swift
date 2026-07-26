@@ -18,6 +18,9 @@ struct NovelReaderView: View {
     @State private var showChapters = false
     @State private var showBookmarks = false
     @State private var showSettings = false
+    // 添加书签后的轻量确认（图标短暂变为 checkmark）
+    @State private var bookmarkJustAdded = false
+    @State private var bookmarkFeedbackTask: Task<Void, Never>?
 
     private var book: NovelBook? {
         library.book(id: bookId)
@@ -120,11 +123,13 @@ struct NovelReaderView: View {
             }
 
             Button(action: addBookmark) {
-                Image(systemName: "bookmark.badge.plus")
+                Image(systemName: bookmarkJustAdded ? "checkmark.circle.fill" : "bookmark.badge.plus")
+                    .foregroundStyle(bookmarkJustAdded ? AppTheme.healthy : settings.theme.secondaryColor)
             }
             .help(LocalizedString.novel("add_bookmark"))
 
-            Button(action: { startSpeech(book: book) }) {
+            // 播放中→暂停，暂停→继续，空闲→开始；避免每次点击都从头重读
+            Button(action: { toggleSpeech(book: book) }) {
                 Image(systemName: speech.currentBookID == book.id && speech.state == .playing ? "speaker.wave.2.fill" : "speaker.wave.2")
             }
             .help(LocalizedString.novel("read_aloud"))
@@ -480,6 +485,24 @@ struct NovelReaderView: View {
         Analytics.capture(.bookmarkAdded, properties: [
             "chapter_index": currentChapterIndex,
         ])
+        // 轻量确认：图标短暂变为 checkmark，1.5 秒后恢复
+        withAnimation(.easeInOut(duration: 0.15)) { bookmarkJustAdded = true }
+        bookmarkFeedbackTask?.cancel()
+        bookmarkFeedbackTask = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.15)) { bookmarkJustAdded = false }
+        }
+    }
+
+    private func toggleSpeech(book: NovelBook) {
+        let wasActive = speech.isActive(for: book.id)
+        speech.toggle(book: book, chapterIndex: currentChapterIndex, paragraphIndex: currentParagraphIndex)
+        if !wasActive {
+            Analytics.capture(.novelSpeechStarted, properties: [
+                "chapter_index": currentChapterIndex,
+            ])
+        }
     }
 
     private func startSpeech(book: NovelBook) {

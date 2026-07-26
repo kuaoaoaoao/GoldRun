@@ -10,6 +10,9 @@ import UniformTypeIdentifiers
 final class DataMigrationManager {
     static let shared = DataMigrationManager()
 
+    // 最近一次导出/导入的失败原因（取消操作为 nil，供设置页区分失败与取消）
+    private(set) var lastErrorMessage: String?
+
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -36,6 +39,7 @@ final class DataMigrationManager {
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
 
+        lastErrorMessage = nil
         guard panel.runModal() == .OK, let url = panel.url else { return false }
 
         do {
@@ -44,6 +48,7 @@ final class DataMigrationManager {
             try data.write(to: url, options: .atomic)
             return true
         } catch {
+            lastErrorMessage = error.localizedDescription
             showAlert(
                 title: LocalizedString.migration("export_failed"),
                 message: error.localizedDescription,
@@ -64,6 +69,7 @@ final class DataMigrationManager {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
 
+        lastErrorMessage = nil
         guard panel.runModal() == .OK, let url = panel.url else { return false }
 
         do {
@@ -79,6 +85,7 @@ final class DataMigrationManager {
             restoreArchive(archive)
             return true
         } catch {
+            lastErrorMessage = LocalizedString.migration("import_corrupt") + "：\(error.localizedDescription)"
             showAlert(
                 title: LocalizedString.migration("import_failed"),
                 message: LocalizedString.migration("import_corrupt") + "：\(error.localizedDescription)",
@@ -99,6 +106,7 @@ final class DataMigrationManager {
             englishProgress: exportEnglishProgress(),
             goldPriceRecords: GoldPriceStore.shared.records,
             goldPredictionLearningRecords: GoldPredictionLearningStore.shared.records,
+            goldTrades: GoldTradeStore.shared.records.isEmpty ? nil : GoldTradeStore.shared.records,
             novelLibrary: exportNovelLibrary(),
             appSettings: exportSettings()
         )
@@ -138,6 +146,11 @@ final class DataMigrationManager {
             GoldPredictionLearningStore.shared.records = newRecords
             GoldPredictionLearningStore.shared.refreshSummary()
             GoldPredictionLearningStore.shared.saveToDisk()
+        }
+
+        // 3.6 恢复交易流水（按 id 去重合并）
+        if let trades = archive.goldTrades, !trades.isEmpty {
+            GoldTradeStore.shared.merge(trades)
         }
 
         // 4. 恢复小说书签和阅读进度（不含文件本身）
@@ -287,6 +300,9 @@ final class DataMigrationManager {
         if !archive.goldPriceRecords.isEmpty {
             parts.append("• \(LocalizedString.migration("gold_items")) \(archive.goldPriceRecords.count)")
         }
+        if let trades = archive.goldTrades, !trades.isEmpty {
+            parts.append("• \(LocalizedString.migration("gold_trade_items")) \(trades.count)")
+        }
         if let novel = archive.novelLibrary, !novel.books.isEmpty {
             parts.append("• \(LocalizedString.migration("novel_items")) \(novel.books.count)")
         }
@@ -332,6 +348,8 @@ struct DataArchive: Codable {
     let englishProgress: EnglishProgressData?
     let goldPriceRecords: [GoldPriceRecord]
     let goldPredictionLearningRecords: [GoldPredictionLearningRecord]
+    // v1.1 追加：交易流水（可选，兼容旧档案 decodeIfPresent）
+    let goldTrades: [GoldTradeRecord]?
     let novelLibrary: NovelLibraryData?
     let appSettings: SettingsData?
 }

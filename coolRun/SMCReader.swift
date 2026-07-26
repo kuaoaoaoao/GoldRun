@@ -2,35 +2,15 @@
 //  SMCReader.swift
 //  coolRun
 //
-//  读取 macOS SMC (System Management Controller) 数据
-//  包括温度传感器
+//  只读访问 macOS SMC 温度传感器。
 //
 
 import Foundation
-import IOKit
 
 #if os(macOS)
+import IOKit
 
-// MARK: - SMC 数据结构
-
-/// SMC 返回的数据类型
-private struct SMCKeyData {
-    var majorType: UInt8 = 0
-    var minorType: UInt8 = 0
-    var dataSize: UInt32 = 0
-    var dataValueType: FourCharCode = 0
-    var data: SMCBytes = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-    var key: FourCharCode = 0
-    var status: UInt8 = 0
-    var info: SMCKeyInfo = SMCKeyInfo()
-}
-
-private struct SMCKeyInfo {
-    var dataSize: UInt32 = 0
-    var dataType: FourCharCode = 0
-    var dataAttributes: UInt8 = 0
-}
+// MARK: - SMC 内核 ABI
 
 private typealias SMCBytes = (
     UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
@@ -39,24 +19,81 @@ private typealias SMCBytes = (
     UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8
 )
 
-// MARK: - SMC 核心读取器
+private struct SMCVersion {
+    var major: UInt8 = 0
+    var minor: UInt8 = 0
+    var build: UInt8 = 0
+    var reserved: UInt8 = 0
+    var release: UInt16 = 0
+}
 
-/// SMC 核心读取器
+private struct SMCPowerLimitData {
+    var version: UInt16 = 0
+    var length: UInt16 = 0
+    var cpuPLimit: UInt32 = 0
+    var gpuPLimit: UInt32 = 0
+    var memoryPLimit: UInt32 = 0
+}
+
+private struct SMCKeyInfo {
+    var dataSize: UInt32 = 0
+    var dataType: UInt32 = 0
+    var dataAttributes: UInt8 = 0
+    // Swift 会复用嵌套结构的尾部填充；显式保留 3 字节以匹配 C ABI。
+    var padding: (UInt8, UInt8, UInt8) = (0, 0, 0)
+}
+
+/// 字段顺序必须与 AppleSMC 用户客户端的 80 字节结构一致。
+private struct SMCKeyData {
+    var key: UInt32 = 0
+    var version = SMCVersion()
+    var powerLimitData = SMCPowerLimitData()
+    var keyInfo = SMCKeyInfo()
+    var result: UInt8 = 0
+    var status: UInt8 = 0
+    var command: UInt8 = 0
+    var data32: UInt32 = 0
+    var bytes: SMCBytes = (
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0
+    )
+}
+
+private enum SMCCommand {
+    static let readBytes: UInt8 = 5
+    static let readKeyInfo: UInt8 = 9
+    static let kernelIndex: UInt32 = 2
+}
+
+// MARK: - SMC 连接
+
 private final class SMCConnection {
     private var connection: io_connect_t = 0
 
     init?() {
-        let service = IOServiceGetMatchingService(
-            kIOMainPortDefault,
-            IOServiceMatching("AppleSMC")
-        )
+        guard MemoryLayout<SMCKeyData>.stride == 80 else {
+            assertionFailure(
+                "Unexpected SMCKeyData ABI layout: \(MemoryLayout<SMCKeyData>.stride) bytes"
+            )
+            return nil
+        }
+
+        let serviceNames = ["AppleSMC", "AppleSMCKeysEndpoint"]
+        var service: io_service_t = 0
+
+        for serviceName in serviceNames where service == 0 {
+            service = IOServiceGetMatchingService(
+                kIOMainPortDefault,
+                IOServiceMatching(serviceName)
+            )
+        }
+
         guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
 
-        let result = IOServiceOpen(service, mach_task_self_, 0, &connection)
-        IOObjectRelease(service)
-
-        guard result == kIOReturnSuccess else {
-            print("[SMCReader] 无法打开 SMC 连接，错误码: \(result)")
+        guard IOServiceOpen(service, mach_task_self_, 0, &connection) == kIOReturnSuccess else {
             return nil
         }
     }
@@ -67,241 +104,192 @@ private final class SMCConnection {
         }
     }
 
-    /// 读取 SMC 值
     func read(key: String) -> Double? {
-        guard key.count == 4 else { return nil }
+        guard key.utf8.count == 4 else { return nil }
 
         var input = SMCKeyData()
         var output = SMCKeyData()
+        input.key = fourCharacterCode(key)
+        input.command = SMCCommand.readKeyInfo
 
-        // 第一步：获取 key 信息
-        input.key = fourCharCode(from: key)
-        input.majorType = 2 // SMC_CMD_READ_KEYINFO
+        guard call(input: &input, output: &output) else { return nil }
+        let keyInfo = output.keyInfo
+        guard keyInfo.dataSize > 0, keyInfo.dataSize <= 32 else { return nil }
 
-        guard callKernel(input: &input, output: &output) else { return nil }
+        input.keyInfo = keyInfo
+        input.command = SMCCommand.readBytes
+        output = SMCKeyData()
 
-        let info = output.info
-        guard info.dataSize > 0 else { return nil }
-
-        // 第二步：读取数据
-        input.majorType = 5 // SMC_CMD_READ_BYTES
-        input.info = info
-
-        guard callKernel(input: &input, output: &output) else { return nil }
-
-        // 解析数据
-        return parseSMCValue(type: info.dataType, bytes: output.data, size: Int(info.dataSize))
+        guard call(input: &input, output: &output) else { return nil }
+        return parseValue(
+            type: keyInfo.dataType,
+            bytes: byteArray(from: output.bytes),
+            size: Int(keyInfo.dataSize)
+        )
     }
 
-    /// 调用内核
-    private func callKernel(input: inout SMCKeyData, output: inout SMCKeyData) -> Bool {
-        let inputSize = MemoryLayout<SMCKeyData>.stride
+    private func call(input: inout SMCKeyData, output: inout SMCKeyData) -> Bool {
         var outputSize = MemoryLayout<SMCKeyData>.stride
-
         let result = IOConnectCallStructMethod(
             connection,
-            UInt32(2), // KERNEL_INDEX_SMC
+            SMCCommand.kernelIndex,
             &input,
-            inputSize,
+            MemoryLayout<SMCKeyData>.stride,
             &output,
             &outputSize
         )
-
         return result == kIOReturnSuccess
     }
 
-    /// 解析 SMC 值
-    private func parseSMCValue(type: FourCharCode, bytes: SMCBytes, size: Int) -> Double? {
+    private func parseValue(type: UInt32, bytes: [UInt8], size: Int) -> Double? {
+        guard bytes.count >= size else { return nil }
+
         switch type {
-        case fourCharCode(from: "sp78"):
-            // 浮点数 7.8 格式（温度）
-            if size >= 2 {
-                let sign = Int16(bytes.0)
-                let fraction = UInt16(bytes.1)
-                return Double(sign) + Double(fraction) / 256.0
+        case fourCharacterCode("sp78"):
+            guard size >= 2 else { return nil }
+            let raw = Int16(bitPattern: (UInt16(bytes[0]) << 8) | UInt16(bytes[1]))
+            return plausibleTemperature(Double(raw) / 256)
+
+        case fourCharacterCode("flt "):
+            guard size >= 4 else { return nil }
+            var value: Float = 0
+            withUnsafeMutableBytes(of: &value) { destination in
+                destination[0] = bytes[0]
+                destination[1] = bytes[1]
+                destination[2] = bytes[2]
+                destination[3] = bytes[3]
             }
-        case fourCharCode(from: "flt "):
-            // 标准浮点数
-            if size >= 4 {
-                var value: Float = 0
-                withUnsafeMutableBytes(of: &value) { ptr in
-                    ptr[0] = bytes.0
-                    ptr[1] = bytes.1
-                    ptr[2] = bytes.2
-                    ptr[3] = bytes.3
-                }
-                return Double(value)
-            }
-        case fourCharCode(from: "fpe2"):
-            // 浮点数 14.2 格式
-            if size >= 2 {
-                let value = (UInt16(bytes.0) << 8) | UInt16(bytes.1)
-                return Double(value) / 4.0
-            }
-        case fourCharCode(from: "ui16"):
-            // 无符号 16 位整数
-            if size >= 2 {
-                return Double((UInt16(bytes.0) << 8) | UInt16(bytes.1))
-            }
-        case fourCharCode(from: "ui32"):
-            // 无符号 32 位整数
-            if size >= 4 {
-                return Double(
-                    (UInt32(bytes.0) << 24) |
-                    (UInt32(bytes.1) << 16) |
-                    (UInt32(bytes.2) << 8) |
-                    UInt32(bytes.3)
-                )
-            }
-        case fourCharCode(from: "si16"):
-            // 有符号 16 位整数
-            if size >= 2 {
-                let value = Int16(bitPattern: (UInt16(bytes.0) << 8) | UInt16(bytes.1))
-                return Double(value)
-            }
+            return plausibleTemperature(Double(value))
+
+        case fourCharacterCode("fpe2"):
+            guard size >= 2 else { return nil }
+            let raw = (UInt16(bytes[0]) << 8) | UInt16(bytes[1])
+            return plausibleTemperature(Double(raw) / 4)
+
+        case fourCharacterCode("fp88"):
+            guard size >= 2 else { return nil }
+            let raw = (UInt16(bytes[0]) << 8) | UInt16(bytes[1])
+            return plausibleTemperature(Double(raw) / 256)
+
         default:
-            // 尝试作为 sp78 解析（大多数温度使用此格式）
-            if size >= 2 {
-                let sign = Int16(bytes.0)
-                let fraction = UInt16(bytes.1)
-                let value = Double(sign) + Double(fraction) / 256.0
-                // 检查是否是合理的温度值 (-100 到 150)
-                if value > -100 && value < 150 {
-                    return value
-                }
-            }
+            return nil
         }
-        return nil
     }
 
-    /// 将字符串转换为 FourCharCode
-    private func fourCharCode(from string: String) -> FourCharCode {
-        var code: FourCharCode = 0
-        for (index, char) in string.utf8.enumerated() where index < 4 {
-            code = code << 8 | FourCharCode(char)
+    private func plausibleTemperature(_ value: Double) -> Double? {
+        guard value.isFinite, value > -40, value < 150 else { return nil }
+        return value
+    }
+
+    private func byteArray(from bytes: SMCBytes) -> [UInt8] {
+        withUnsafeBytes(of: bytes) { Array($0) }
+    }
+
+    private func fourCharacterCode(_ string: String) -> UInt32 {
+        string.utf8.reduce(UInt32(0)) { code, character in
+            (code << 8) | UInt32(character)
         }
-        return code
     }
 }
 
 // MARK: - 公开 API
 
-/// 温度传感器读数
 struct TemperatureReading: Equatable, Identifiable {
     let id = UUID()
     let name: String
-    let temperature: Double // 摄氏度
+    let temperature: Double
 
     var formatted: String {
         String(format: "%.1f°C", temperature)
     }
 }
 
-/// SMC 读取器 - 公开接口
 final class SMCReader {
-    private var connection: SMCConnection?
-    private var isAvailable: Bool = false
+    private struct SensorDefinition {
+        let key: String
+        let name: String
+        let category: Category
+
+        enum Category {
+            case cpu
+            case gpu
+            case system
+        }
+    }
+
+    private static let sensorDefinitions: [SensorDefinition] = [
+        // Apple Silicon 代表性传感器
+        SensorDefinition(key: "TCMz", name: "CPU Die Hotspot", category: .cpu),
+        SensorDefinition(key: "TCMb", name: "CPU Core Max", category: .cpu),
+        SensorDefinition(key: "TRDX", name: "GPU Die Hotspot", category: .gpu),
+        SensorDefinition(key: "TPMP", name: "SoC Package", category: .system),
+        SensorDefinition(key: "TVm0", name: "Unified Memory", category: .system),
+        SensorDefinition(key: "TMVR", name: "Memory VRM", category: .system),
+        SensorDefinition(key: "T5SP", name: "SSD Controller", category: .system),
+        SensorDefinition(key: "TB0T", name: "Battery", category: .system),
+        SensorDefinition(key: "TAOL", name: "Ambient", category: .system),
+        SensorDefinition(key: "TW0P", name: "Wi-Fi", category: .system),
+
+        // Intel Mac 与部分机型的兼容键
+        SensorDefinition(key: "TC0P", name: "CPU Proximity", category: .cpu),
+        SensorDefinition(key: "TC0D", name: "CPU Die", category: .cpu),
+        SensorDefinition(key: "TC0E", name: "CPU Core", category: .cpu),
+        SensorDefinition(key: "TG0P", name: "GPU Proximity", category: .gpu),
+        SensorDefinition(key: "TG0D", name: "GPU Die", category: .gpu),
+        SensorDefinition(key: "TM0P", name: "Memory Proximity", category: .system),
+        SensorDefinition(key: "Ts0P", name: "SSD Proximity", category: .system)
+    ]
+
+    private let connection: SMCConnection?
 
     init() {
         connection = SMCConnection()
-        isAvailable = connection != nil
     }
 
-    /// 检查 SMC 是否可用
     var available: Bool {
-        isAvailable
+        connection != nil
     }
 
-    // MARK: - 温度传感器
-
-    /// 常见温度传感器的 SMC Key
-    private static let temperatureKeys: [(key: String, name: String)] = [
-        // CPU 温度
-        ("TC0P", "CPU 近端"),
-        ("TC0D", "CPU 核心"),
-        ("TC0E", "CPU"),
-        ("TC0F", "CPU"),
-        ("TC1C", "CPU 核心 1"),
-        ("TC2C", "CPU 核心 2"),
-        ("TC3C", "CPU 核心 3"),
-        ("TC4C", "CPU 核心 4"),
-        ("TC5C", "CPU 核心 5"),
-        ("TC6C", "CPU 核心 6"),
-        ("TC7C", "CPU 核心 7"),
-        ("TC8C", "CPU 核心 8"),
-        // GPU 温度
-        ("TG0P", "GPU 近端"),
-        ("TG0D", "GPU 核心"),
-        ("TG0H", "GPU 散热器"),
-        // 内存温度
-        ("TM0P", "内存 近端"),
-        ("TM0S", "内存"),
-        // SSD 温度
-        ("Ts0P", "SSD"),
-        ("Ts1P", "SSD"),
-        // 主板温度
-        ("Ts0S", "主板"),
-        ("Tp01", "主板 近端"),
-    ]
-
-    /// 读取所有可用的温度传感器
     func readTemperatures() -> [TemperatureReading] {
-        guard let connection = connection else { return [] }
+        guard let connection else { return [] }
 
-        var readings: [TemperatureReading] = []
-
-        for (key, name) in Self.temperatureKeys {
-            if let temp = connection.read(key: key), temp > -40, temp < 150 {
-                readings.append(TemperatureReading(name: name, temperature: temp))
-            }
-        }
-
-        // 去重：相同温度的传感器只保留一个
-        var seen = Set<Double>()
-        return readings.filter { reading in
-            if seen.contains(reading.temperature) {
-                return false
-            }
-            seen.insert(reading.temperature)
-            return true
+        return Self.sensorDefinitions.compactMap { sensor in
+            guard let temperature = connection.read(key: sensor.key) else { return nil }
+            return TemperatureReading(name: sensor.name, temperature: temperature)
         }
     }
 
-    /// 读取 CPU 温度（取所有 CPU 传感器的平均值）
+    /// 优先显示热点；热点不可用时退回其它 CPU 传感器的最高值。
     func readCPUTemperature() -> Double? {
-        guard let connection = connection else { return nil }
-
-        let cpuKeys = ["TC0P", "TC0D", "TC0E", "TC0F", "TC1C", "TC2C", "TC3C", "TC4C"]
-        var temps: [Double] = []
-
-        for key in cpuKeys {
-            if let temp = connection.read(key: key), temp > 0, temp < 150 {
-                temps.append(temp)
-            }
-        }
-
-        guard !temps.isEmpty else { return nil }
-        return temps.reduce(0, +) / Double(temps.count)
+        readTemperature(category: .cpu, preferredKeys: ["TCMz", "TCMb", "TC0D", "TC0P"])
     }
 
-    /// 读取 GPU 温度
+    /// 优先显示 GPU 热点；旧机型退回 GPU 核心或近端传感器。
     func readGPUTemperature() -> Double? {
-        guard let connection = connection else { return nil }
-
-        let gpuKeys = ["TG0P", "TG0D", "TG0H"]
-        for key in gpuKeys {
-            if let temp = connection.read(key: key), temp > 0, temp < 150 {
-                return temp
-            }
-        }
-        return nil
+        readTemperature(category: .gpu, preferredKeys: ["TRDX", "TG0D", "TG0P"])
     }
 
+    private func readTemperature(
+        category: SensorDefinition.Category,
+        preferredKeys: [String]
+    ) -> Double? {
+        guard let connection else { return nil }
+
+        for key in preferredKeys {
+            if let temperature = connection.read(key: key) {
+                return temperature
+            }
+        }
+
+        return Self.sensorDefinitions
+            .filter { $0.category == category }
+            .compactMap { connection.read(key: $0.key) }
+            .max()
+    }
 }
 
 #else
 
-// 非 macOS 平台的空实现
 final class SMCReader {
     var available: Bool { false }
     func readTemperatures() -> [TemperatureReading] { [] }

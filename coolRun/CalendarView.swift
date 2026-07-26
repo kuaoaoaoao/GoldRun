@@ -49,16 +49,8 @@ struct CalendarView: View {
             selectedDateDetailView
         }
         .padding(.vertical, 6)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(colorScheme == .dark ? Color.black.opacity(0.3) : Color.white.opacity(0.5))
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.08), lineWidth: 0.5)
-        }
-        .shadow(color: colorScheme == .dark ? .black.opacity(0.2) : .black.opacity(0.08), radius: 10, y: 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .appCardSurface(cornerRadius: 12)
         .sheet(isPresented: $showBirthdayList) {
             BirthdayListView()
         }
@@ -192,13 +184,13 @@ struct CalendarView: View {
                     // 生日名称
                     if hasBirthday {
                         Text(birthdayDisplayText(birthdays: birthdays))
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(AppTheme.warning)
                             .lineLimit(1)
                     } else {
                         // 占位，保持高度一致
                         Text(" ")
-                            .font(.system(size: 7))
+                            .font(.system(size: 8))
                     }
                 }
                 .frame(height: 36)
@@ -244,10 +236,10 @@ struct CalendarView: View {
         .background {
             if isSelected {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(AppTheme.healthy.opacity(0.2))
+                    .fill(AppTheme.accent.opacity(0.18))
             } else if isToday {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(AppTheme.healthy.opacity(0.5), lineWidth: 1)
+                    .stroke(AppTheme.accent.opacity(0.55), lineWidth: 1)
             } else if hasBirthday {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(AppTheme.warning.opacity(0.12))
@@ -495,9 +487,9 @@ struct CalendarView: View {
 
     private func dayNumberColor(isToday: Bool, isSelected: Bool, isWeekend: Bool, isCurrentMonth: Bool) -> Color {
         if isSelected {
-            return AppTheme.healthy
+            return AppTheme.accent
         } else if isToday {
-            return AppTheme.healthy
+            return AppTheme.accent
         } else if !isCurrentMonth {
             return AppTheme.textSecondary(colorScheme).opacity(0.4)
         } else if isWeekend {
@@ -539,7 +531,7 @@ struct CalendarView: View {
 
         // 初一月名
         if lunarDate.day == 1 && isCurrentMonth {
-            return AppTheme.healthy
+            return AppTheme.accent
         }
 
         // 非当月
@@ -549,7 +541,7 @@ struct CalendarView: View {
 
         // 选中
         if isSelected {
-            return AppTheme.healthy.opacity(0.8)
+            return AppTheme.accent.opacity(0.82)
         }
 
         return AppTheme.textSecondary(colorScheme)
@@ -667,12 +659,12 @@ struct YearMonthPickerView: View {
             Button(action: goToToday) {
                 Text(LocalizedString.calendar("today"))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(AppTheme.healthy)
+                    .foregroundStyle(AppTheme.accent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(AppTheme.healthy.opacity(0.5), lineWidth: 1)
+                            .stroke(AppTheme.accent.opacity(0.5), lineWidth: 1)
                     }
             }
             .buttonStyle(.plain)
@@ -722,12 +714,12 @@ struct YearMonthPickerView: View {
         }) {
             Text("\(year)")
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : (isCurrentYear ? AppTheme.healthy : AppTheme.textPrimary(colorScheme)))
+                .foregroundStyle(isSelected ? .white : (isCurrentYear ? AppTheme.accent : AppTheme.textPrimary(colorScheme)))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isSelected ? AppTheme.healthy : (isCurrentYear ? AppTheme.healthy.opacity(0.1) : AppTheme.progressBg(colorScheme)))
+                        .fill(isSelected ? AppTheme.accent : (isCurrentYear ? AppTheme.accent.opacity(0.1) : AppTheme.progressBg(colorScheme)))
                 }
         }
         .buttonStyle(.plain)
@@ -766,12 +758,12 @@ struct YearMonthPickerView: View {
         }) {
             Text(months[month - 1])
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : (isCurrentMonth ? AppTheme.healthy : AppTheme.textPrimary(colorScheme)))
+                .foregroundStyle(isSelected ? .white : (isCurrentMonth ? AppTheme.accent : AppTheme.textPrimary(colorScheme)))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isSelected ? AppTheme.healthy : (isCurrentMonth ? AppTheme.healthy.opacity(0.1) : AppTheme.progressBg(colorScheme)))
+                        .fill(isSelected ? AppTheme.accent : (isCurrentMonth ? AppTheme.accent.opacity(0.1) : AppTheme.progressBg(colorScheme)))
                 }
         }
         .buttonStyle(.plain)
@@ -802,7 +794,7 @@ struct YearMonthPickerView: View {
                     .padding(.vertical, 8)
                     .background {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(AppTheme.healthy)
+                            .fill(AppTheme.accent)
                     }
             }
             .buttonStyle(.plain)

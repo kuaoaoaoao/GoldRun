@@ -346,11 +346,7 @@ final class GoldPredictionLearningStore {
     @ObservationIgnored private let minimumRecordInterval: TimeInterval = 10 * 60
 
     private init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        let directory = (appSupport ?? FileManager.default.temporaryDirectory)
-            .appendingPathComponent("coolRun", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        fileURL = directory.appendingPathComponent("gold_prediction_learning.json")
+        fileURL = GoldDataStorage.fileURL(named: "gold_prediction_learning.json")
 
         encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
@@ -466,16 +462,14 @@ final class GoldPredictionLearningStore {
         filterStatus = nil
     }
 
-    // Available filter options
-    static let availableStrategyVersions: [String] = {
-        let versions = Set(GoldPredictionLearningStore.shared.allRecords.map(\.strategyVersion)).sorted()
-        return versions
-    }()
+    // Available filter options（每次访问实时计算，避免新记录进入后选项不刷新）
+    static var availableStrategyVersions: [String] {
+        Set(GoldPredictionLearningStore.shared.allRecords.map(\.strategyVersion)).sorted()
+    }
 
-    static let availableRegimes: [String] = {
-        let regimes = Set(GoldPredictionLearningStore.shared.allRecords.map(\.regime)).sorted()
-        return regimes
-    }()
+    static var availableRegimes: [String] {
+        Set(GoldPredictionLearningStore.shared.allRecords.map(\.regime)).sorted()
+    }
 
     static let availableDirections: [String] = ["buy", "sell"]
 
@@ -486,8 +480,23 @@ final class GoldPredictionLearningStore {
     }
 
     private func loadFromDisk() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
-        allRecords = (try? decoder.decode([GoldPredictionLearningRecord].self, from: data)) ?? []
+        let sources = GoldDataStorage.readableFileURLs(named: fileURL.lastPathComponent)
+        var recordsByID: [UUID: GoldPredictionLearningRecord] = [:]
+        for source in sources {
+            guard let data = try? Data(contentsOf: source),
+                  let sourceRecords = try? decoder.decode([GoldPredictionLearningRecord].self, from: data) else { continue }
+            for record in sourceRecords {
+                recordsByID[record.id] = record
+            }
+        }
+
+        allRecords = recordsByID.values.sorted { $0.createdAt < $1.createdAt }
+        if allRecords.count > maxRecords {
+            allRecords.removeFirst(allRecords.count - maxRecords)
+        }
+        if !allRecords.isEmpty, sources.contains(where: { $0.standardizedFileURL != fileURL.standardizedFileURL }) {
+            saveToDisk()
+        }
     }
 
     func saveToDisk() {

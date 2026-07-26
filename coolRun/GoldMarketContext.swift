@@ -112,7 +112,7 @@ final class GoldMarketContextService {
         }
 
         do {
-            newsItems = try await fetchGoldNews()
+            newsItems = try await fetchGoldNews(now: now)
         } catch {
             newsItems = []
             missingParts.append(LocalizedString.gold("missing_news_rss"))
@@ -139,31 +139,103 @@ final class GoldMarketContextService {
         return context
     }
 
-    private func fetchGoldNews() async throws -> [GoldNewsItem] {
+    private struct NewsSearch: Sendable {
+        let query: String
+        let language: String
+        let region: String
+        let edition: String
+    }
+
+    private func fetchGoldNews(now: Date) async throws -> [GoldNewsItem] {
+        let searches = [
+            NewsSearch(
+                query: "(黄金 OR 金价 OR XAUUSD) when:3d",
+                language: "zh-CN",
+                region: "CN",
+                edition: "CN:zh-Hans"
+            ),
+            NewsSearch(
+                query: "(黄金 OR 金价) (美联储 OR 美元 OR 美债收益率 OR 通胀 OR 地缘冲突) when:3d",
+                language: "zh-CN",
+                region: "CN",
+                edition: "CN:zh-Hans"
+            ),
+            NewsSearch(
+                query: "(gold OR XAUUSD) (Fed OR dollar OR Treasury yields OR inflation OR geopolitics) when:3d",
+                language: "en-US",
+                region: "US",
+                edition: "US:en"
+            )
+        ]
+
+        let batches = await withTaskGroup(of: [RSSParsedItem].self) { group in
+            for search in searches {
+                group.addTask { [session] in
+                    do {
+                        let url = try await Self.newsURL(for: search)
+                        let data = try await Self.fetchData(session: session, url: url, timeout: 12)
+                        return await GoldNewsRSSParser.parse(data: data)
+                    } catch {
+                        return []
+                    }
+                }
+            }
+
+            var result: [[RSSParsedItem]] = []
+            for await batch in group where !batch.isEmpty {
+                result.append(batch)
+            }
+            return result
+        }
+
+        guard !batches.isEmpty else { throw GoldMarketContextError.invalidResponse }
+
+        let oldestAllowed = now.addingTimeInterval(-4 * 24 * 60 * 60)
+        var seenTitles = Set<String>()
+        let merged = batches
+            .flatMap { $0 }
+            .filter { item in
+                item.publishedAt.map { $0 >= oldestAllowed && $0 <= now.addingTimeInterval(10 * 60) } ?? true
+            }
+            .sorted { lhs, rhs in
+                (lhs.publishedAt ?? .distantPast) > (rhs.publishedAt ?? .distantPast)
+            }
+            .filter { item in
+                let key = Self.normalizedNewsTitle(item.title)
+                return !key.isEmpty && seenTitles.insert(key).inserted
+            }
+
+        return merged.prefix(30).map { item in
+            GoldNewsItem(
+                title: item.title,
+                source: item.source,
+                link: item.link,
+                publishedAt: item.publishedAt,
+                sentimentScore: GoldMarketContextScorer.scoreNewsText(item.title)
+            )
+        }
+    }
+
+    private static func newsURL(for search: NewsSearch) throws -> URL {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "news.google.com"
         components.path = "/rss/search"
         components.queryItems = [
-            URLQueryItem(name: "q", value: "gold OR XAUUSD OR 黄金 美联储 美元 收益率"),
-            URLQueryItem(name: "hl", value: "zh-CN"),
-            URLQueryItem(name: "gl", value: "CN"),
-            URLQueryItem(name: "ceid", value: "CN:zh-Hans")
+            URLQueryItem(name: "q", value: search.query),
+            URLQueryItem(name: "hl", value: search.language),
+            URLQueryItem(name: "gl", value: search.region),
+            URLQueryItem(name: "ceid", value: search.edition)
         ]
 
         guard let url = components.url else { throw GoldMarketContextError.invalidURL }
-        let data = try await fetchData(url: url, timeout: 12)
-        return GoldNewsRSSParser.parse(data: data)
-            .prefix(10)
-            .map { item in
-                GoldNewsItem(
-                    title: item.title,
-                    source: item.source,
-                    link: item.link,
-                    publishedAt: item.publishedAt,
-                    sentimentScore: GoldMarketContextScorer.scoreNewsText(item.title)
-                )
-            }
+        return url
+    }
+
+    private static func normalizedNewsTitle(_ title: String) -> String {
+        title
+            .lowercased()
+            .replacingOccurrences(of: #"[^\p{L}\p{N}]"#, with: "", options: .regularExpression)
     }
 
     private func fetchTreasuryYieldContext(now: Date) async throws -> GoldMacroSnapshot {
@@ -207,6 +279,10 @@ final class GoldMarketContextService {
     }
 
     private func fetchData(url: URL, timeout: TimeInterval) async throws -> Data {
+        try await Self.fetchData(session: session, url: url, timeout: timeout)
+    }
+
+    private static func fetchData(session: URLSession, url: URL, timeout: TimeInterval) async throws -> Data {
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.setValue("coolRun gold context", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
@@ -249,7 +325,7 @@ enum GoldMarketContextScorer {
         missingDataDescription: String? = nil
     ) -> GoldMarketContext {
         let macroScore = scoreMacro(macro)
-        let newsScore = scoreNewsItems(newsItems)
+        let newsScore = scoreNewsItems(newsItems, now: now)
         let availableWeights = (macro == nil ? 0.0 : 0.55) + (newsItems.isEmpty ? 0.0 : 0.45)
         let overallScore: Double
 
@@ -296,11 +372,19 @@ enum GoldMarketContextScorer {
         return (-changeBps * 2.2).clamped(to: -45...45)
     }
 
-    private nonisolated static func scoreNewsItems(_ items: [GoldNewsItem]) -> Double {
+    private nonisolated static func scoreNewsItems(_ items: [GoldNewsItem], now: Date) -> Double {
         guard !items.isEmpty else { return 0 }
         let scoredItems = items.filter { abs($0.sentimentScore) > 0 }
         let source = scoredItems.isEmpty ? items : scoredItems
-        return (source.map(\.sentimentScore).reduce(0, +) / Double(source.count)).clamped(to: -100...100)
+        let weighted = source.map { item -> (score: Double, weight: Double) in
+            guard let publishedAt = item.publishedAt else { return (item.sentimentScore, 0.35) }
+            let ageHours = max(0, now.timeIntervalSince(publishedAt) / 3600)
+            let recencyWeight = exp(-ageHours / 36)
+            return (item.sentimentScore, max(0.15, recencyWeight))
+        }
+        let totalWeight = weighted.map(\.weight).reduce(0, +)
+        guard totalWeight > 0 else { return 0 }
+        return (weighted.map { $0.score * $0.weight }.reduce(0, +) / totalWeight).clamped(to: -100...100)
     }
 
     private nonisolated static func makeReasons(

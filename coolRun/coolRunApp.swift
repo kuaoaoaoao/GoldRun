@@ -17,6 +17,9 @@ struct coolRunApp: App {
     #endif
 
     init() {
+        GoldDataStorage.migrateLegacyGoldPreferencesIfNeeded()
+        CloudSyncStore.shared.start()
+        CloudSyncStore.shared.pushBirthdaysFromLocalDefaults()
         Analytics.configure(
             projectToken: ProcessInfo.processInfo.environment["POSTHOG_API_KEY"] ?? posthogApiKey,
             host: ProcessInfo.processInfo.environment["POSTHOG_HOST"] ?? posthogHost,

@@ -53,6 +53,22 @@ class AppSettings: ObservableObject {
         didSet { userDefaults.set(goldRefreshRate.rawValue, forKey: "gold_refresh_rate") }
     }
 
+    // 预测自动校准：关闭后只观察历史表现，不自动调整信心和仓位
+    @Published var goldAutoCalibrationEnabled: Bool {
+        didSet { userDefaults.set(goldAutoCalibrationEnabled, forKey: "gold_auto_calibration_enabled") }
+    }
+
+    // 金价到价提醒：触达上/下限时发系统通知
+    @Published var goldAlertEnabled: Bool {
+        didSet { userDefaults.set(goldAlertEnabled, forKey: "gold_alert_enabled") }
+    }
+    @Published var goldAlertUpperText: String {
+        didSet { userDefaults.set(goldAlertUpperText, forKey: "gold_alert_upper") }
+    }
+    @Published var goldAlertLowerText: String {
+        didSet { userDefaults.set(goldAlertLowerText, forKey: "gold_alert_lower") }
+    }
+
     // 隐私设置
     @Published var analyticsEnabled: Bool {
         didSet {
@@ -114,8 +130,17 @@ class AppSettings: ObservableObject {
     @Published var englishHasSeenVoiceOnboarding: Bool {
         didSet { userDefaults.set(englishHasSeenVoiceOnboarding, forKey: "english_has_seen_voice_onboarding") }
     }
+    // 语音质量横幅关闭后持久记住，不随面板重建反复出现
+    @Published var englishVoiceHintDismissed: Bool {
+        didSet { userDefaults.set(englishVoiceHintDismissed, forKey: "english_voice_hint_dismissed") }
+    }
     @Published var englishStage: EnglishStage {
         didSet { userDefaults.set(englishStage.rawValue, forKey: "english_stage") }
+    }
+
+    // 记住上次使用的模块，重启后直接回到该模块
+    @Published var lastViewModeRaw: String {
+        didSet { userDefaults.set(lastViewModeRaw, forKey: "last_view_mode") }
     }
 
     private init() {
@@ -140,7 +165,15 @@ class AppSettings: ObservableObject {
         let goldRefreshRaw = userDefaults.string(forKey: "gold_refresh_rate") ?? GoldRefreshRate.minute.rawValue
         self.goldRefreshRate = GoldRefreshRate(rawValue: goldRefreshRaw) ?? .minute
 
+        self.goldAutoCalibrationEnabled = userDefaults.object(forKey: "gold_auto_calibration_enabled") as? Bool ?? true
+
+        self.goldAlertEnabled = userDefaults.object(forKey: "gold_alert_enabled") as? Bool ?? false
+        self.goldAlertUpperText = userDefaults.string(forKey: "gold_alert_upper") ?? ""
+        self.goldAlertLowerText = userDefaults.string(forKey: "gold_alert_lower") ?? ""
+
         self.analyticsEnabled = userDefaults.object(forKey: "analytics_enabled") as? Bool ?? true
+
+        self.lastViewModeRaw = userDefaults.string(forKey: "last_view_mode") ?? ""
 
         let modeRaw = userDefaults.string(forKey: "menubar_display_mode") ?? MenuBarDisplayMode.goldPrice.rawValue
         self.menuBarDisplayMode = MenuBarDisplayMode(rawValue: modeRaw) ?? .goldPrice
@@ -164,6 +197,7 @@ class AppSettings: ObservableObject {
         self.englishMenuTextStyle = EnglishMenuTextStyle(rawValue: textStyleRaw) ?? .englishOnly
         self.englishDailyTarget = userDefaults.object(forKey: "english_daily_target") as? Int ?? 10
         self.englishHasSeenVoiceOnboarding = userDefaults.object(forKey: "english_has_seen_voice_onboarding") as? Bool ?? false
+        self.englishVoiceHintDismissed = userDefaults.object(forKey: "english_voice_hint_dismissed") as? Bool ?? false
         let stageRaw = userDefaults.string(forKey: "english_stage") ?? EnglishStage.daily.rawValue
         self.englishStage = EnglishStage(rawValue: stageRaw) ?? .daily
     }
@@ -203,6 +237,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     case network = "network"
     case novel = "novel"
     case english = "english"
+    case codex = "codex"
 
     var id: String { rawValue }
 
@@ -223,6 +258,8 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
             return LocalizedString.l(currentLang, en: "Novel", zh: "小说", ja: "小説", ko: "소설")
         case .english:
             return LocalizedString.l(currentLang, en: "English Learning", zh: "英语学习", ja: "英語学習", ko: "영어 학습")
+        case .codex:
+            return "Codex"
         }
     }
 
@@ -235,6 +272,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
         case .network: return "arrow.up.arrow.down"
         case .novel: return "book.pages"
         case .english: return "character.book.closed"
+        case .codex: return "sparkles"
         }
     }
 }
@@ -389,7 +427,20 @@ enum LocalizedString {
         case "coin_animation": return l(currentLang, en: "Coin Animation", zh: "金币动画", ja: "コインアニメーション", ko: "코인 애니메이션")
         case "gold_updates": return l(currentLang, en: "Gold Price Updates", zh: "金价更新", ja: "金価格の更新", ko: "금 가격 업데이트")
         case "gold_updates_desc": return l(currentLang, en: "Control request frequency to the price provider", zh: "控制向金价数据源发起请求的频率", ja: "価格データ提供元へのリクエスト頻度を管理", ko: "가격 제공자 요청 빈도 관리")
+        // 卡片新标题：刷新频率与到价提醒合并在同一卡，标题要能覆盖两者
+        case "gold_data_alerts": return l(currentLang, en: "Gold Data & Alerts", zh: "金价数据与提醒", ja: "金価格データとアラート", ko: "금 가격 데이터 및 알림")
+        case "gold_data_alerts_desc": return l(currentLang, en: "Refresh frequency and price alert thresholds", zh: "刷新频率与到价提醒阈值", ja: "更新頻度と価格アラートのしきい値", ko: "새로고침 빈도와 가격 알림 임계값")
+        // 到价提醒阈值非法输入提示
+        case "gold_alert_invalid": return l(currentLang, en: "Threshold must be a number greater than 0", zh: "阈值需为大于 0 的数字", ja: "しきい値は 0 より大きい数値を入力してください", ko: "임계값은 0보다 큰 숫자여야 합니다")
+        case "gold_alert_inverted": return l(currentLang, en: "Upper limit must be higher than lower limit", zh: "上限价需高于下限价", ja: "上限価格は下限価格より高くしてください", ko: "상한 가격은 하한 가격보다 높아야 합니다")
+        case "notification_permission_denied": return l(currentLang, en: "System notifications are disabled. Enable them in System Settings → Notifications.", zh: "系统通知权限未开启，提醒无法送达。可在 系统设置 → 通知 中开启", ja: "システム通知がオフのため通知を届けられません。システム設定 → 通知 で有効にしてください", ko: "시스템 알림이 꺼져 있어 알림을 받을 수 없습니다. 시스템 설정 → 알림에서 켜주세요")
         case "refresh_every": return l(currentLang, en: "Refresh Every", zh: "刷新间隔", ja: "更新間隔", ko: "새로 고침 간격")
+        case "gold_auto_calibration": return l(currentLang, en: "Auto Calibration", zh: "预测自动校准", ja: "予測自動補正", ko: "예측 자동 보정")
+        case "gold_auto_calibration_note": return l(currentLang, en: "Adjust confidence and position by historical hit rate. When off, results are observed only.", zh: "根据历史预测命中率自动调整信心和建议仓位；关闭后只展示观察结果，不参与调参。", ja: "履歴的中率に基づき信頼度とポジションを自動調整します。オフにすると観察のみ行います。", ko: "과거 적중률에 따라 신뢰도와 포지션을 자동 조정합니다. 끄면 관찰만 합니다.")
+        case "gold_alert": return l(currentLang, en: "Price Alert", zh: "到价提醒", ja: "価格アラート", ko: "가격 알림")
+        case "gold_alert_upper": return l(currentLang, en: "Upper Limit (¥/g)", zh: "上限价（元/克）", ja: "上限価格（元/g）", ko: "상한 가격 (위안/g)")
+        case "gold_alert_lower": return l(currentLang, en: "Lower Limit (¥/g)", zh: "下限价（元/克）", ja: "下限価格（元/g）", ko: "하한 가격 (위안/g)")
+        case "gold_alert_note": return l(currentLang, en: "Sends a system notification when the price crosses a limit. Re-arms after the price moves back inside.", zh: "金价触达上限或下限时发系统通知；价格回到区间内后会重新监控，避免反复提醒。", ja: "価格が上限・下限に達すると通知します。区間内に戻ると再監視します。", ko: "가격이 상한/하한에 도달하면 알림을 보냅니다. 구간 안으로 돌아오면 다시 감시합니다.")
         case "english_voice": return l(currentLang, en: "English Voice", zh: "英语语音", ja: "英語音声", ko: "영어 음성")
         case "english_voice_desc": return l(currentLang, en: "Choose an accent, installed system voice and speaking speed", zh: "选择口音、系统语音和朗读速度", ja: "アクセント、インストール済みの音声、読み上げ速度を選択", ko: "억양, 설치된 시스템 음성과 말하기 속도 선택")
         case "continuous_learning": return l(currentLang, en: "Continuous Learning", zh: "连续学习", ja: "連続学習", ko: "연속 학습")
@@ -429,6 +480,22 @@ enum LocalizedString {
         case "network": return l(currentLang, en: "Network", zh: "网络", ja: "ネットワーク", ko: "네트워크")
         case "uptime": return l(currentLang, en: "Uptime", zh: "运行时间", ja: "稼働時間", ko: "가동 시간")
         case "temperature": return l(currentLang, en: "Temperature", zh: "温度", ja: "温度", ko: "온도")
+        case "device_status": return l(currentLang, en: "Device status", zh: "设备状态", ja: "デバイス状態", ko: "기기 상태")
+        case "live": return l(currentLang, en: "Live monitoring", zh: "实时监控", ja: "リアルタイム監視", ko: "실시간 모니터링")
+        case "status_normal": return l(currentLang, en: "Normal", zh: "运行正常", ja: "正常", ko: "정상")
+        case "status_elevated": return l(currentLang, en: "Elevated load", zh: "负载偏高", ja: "負荷上昇", ko: "부하 높음")
+        case "status_attention": return l(currentLang, en: "Needs attention", zh: "需要关注", ja: "要確認", ko: "확인 필요")
+        case "cores_unit": return l(currentLang, en: "cores", zh: "核", ja: "コア", ko: "코어")
+        case "sensors": return l(currentLang, en: "sensors", zh: "传感器", ja: "センサー", ko: "센서")
+        case "unavailable": return l(currentLang, en: "Unavailable", zh: "不可用", ja: "利用不可", ko: "사용 불가")
+        case "temperature_unavailable": return l(currentLang, en: "Temperature sensors are unavailable on this device", zh: "当前设备无法读取温度传感器", ja: "このデバイスでは温度センサーを読み取れません", ko: "이 기기에서는 온도 센서를 읽을 수 없습니다")
+        case "thermal_normal": return l(currentLang, en: "Thermals normal", zh: "温度正常", ja: "温度正常", ko: "온도 정상")
+        case "thermal_warm": return l(currentLang, en: "Running warm", zh: "温度偏高", ja: "温度やや高め", ko: "온도 다소 높음")
+        case "thermal_hot": return l(currentLang, en: "Running hot", zh: "温度过高", ja: "高温", ko: "온도 높음")
+        case "expand_hint": return l(currentLang, en: "Show details", zh: "展开详情", ja: "詳細を表示", ko: "세부 정보 보기")
+        case "collapse_hint": return l(currentLang, en: "Hide details", zh: "收起详情", ja: "詳細を閉じる", ko: "세부 정보 닫기")
+        case "no_modules": return l(currentLang, en: "No monitor modules", zh: "未启用监控模块", ja: "監視モジュールなし", ko: "모니터링 모듈 없음")
+        case "no_modules_hint": return l(currentLang, en: "Enable modules in Settings", zh: "请在设置中启用需要的模块", ja: "設定でモジュールを有効にしてください", ko: "설정에서 모듈을 활성화하세요")
         case "core_count": return l(currentLang, en: "Cores", zh: "核心数", ja: "コア数", ko: "코어 수")
         case "cpu_temp": return l(currentLang, en: "CPU Temp", zh: "CPU 温度", ja: "CPU 温度", ko: "CPU 온도")
         case "gpu_temp": return l(currentLang, en: "GPU Temp", zh: "GPU 温度", ja: "GPU 温度", ko: "GPU 온도")
@@ -582,6 +649,41 @@ enum LocalizedString {
 
     // MARK: - 金价分析
 
+    /// 把数据时效秒数格式化为“X小时Y分前 / X分Y秒前 / X秒前”，避免出现七万多秒这种可读性差的显示。
+    static func goldAge(_ seconds: TimeInterval, lang: AppLanguage? = nil) -> String {
+        let currentLang = lang ?? AppSettings.shared.language
+        let total = max(Int(seconds), 0)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+
+        if hours > 0 {
+            return l(
+                currentLang,
+                en: "\(hours)h \(minutes)m ago",
+                zh: "\(hours)小时\(minutes)分前",
+                ja: "\(hours)時間\(minutes)分前",
+                ko: "\(hours)시간 \(minutes)분 전"
+            )
+        }
+        if minutes > 0 {
+            return l(
+                currentLang,
+                en: "\(minutes)m \(secs)s ago",
+                zh: "\(minutes)分\(secs)秒前",
+                ja: "\(minutes)分\(secs)秒前",
+                ko: "\(minutes)분 \(secs)초 전"
+            )
+        }
+        return l(
+            currentLang,
+            en: "\(secs)s ago",
+            zh: "\(secs)秒前",
+            ja: "\(secs)秒前",
+            ko: "\(secs)초 전"
+        )
+    }
+
     static func gold(_ key: String, lang: AppLanguage? = nil) -> String {
         let currentLang = lang ?? AppSettings.shared.language
         switch key {
@@ -700,6 +802,15 @@ enum LocalizedString {
         case "minutes_30": return l(currentLang, en: "30 minutes", zh: "30分钟", ja: "30分", ko: "30분")
         case "pending_count_format": return l(currentLang, en: "Pending %d", zh: "待验证 %d", ja: "検証待ち %d", ko: "대기 %d")
         case "calibration_applied_format": return l(currentLang, en: "Calibration applied: confidence ×%@, position ×%@", zh: "已应用校准：信心 ×%@，仓位 ×%@", ja: "補正を適用：信頼度 ×%@、ポジション ×%@", ko: "보정 적용: 신뢰도 ×%@, 포지션 ×%@")
+        case "calibration_reason_format": return l(currentLang, en: "Based on %d validated predictions: hit rate %@, avg bias %@", zh: "调整依据：%d 条已验证预测，方向命中率 %@，平均预测偏差 %@", ja: "調整根拠：検証済み %d 件、的中率 %@、平均バイアス %@", ko: "조정 근거: 검증된 예측 %d건, 적중률 %@, 평균 편향 %@")
+        case "calibration_off_note": return l(currentLang, en: "Auto calibration is off. History is observed only and does not change advice.", zh: "自动校准已关闭，历史表现仅观察，不影响建议。", ja: "自動補正はオフです。履歴は観察のみで提案に影響しません。", ko: "자동 보정이 꺼져 있습니다. 기록은 관찰만 되며 제안에 영향을 주지 않습니다.")
+        case "calibration_observed_format": return l(currentLang, en: "If enabled would apply: confidence ×%@, position ×%@", zh: "若开启将应用：信心 ×%@，仓位 ×%@", ja: "オンにすると適用：信頼度 ×%@、ポジション ×%@", ko: "켜면 적용됨: 신뢰도 ×%@, 포지션 ×%@")
+        case "group_stats": return l(currentLang, en: "Grouped Stats", zh: "分组统计", ja: "グループ統計", ko: "그룹 통계")
+        case "by_strategy_version": return l(currentLang, en: "By strategy version", zh: "按策略版本", ja: "戦略バージョン別", ko: "전략 버전별")
+        case "by_market_state": return l(currentLang, en: "By market state", zh: "按市场状态", ja: "市場状態別", ko: "시장 상태별")
+        case "by_direction": return l(currentLang, en: "By direction", zh: "按预测方向", ja: "予測方向別", ko: "예측 방향별")
+        case "hit_rate": return l(currentLang, en: "Hit rate", zh: "命中率", ja: "的中率", ko: "적중률")
+        case "validated_count_format": return l(currentLang, en: "Validated %d", zh: "已验证 %d", ja: "検証済み %d", ko: "검증됨 %d")
         case "recent_prediction_review": return l(currentLang, en: "Recent Prediction Review", zh: "最近预测复盘", ja: "最近の予測レビュー", ko: "최근 예측 복기")
         case "actual_return_format": return l(currentLang, en: "Actual %@", zh: "实际 %@", ja: "実績 %@", ko: "실제 %@")
         case "waiting_result_format": return l(currentLang, en: "Waiting 30 min result · %@", zh: "等待 30 分钟结果 · %@", ja: "30分後の結果待ち · %@", ko: "30분 결과 대기 · %@")
@@ -830,16 +941,25 @@ enum LocalizedString {
         case "stage_middle": return l(currentLang, en: "Middle School", zh: "初中英语", ja: "中学英語", ko: "중학교 영어")
         case "stage_high": return l(currentLang, en: "High School", zh: "高中英语", ja: "高校英語", ko: "고등학교 영어")
         case "stage_cet4": return l(currentLang, en: "CET-4", zh: "大学四级", ja: "CET-4", ko: "CET-4")
+        case "stage_cet6": return l(currentLang, en: "CET-6", zh: "大学六级", ja: "CET-6", ko: "CET-6")
+        case "stage_ielts": return l(currentLang, en: "IELTS", zh: "雅思", ja: "IELTS", ko: "IELTS")
+        case "stage_toefl": return l(currentLang, en: "TOEFL", zh: "托福", ja: "TOEFL", ko: "TOEFL")
         case "stage_daily_short": return l(currentLang, en: "Daily", zh: "日常", ja: "日常", ko: "일상")
         case "stage_primary_short": return l(currentLang, en: "Primary", zh: "小学", ja: "小学", ko: "초등")
         case "stage_middle_short": return l(currentLang, en: "Middle", zh: "初中", ja: "中学", ko: "중학")
         case "stage_high_short": return l(currentLang, en: "High", zh: "高中", ja: "高校", ko: "고등")
         case "stage_cet4_short": return l(currentLang, en: "CET-4", zh: "四级", ja: "CET-4", ko: "CET-4")
+        case "stage_cet6_short": return l(currentLang, en: "CET-6", zh: "六级", ja: "CET-6", ko: "CET-6")
+        case "stage_ielts_short": return l(currentLang, en: "IELTS", zh: "雅思", ja: "IELTS", ko: "IELTS")
+        case "stage_toefl_short": return l(currentLang, en: "TOEFL", zh: "托福", ja: "TOEFL", ko: "TOEFL")
         case "stage_daily_desc": return l(currentLang, en: "Everyday words for quick listening and review", zh: "日常场景词，适合快速听读和复习", ja: "日常場面の単語。短時間の聞き読みと復習向け", ko: "일상 단어, 빠른 듣기와 복습에 적합")
         case "stage_primary_desc": return l(currentLang, en: "Primary school basics plus a general expanded word list", zh: "小学基础词 + 通用扩展词表", ja: "小学校の基礎語彙 + 汎用拡張単語集", ko: "초등 기본 단어 + 일반 확장 단어장")
         case "stage_middle_desc": return l(currentLang, en: "Middle school core words plus a general expanded word list", zh: "初中核心词 + 通用扩展词表", ja: "中学校の重要語彙 + 汎用拡張単語集", ko: "중학교 핵심 단어 + 일반 확장 단어장")
         case "stage_high_desc": return l(currentLang, en: "High school core words plus a general expanded word list", zh: "高中核心词 + 通用扩展词表", ja: "高校の重要語彙 + 汎用拡張単語集", ko: "고등학교 핵심 단어 + 일반 확장 단어장")
         case "stage_cet4_desc": return l(currentLang, en: "CET-4 high-frequency words plus a general expanded word list", zh: "四级高频词 + 通用扩展词表", ja: "CET-4頻出語彙 + 汎用拡張単語集", ko: "CET-4 고빈도 단어 + 일반 확장 단어장")
+        case "stage_cet6_desc": return l(currentLang, en: "CET-6 high-frequency words for advanced college study", zh: "六级高频词，适合大学进阶学习", ja: "CET-6頻出語彙。大学の応用学習向け", ko: "CET-6 고빈도 단어, 대학 심화 학습에 적합")
+        case "stage_ielts_desc": return l(currentLang, en: "IELTS core academic and everyday vocabulary", zh: "雅思核心学术与生活词汇", ja: "IELTS重要アカデミー・日常語彙", ko: "IELTS 핵심 학술·일상 어휘")
+        case "stage_toefl_desc": return l(currentLang, en: "TOEFL high-frequency academic vocabulary", zh: "托福高频学术词汇", ja: "TOEFL頻出アカデミック語彙", ko: "TOEFL 고빈도 학술 어휘")
         // MenuTextStyle
         case "english_only": return l(currentLang, en: "English Only", zh: "仅英文", ja: "英語のみ", ko: "영어만")
         case "english_and_chinese": return l(currentLang, en: "English + Chinese", zh: "英文 + 中文", ja: "英語 + 中国語", ko: "영어 + 중국어")
@@ -884,6 +1004,8 @@ enum LocalizedString {
         case "voice_recommend": return l(currentLang, en: "Recommended voices (60–150MB, one-time download)", zh: "推荐音色（体积约 60–150MB，一次下载永久使用）", ja: "おすすめ音声（60-150MB、一度だけダウンロード）", ko: "추천 음성(60-150MB, 한 번만 다운로드)")
         case "later": return l(currentLang, en: "Later", zh: "以后再说", ja: "後で", ko: "나중에")
         case "go_download": return l(currentLang, en: "Open Settings", zh: "打开语音设置", ja: "設定を開く", ko: "설정 열기")
+        // 语音质量已达标时的按钮文案（不再误导用户去"下载"）
+        case "view_voice_settings": return l(currentLang, en: "View Voice Settings", zh: "查看语音设置", ja: "音声設定を見る", ko: "음성 설정 보기")
         case "download_now": return l(currentLang, en: "Download Now", zh: "立即前往下载", ja: "今すぐダウンロード", ko: "지금 다운로드")
         case "open_voice_download": return l(currentLang, en: "Open System Settings to download better English voices", zh: "打开系统设置，去下载更好听的英语语音", ja: "システム設定を開いてより自然な英語音声をダウンロード", ko: "시스템 설정을 열어 더 자연스러운 영어 음성 다운로드")
         case "close_hint": return l(currentLang, en: "Close for now", zh: "暂时关闭", ja: "いったん閉じる", ko: "일단 닫기")
@@ -1002,6 +1124,7 @@ enum LocalizedString {
         case "birthday_items": return l(currentLang, en: "Birthdays", zh: "生日", ja: "誕生日", ko: "생일")
         case "english_items": return l(currentLang, en: "English progress", zh: "英语学习进度", ja: "英語学習の進捗", ko: "영어 학습 진행도")
         case "gold_items": return l(currentLang, en: "Gold price history", zh: "金价历史", ja: "金価格履歴", ko: "금 가격 기록")
+        case "gold_trade_items": return l(currentLang, en: "Gold trade records", zh: "黄金交易流水", ja: "金の取引履歴", ko: "금 거래 내역")
         case "novel_items": return l(currentLang, en: "Novel progress/bookmarks", zh: "小说进度/书签", ja: "小説の進捗/しおり", ko: "소설 진행도/책갈피")
         case "app_settings": return l(currentLang, en: "App settings", zh: "应用设置", ja: "アプリ設定", ko: "앱 설정")
         default: return key

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AppKit
 
 struct EnglishLearningView: View {
     @ObservedObject private var manager = EnglishLearningManager.shared
@@ -7,7 +8,6 @@ struct EnglishLearningView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var textbookStore = EnglishTextbookStore.shared
     @Environment(\.colorScheme) private var colorScheme
-    @State private var voiceHintDismissed = false
     @State private var showVoiceOnboarding = false
     @State private var showTextbookManager = false
 
@@ -22,12 +22,18 @@ struct EnglishLearningView: View {
         return "\(LocalizedString.english("today_learning")) \(summary.learnedCount)/\(summary.dailyTarget)"
     }
 
+    private var queueProgress: Double {
+        guard manager.queueCount > 0 else { return 0 }
+        return min(Double(manager.currentIndex + 1) / Double(manager.queueCount), 1)
+    }
+
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             dailyProgress
             categoryPicker
 
-            if !voiceHintDismissed && manager.needsHigherQualityEnglishVoice {
+            // 关闭状态持久化，面板重建后不再反复弹出
+            if !settings.englishVoiceHintDismissed && manager.needsHigherQualityEnglishVoice {
                 voiceQualityBanner
             }
 
@@ -36,18 +42,23 @@ struct EnglishLearningView: View {
                 playbackControls
                 feedbackControls(item)
             } else {
-                ContentUnavailableView(LocalizedString.english("no_content"), systemImage: "character.book.closed")
-                    .frame(maxHeight: .infinity)
+                // 空态给行动入口，不让用户卡在"暂无内容"
+                ContentUnavailableView {
+                    Label(LocalizedString.english("no_content"), systemImage: "character.book.closed")
+                } actions: {
+                    Button {
+                        openTextbookManager()
+                    } label: {
+                        Label(LocalizedString.english("open_textbook_manager"), systemImage: "books.vertical")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                }
+                .frame(maxHeight: .infinity)
             }
         }
-        .padding(11)
-        .frame(minHeight: 410, maxHeight: 450)
-        .background(panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.08), lineWidth: 0.5)
-        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 410, maxHeight: .infinity, alignment: .top)
+        .appCardSurface(cornerRadius: 12)
         .overlay {
             if showVoiceOnboarding {
                 voiceOnboardingOverlay
@@ -62,33 +73,111 @@ struct EnglishLearningView: View {
             manager.refreshQueue()
             manager.markCurrentViewed()
             presentVoiceOnboardingIfNeeded()
+            syncEnglishToCloud()
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             manager.refreshQueue()
         }
+        .onChange(of: manager.currentItem) { _, _ in
+            syncEnglishToCloud()
+        }
+        .onChange(of: summary) { _, _ in
+            syncEnglishToCloud()
+        }
+    }
+
+    /// 课本管理面板 660x520 远超 320pt 弹窗，经 MacAppDelegate 以独立窗口打开；取不到 delegate 时回退 sheet
+    private func openTextbookManager() {
+        if let delegate = NSApp.delegate as? MacAppDelegate {
+            delegate.openEnglishTextbookManagerWindow()
+        } else {
+            showTextbookManager = true
+        }
+    }
+
+    /// 将英语打卡快照镜像到 iCloud，供手表端抬手查看（未开 iCloud 能力时优雅降级）。
+    private func syncEnglishToCloud() {
+        CloudSyncStore.shared.pushEnglish(
+            streak: summary.streak,
+            learnedToday: summary.learnedCount,
+            dailyTarget: summary.dailyTarget,
+            word: manager.currentItem?.title,
+            translation: manager.currentItem?.translation,
+            wordID: manager.currentItem?.id,
+            accent: settings.englishAccent.rawValue
+        )
     }
 
     private var dailyProgress: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: summary.isGoalComplete ? "checkmark.seal.fill" : "flame.fill")
-                    .foregroundStyle(summary.isGoalComplete ? AppTheme.healthy : AppTheme.warning)
+        HStack(spacing: 9) {
+            ZStack {
+                Circle()
+                    .stroke(AppTheme.progressBg(colorScheme), lineWidth: 4)
+                Circle()
+                    .trim(from: 0, to: max(0.025, summary.progress))
+                    .stroke(
+                        summary.isGoalComplete ? AppTheme.healthy : AppTheme.accent,
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                if summary.isGoalComplete {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(AppTheme.healthy)
+                } else {
+                    Text("\(summary.learnedCount)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+            }
+            .frame(width: 38, height: 38)
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(dailyProgressText)
                     .font(.system(size: 11, weight: .semibold))
-                Spacer()
-                Text("🔥 \(summary.streak) \(LocalizedString.english("days"))")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
-                textbookButton
+
+                HStack(spacing: 7) {
+                    Label("\(summary.streak) \(LocalizedString.english("days"))", systemImage: "flame.fill")
+                        .foregroundStyle(summary.streak > 0 ? AppTheme.warning : AppTheme.textSecondary(colorScheme))
+                    Label("\(summary.masteredCount)", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(summary.masteredCount > 0 ? AppTheme.healthy : AppTheme.textSecondary(colorScheme))
+                }
+                .font(.system(size: 8.5, weight: .medium, design: .rounded))
             }
-            ProgressView(value: summary.progress)
-                .tint(summary.isGoalComplete ? AppTheme.healthy : AppTheme.warning)
+
+            Spacer(minLength: 4)
+            textbookButton
         }
+        .padding(9)
+        .background(AppTheme.elevatedSurface(colorScheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppTheme.stroke(colorScheme), lineWidth: 0.5)
+        }
+    }
+
+    private var masteryTint: Color {
+        switch manager.currentProgress.mastery {
+        case .new: AppTheme.textSecondary(colorScheme)
+        case .unfamiliar: AppTheme.warning
+        case .learning: AppTheme.accent
+        case .familiar, .mastered: AppTheme.healthy
+        }
+    }
+
+    private var masteryStatus: some View {
+        Text(manager.currentProgress.mastery.title)
+            .font(.system(size: 8, weight: .semibold))
+            .foregroundStyle(masteryTint)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(masteryTint.opacity(0.12), in: Capsule())
     }
 
     private var textbookButton: some View {
         Button {
-            showTextbookManager = true
+            openTextbookManager()
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "books.vertical.fill")
@@ -101,8 +190,8 @@ struct EnglishLearningView: View {
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .foregroundStyle(AppTheme.healthy)
-            .background(AppTheme.healthy.opacity(0.14), in: Capsule())
+            .foregroundStyle(AppTheme.accent)
+            .background(AppTheme.accent.opacity(0.14), in: Capsule())
         }
         .buttonStyle(.plain)
         .fixedSize()
@@ -122,14 +211,17 @@ struct EnglishLearningView: View {
                             .font(.system(size: 10, weight: .semibold))
                         Text(category.title)
                             .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .truncationMode(.tail)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 24)
                     .padding(.vertical, 6)
-                    .foregroundStyle(manager.category == category ? AppTheme.healthy : AppTheme.textSecondary(colorScheme))
+                    .foregroundStyle(manager.category == category ? AppTheme.accent : AppTheme.textSecondary(colorScheme))
                     .background {
                         if manager.category == category {
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(AppTheme.healthy.opacity(0.14))
+                                .fill(AppTheme.accent.opacity(0.14))
                         }
                     }
                 }
@@ -147,13 +239,14 @@ struct EnglishLearningView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(cardEyebrow(item))
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(AppTheme.healthy)
+                        .foregroundStyle(AppTheme.accent)
                         .textCase(.uppercase)
                     Text(manager.positionText)
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(AppTheme.textSecondary(colorScheme))
                 }
                 Spacer()
+                masteryStatus
                 Button(action: manager.toggleFavorite) {
                     Image(systemName: manager.currentProgress.isFavorite ? "star.fill" : "star")
                         .font(.system(size: 13))
@@ -164,7 +257,18 @@ struct EnglishLearningView: View {
                 .help(manager.currentProgress.isFavorite ? LocalizedString.english("unfavorite") : LocalizedString.english("favorite"))
             }
 
-            ScrollView {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(AppTheme.progressBg(colorScheme))
+                    Capsule()
+                        .fill(AppTheme.accent.opacity(0.78))
+                        .frame(width: max(2, geometry.size.width * queueProgress))
+                }
+            }
+            .frame(height: 2.5)
+
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 9) {
                     switch item.category {
                     case .words:
@@ -181,9 +285,16 @@ struct EnglishLearningView: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 218, maxHeight: 248, alignment: .topLeading)
-        .background(AppTheme.progressBg(colorScheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(11)
+        .frame(maxWidth: .infinity, minHeight: 208, maxHeight: 236, alignment: .topLeading)
+        .background(AppTheme.elevatedSurface(colorScheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    manager.state == .idle ? AppTheme.stroke(colorScheme) : AppTheme.accent.opacity(0.34),
+                    lineWidth: manager.state == .idle ? 0.5 : 1
+                )
+        }
     }
 
     private func wordContent(_ item: EnglishLearningItem) -> some View {
@@ -245,7 +356,7 @@ struct EnglishLearningView: View {
             ForEach(Array(item.passageSentences.enumerated()), id: \.offset) { _, sentence in
                 Text(sentence)
                     .font(.system(size: 11, weight: manager.currentSpokenText == sentence ? .semibold : .regular))
-                    .foregroundStyle(manager.currentSpokenText == sentence ? AppTheme.healthy : AppTheme.textPrimary(colorScheme))
+                    .foregroundStyle(manager.currentSpokenText == sentence ? AppTheme.accent : AppTheme.textPrimary(colorScheme))
                     .lineSpacing(2)
             }
             if settings.englishShowTranslation {
@@ -267,7 +378,7 @@ struct EnglishLearningView: View {
             if let source = item.source {
                 Text("— \(source)")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(AppTheme.healthy)
+                    .foregroundStyle(AppTheme.accent)
             }
             if settings.englishShowTranslation {
                 Text(item.translation)
@@ -287,7 +398,7 @@ struct EnglishLearningView: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 40, height: 32)
-                    .background(AppTheme.healthy, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
             .buttonStyle(.plain)
             .help(primaryPlaybackHelp)
@@ -300,28 +411,51 @@ struct EnglishLearningView: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(5)
+        .background(AppTheme.progressBg(colorScheme).opacity(0.72), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func feedbackControls(_ item: EnglishLearningItem) -> some View {
         HStack(spacing: 8) {
-            feedbackButton(LocalizedString.english("not_known"), icon: "arrow.counterclockwise", color: AppTheme.warning, action: manager.markUnfamiliar)
+            feedbackButton(
+                LocalizedString.english("not_known"),
+                icon: "arrow.counterclockwise",
+                color: AppTheme.warning,
+                action: manager.markUnfamiliar
+            )
             feedbackButton(
                 manager.currentProgress.mastery >= .familiar ? LocalizedString.english("mastered") : LocalizedString.english("known"),
                 icon: "checkmark",
                 color: AppTheme.healthy,
+                filled: true,
                 action: manager.markKnown
             )
         }
     }
 
-    private func feedbackButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func feedbackButton(
+        _ title: String,
+        icon: String,
+        color: Color,
+        filled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(color)
+                .foregroundStyle(filled ? Color.white : color)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(
+                    filled ? color : color.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+                .overlay {
+                    if !filled {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(color.opacity(0.20), lineWidth: 0.5)
+                    }
+                }
         }
         .buttonStyle(.plain)
     }
@@ -365,10 +499,6 @@ struct EnglishLearningView: View {
         }
     }
 
-    private var panelBackground: some ShapeStyle {
-        colorScheme == .dark ? Color.black.opacity(0.30) : Color.white.opacity(0.55)
-    }
-
     private var voiceQualityBanner: some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles")
@@ -393,7 +523,7 @@ struct EnglishLearningView: View {
             .buttonStyle(.plain)
             .help(LocalizedString.english("open_voice_download"))
             Button {
-                withAnimation(.easeInOut(duration: 0.15)) { voiceHintDismissed = true }
+                withAnimation(.easeInOut(duration: 0.15)) { settings.englishVoiceHintDismissed = true }
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
@@ -433,7 +563,7 @@ struct EnglishLearningView: View {
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: "waveform.badge.mic")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(AppTheme.healthy)
+                            .foregroundStyle(AppTheme.accent)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(LocalizedString.english("voice_better_title"))
                                 .font(.system(size: 15, weight: .bold))
@@ -498,7 +628,7 @@ struct EnglishLearningView: View {
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
-                                .background(AppTheme.healthy, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }

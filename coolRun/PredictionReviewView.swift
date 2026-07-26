@@ -15,6 +15,9 @@ struct PredictionReviewView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 10) {
                 summaryCard
+                if !store.allRecords.isEmpty {
+                    groupedStatsCard
+                }
                 filterSection
                 recordList
             }
@@ -53,7 +56,7 @@ struct PredictionReviewView: View {
                     .clipShape(Capsule())
                 
                 if let age = priceStore.lastPriceAge {
-                    Text(String(format: LocalizedString.gold("seconds_ago_format", lang: appSettings.language), Int(age)))
+                    Text(LocalizedString.goldAge(age, lang: appSettings.language))
                         .font(.system(size: 10))
                         .foregroundStyle(AppTheme.textSecondary(colorScheme))
                 }
@@ -75,7 +78,12 @@ struct PredictionReviewView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             
-            if !store.summary.strategyCalibration.isNeutral {
+            if !appSettings.goldAutoCalibrationEnabled {
+                Label(LocalizedString.gold("calibration_off_note", lang: appSettings.language), systemImage: "pause.circle")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !store.summary.strategyCalibration.isNeutral {
                 calibrationBadge
             }
         }
@@ -107,6 +115,96 @@ struct PredictionReviewView: View {
         .padding(.vertical, 6)
         .background(tint.opacity(0.10))
         .clipShape(Capsule())
+    }
+    
+    // MARK: - Grouped Stats
+    
+    /// 分组统计：按策略版本、市场状态、预测方向展示命中率和平均误差
+    private var groupedStatsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(LocalizedString.gold("group_stats", lang: appSettings.language), systemImage: "chart.bar.doc.horizontal")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+            
+            groupedStatsSection(
+                title: LocalizedString.gold("by_strategy_version", lang: appSettings.language),
+                summaries: store.summaryByStrategyVersion,
+                displayName: { $0 }
+            )
+            groupedStatsSection(
+                title: LocalizedString.gold("by_market_state", lang: appSettings.language),
+                summaries: store.summaryByRegime,
+                displayName: { $0 }
+            )
+            groupedStatsSection(
+                title: LocalizedString.gold("by_direction", lang: appSettings.language),
+                summaries: store.summaryByDirection,
+                displayName: { directionText(for: $0) }
+            )
+        }
+        .padding(12)
+        .background(panelBg)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+    
+    @ViewBuilder
+    private func groupedStatsSection(
+        title: String,
+        summaries: [String: GoldPredictionLearningSummary],
+        displayName: @escaping (String) -> String
+    ) -> some View {
+        if !summaries.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                
+                ForEach(summaries.keys.sorted(), id: \.self) { key in
+                    if let groupSummary = summaries[key] {
+                        groupedStatsRow(name: displayName(key), summary: groupSummary)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func groupedStatsRow(name: String, summary: GoldPredictionLearningSummary) -> some View {
+        HStack(spacing: 8) {
+            Text(name)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                .lineLimit(1)
+                .frame(minWidth: 60, alignment: .leading)
+            
+            Spacer()
+            
+            Text(String(format: LocalizedString.gold("validated_count_format", lang: appSettings.language), summary.validatedCount))
+                .font(.system(size: 9))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            
+            Text("\(LocalizedString.gold("hit_rate", lang: appSettings.language)) \(summary.hitRate?.percentNumber ?? "--")")
+                .font(.system(size: 9, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(hitRateColor(summary))
+            
+            Text("\(LocalizedString.gold("average_error", lang: appSettings.language)) \(summary.averageAbsoluteError?.percentNumber ?? "--")")
+                .font(.system(size: 9))
+                .monospacedDigit()
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+    
+    private func hitRateColor(_ summary: GoldPredictionLearningSummary) -> Color {
+        guard let hitRate = summary.hitRate, summary.validatedCount >= 8 else {
+            return AppTheme.textSecondary(colorScheme)
+        }
+        if hitRate >= 0.62 { return AppTheme.healthy }
+        if hitRate <= 0.42 { return AppTheme.critical }
+        return Color(red: 0.88, green: 0.57, blue: 0.16)
     }
     
     // MARK: - Filter Section
@@ -147,7 +245,14 @@ struct PredictionReviewView: View {
                     options: GoldPredictionLearningStore.availableDirections.map { $0 == "buy" ? buyText : sellText },
                     selection: Binding(
                         get: { store.filterDirection.map { $0 == "buy" ? buyText : sellText } },
-                        set: { newValue in store.filterDirection = newValue == buyText ? "buy" : "sell" }
+                        set: { newValue in
+                            // 选"全部"（nil）时清空筛选，否则映射回内部值
+                            switch newValue {
+                            case buyText: store.filterDirection = "buy"
+                            case sellText: store.filterDirection = "sell"
+                            default: store.filterDirection = nil
+                            }
+                        }
                     ),
                     placeholder: LocalizedString.gold("all", lang: appSettings.language)
                 )
@@ -159,7 +264,12 @@ struct PredictionReviewView: View {
                     selection: Binding(
                         get: { store.filterStatus.map { $0 == .pending ? pendingText : validatedText } },
                         set: { newValue in
-                            store.filterStatus = newValue == pendingText ? .pending : .validated
+                            // 选"全部"（nil）时清空筛选，否则映射回内部值
+                            switch newValue {
+                            case pendingText: store.filterStatus = .pending
+                            case validatedText: store.filterStatus = .validated
+                            default: store.filterStatus = nil
+                            }
                         }
                     ),
                     placeholder: LocalizedString.gold("all", lang: appSettings.language)
@@ -294,6 +404,11 @@ struct PredictionReviewView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(panelBg)
+            // 整行可点展开，不用去点 10pt 的小箭头
+            .contentShape(Rectangle())
+            .onTapGesture {
+                expandedRecordID = isExpanded ? nil : record.id
+            }
             
             // 展开的详情区域
             if isExpanded {

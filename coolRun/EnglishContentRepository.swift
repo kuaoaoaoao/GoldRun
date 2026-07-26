@@ -215,7 +215,25 @@ private extension EnglishContentRepository {
         sentence("see-you-soon", "See you soon.", "一会儿见。"),
         sentence("happy-birthday", "Happy birthday!", "生日快乐！"),
         sentence("dont-worry-starter", "Do not worry.", "不要担心。"),
-        sentence("try-again", "Try again, please.", "请再试一次。")
+        sentence("try-again", "Try again, please.", "请再试一次。"),
+        sentence("can-you-help", "Could you help me, please?", "你能帮帮我吗？"),
+        sentence("where-toilet", "Where is the restroom?", "洗手间在哪里？"),
+        sentence("how-to-get", "How can I get to the airport?", "我怎么去机场？"),
+        sentence("check-the-bill", "Could I have the bill, please?", "请给我账单，好吗？"),
+        sentence("table-for-two", "A table for two, please.", "请给我们一张两人桌。"),
+        sentence("just-looking", "I am just looking, thank you.", "我只是随便看看，谢谢。"),
+        sentence("whats-the-time", "What time does it open?", "它几点开门？"),
+        sentence("i-agree", "I agree with you.", "我同意你的看法。"),
+        sentence("in-my-opinion", "In my opinion, it is a good idea.", "在我看来，这是个好主意。"),
+        sentence("let-me-think", "Let me think about it.", "让我考虑一下。"),
+        sentence("no-problem", "No problem at all.", "完全没问题。"),
+        sentence("congratulations", "Congratulations on your success!", "恭喜你成功！"),
+        sentence("take-care", "Take care of yourself.", "好好照顾自己。"),
+        sentence("good-luck", "Good luck with your exam.", "祝你考试顺利。"),
+        sentence("long-time-no-see", "Long time no see.", "好久不见。"),
+        sentence("keep-in-touch", "Let us keep in touch.", "我们保持联系。"),
+        sentence("im-not-sure", "I am not sure about that.", "我对那个不太确定。"),
+        sentence("could-you-repeat", "Could you repeat that, please?", "你能重复一遍吗？")
     ]
 
     static let bundledPassages: [EnglishLearningItem] = [

@@ -1,5 +1,6 @@
 import Observation
 import SwiftUI
+import AppKit
 
 @MainActor
 @Observable
@@ -13,22 +14,38 @@ final class GoldAnalysisViewModel {
     private(set) var candles: [GoldCandlestick] = []
     private(set) var isLoading = false
     private(set) var isMarketContextLoading = false
+    // 官方走势与多平台金价
+    private(set) var remoteChartPoints: [GoldPriceRecord] = []
+    private(set) var remoteChartRange: GoldChartRange?
+    private(set) var isRemoteChartLoading = false
+    private(set) var multiSourcePrices: [GoldMultiSourcePrice] = []
+    // 国际市场参考（失败置 nil，卡片隐藏）
+    private(set) var globalSnapshot: GoldGlobalSnapshot?
 
     private let marketContextService = GoldMarketContextService()
+    private let marketDataService = GoldMarketDataService.shared
+    private let globalMarketService = GoldGlobalMarketService.shared
     private let learningStore = GoldPredictionLearningStore.shared
     private var analysisTask: Task<Void, Never>?
     private var marketContextTask: Task<Void, Never>?
+    private var remoteChartTask: Task<Void, Never>?
+    private var multiSourceTask: Task<Void, Never>?
+    private var globalMarketTask: Task<Void, Never>?
     private var lastRecordsSignature = ""
 
     func refresh(records: [GoldPriceRecord], candlePeriod: CandlePeriod) {
         let contextSnapshot = marketContext
-        let calibration = learningStore.summary.strategyCalibration
+        // 关闭自动校准时只观察历史表现，策略按中性参数运行
+        let autoCalibrationEnabled = AppSettings.shared.goldAutoCalibrationEnabled
+        let calibration = autoCalibrationEnabled
+            ? learningStore.summary.strategyCalibration
+            : .neutral
         let signature = makeSignature(
             records: records,
             candlePeriod: candlePeriod,
             marketContext: contextSnapshot,
             calibration: calibration
-        )
+        ) + "-cal:\(autoCalibrationEnabled)"
         guard signature != lastRecordsSignature else { return }
 
         lastRecordsSignature = signature
@@ -71,14 +88,82 @@ final class GoldAnalysisViewModel {
         }
     }
 
+    // 拉取官方走势（今日分时/历史日线），失败时保持本地数据回落
+    func refreshRemoteChart(range: GoldChartRange) {
+        remoteChartTask?.cancel()
+        if remoteChartRange != range {
+            isRemoteChartLoading = true
+        }
+
+        let service = marketDataService
+        remoteChartTask = Task { [weak self] in
+            // 无论成功/失败/提前 return，只要任务未被取消（新任务接管）就复位 loading
+            defer {
+                if !Task.isCancelled {
+                    self?.isRemoteChartLoading = false
+                }
+            }
+            do {
+                let points: [GoldRemotePricePoint]
+                if let historyRange = range.historyRange {
+                    points = try await service.fetchHistoryPrices(range: historyRange)
+                } else {
+                    points = try await service.fetchTodayPrices()
+                    // 官方分时回填本地库，填补 App 未运行时段的断档
+                    GoldPriceStore.shared.mergeOfficialPrices(points)
+                }
+                guard !Task.isCancelled else { return }
+                self?.remoteChartPoints = points.map {
+                    GoldPriceRecord(price: $0.price, timestamp: $0.timestamp, source: "JD-official")
+                }
+                self?.remoteChartRange = range
+            } catch {
+                guard !Task.isCancelled else { return }
+                if self?.remoteChartRange != range {
+                    self?.remoteChartPoints = []
+                    self?.remoteChartRange = nil
+                }
+            }
+        }
+    }
+
+    // 多平台金价对比（个人站接口，失败时静默隐藏卡片）
+    func refreshMultiSourcePrices() {
+        multiSourceTask?.cancel()
+        let service = marketDataService
+        multiSourceTask = Task { [weak self] in
+            let prices = (try? await service.fetchMultiSourcePrices()) ?? []
+            guard !Task.isCancelled else { return }
+            self?.multiSourcePrices = prices
+        }
+    }
+
+    // 国际市场参考（新浪行情，失败时静默隐藏卡片）
+    func refreshGlobalMarket() {
+        globalMarketTask?.cancel()
+        let service = globalMarketService
+        globalMarketTask = Task { [weak self] in
+            let snapshot = try? await service.fetchSnapshot()
+            guard !Task.isCancelled else { return }
+            self?.globalSnapshot = snapshot
+        }
+    }
+
     func cancel() {
         analysisTask?.cancel()
         analysisTask = nil
         marketContextTask?.cancel()
         marketContextTask = nil
+        remoteChartTask?.cancel()
+        remoteChartTask = nil
+        multiSourceTask?.cancel()
+        multiSourceTask = nil
+        globalMarketTask?.cancel()
+        globalMarketTask = nil
         lastRecordsSignature = ""
         isLoading = false
         isMarketContextLoading = false
+        isRemoteChartLoading = false
     }
 
     private func apply(_ result: GoldAnalysisResult, sourceRecords: [GoldPriceRecord]) {
@@ -235,7 +320,11 @@ struct GoldAnalysisView: View {
     @State private var learningStore = GoldPredictionLearningStore.shared
     @ObservedObject private var appSettings = AppSettings.shared
     @State private var candlePeriod: CandlePeriod = .minute5
+    @State private var chartRange: GoldChartRange = .today
     @State private var selectedTab: AnalysisTab = .analysis
+    @State private var showTechnicalDetails = false
+    // 手动刷新中（头部按钮显示 mini ProgressView）
+    @State private var isManualRefreshing = false
     @AppStorage("goldHoldingGramsText") private var holdingGramsText = ""
     @AppStorage("goldHoldingAverageCostText") private var holdingAverageCostText = ""
     @Environment(\.colorScheme) private var colorScheme
@@ -254,44 +343,88 @@ struct GoldAnalysisView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab 切换器
-            tabPicker
+            moduleHeader
             
-            TabView(selection: $selectedTab) {
-                analysisContent
-                    .tag(AnalysisTab.analysis)
-                PredictionReviewView()
-                    .tag(AnalysisTab.review)
+            Group {
+                switch selectedTab {
+                case .analysis:
+                    analysisContent
+                case .review:
+                    PredictionReviewView()
+                }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .appCardSurface(cornerRadius: 12)
     }
     
-    private var tabPicker: some View {
-        HStack(spacing: 0) {
-            ForEach([AnalysisTab.analysis, .review], id: \.self) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Text(tab.title(lang: appSettings.language))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(selectedTab == tab ? tint : AppTheme.textSecondary(colorScheme))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background {
-                            if selectedTab == tab {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(tint.opacity(colorScheme == .dark ? 0.18 : 0.14))
-                            } else {
-                                Color.clear
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
+    private var moduleHeader: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(AppTheme.gold)
+                .frame(width: 30, height: 30)
+                .background(
+                    AppTheme.gold.opacity(colorScheme == .dark ? 0.20 : 0.13),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(LocalizedString.l(
+                    appSettings.language,
+                    en: "Gold watch",
+                    zh: "黄金观察",
+                    ja: "金相場",
+                    ko: "금 시세"
+                ))
+                .font(.system(size: 13, weight: .bold))
+                Text(LocalizedString.l(
+                    appSettings.language,
+                    en: "Price, position and risk",
+                    zh: "价格、持仓与风险提示",
+                    ja: "価格・保有・リスク",
+                    ko: "가격, 보유 및 위험"
+                ))
+                .font(.system(size: 8.5))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
             }
+
+            Spacer(minLength: 6)
+
+            // 手动刷新：不用等定时器，随时拉最新金价
+            Button {
+                manualRefresh()
+            } label: {
+                if isManualRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.65)
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(isManualRefreshing)
+            .help(LocalizedString.l(appSettings.language, en: "Refresh now", zh: "立即刷新", ja: "今すぐ更新", ko: "지금 새로고침"))
+
+            Picker("", selection: $selectedTab) {
+                ForEach([AnalysisTab.analysis, .review], id: \.self) { tab in
+                    Text(tab.title(lang: appSettings.language))
+                        .tag(tab)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 116)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .background(panelBackground)
+        .padding(.top, 11)
+        .padding(.bottom, 8)
     }
     
     private var analysisContent: some View {
@@ -300,48 +433,45 @@ struct GoldAnalysisView: View {
                 if let statistics = viewModel.statistics {
                     let positionAdvice = makePositionAdvice(currentPrice: statistics.currentPrice)
                     header(statistics: statistics)
+
+                    if viewModel.isLoading {
+                        loadingCard
+                    } else if let advancedReport = viewModel.advancedReport {
+                        GoldDecisionSummaryCard(report: advancedReport)
+                    }
+
+                    marketChartCard
+
+                    if !viewModel.multiSourcePrices.isEmpty {
+                        MultiSourcePriceCard(
+                            sources: viewModel.multiSourcePrices,
+                            validation: store.crossValidatePrice(
+                                statistics.currentPrice,
+                                against: viewModel.multiSourcePrices
+                            )
+                        )
+                    }
+
+                    if let globalSnapshot = viewModel.globalSnapshot {
+                        GlobalMarketCard(
+                            snapshot: globalSnapshot,
+                            domesticPrice: statistics.currentPrice
+                        )
+                    }
+
                     GoldPositionCard(
                         gramsText: $holdingGramsText,
                         averageCostText: $holdingAverageCostText,
                         advice: positionAdvice,
                         hasInput: hasPositionInput
                     )
-                    PriceLineChart(records: viewModel.displayRecords)
-                        .frame(height: 82)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(panelBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-                    periodPicker
-                    candleStrip
+                    GoldTradeLedgerCard(
+                        gramsText: $holdingGramsText,
+                        averageCostText: $holdingAverageCostText
+                    )
 
-                    if let snapshot = viewModel.snapshot {
-                        indicatorGrid(snapshot: snapshot)
-                    }
-
-                    if let signal = viewModel.signal {
-                        SignalCardView(signal: signal)
-                    }
-
-                    if viewModel.isLoading {
-                        loadingCard
-                    } else if let advancedReport = viewModel.advancedReport {
-                        BeginnerGuidanceCard(
-                            report: advancedReport,
-                            learningSummary: learningStore.summary
-                        )
-                        AdvancedStrategyCard(report: advancedReport)
-                        MarketContextCard(
-                            context: advancedReport.marketContext,
-                            isLoading: viewModel.isMarketContextLoading
-                        )
-                        PredictionLearningCard(
-                            summary: learningStore.summary,
-                            records: learningStore.records
-                        )
-                        BeginnerGlossaryCard()
-                    }
+                    technicalDetails
 
                     dataFooter(statistics: statistics)
                 } else if viewModel.isLoading {
@@ -350,23 +480,105 @@ struct GoldAnalysisView: View {
                     emptyState
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 9)
         }
         .task {
             viewModel.refresh(records: store.records, candlePeriod: candlePeriod)
             viewModel.refreshMarketContext(records: store.records, candlePeriod: candlePeriod)
+            viewModel.refreshRemoteChart(range: chartRange)
+            viewModel.refreshMultiSourcePrices()
+            viewModel.refreshGlobalMarket()
+        }
+        .task {
+            // 定时重新评估数据健康度，网络长时间失败时健康徽标也能变为"陈旧"
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                store.checkFreshness()
+            }
         }
         .onChange(of: store.records) { _, records in
             viewModel.refresh(records: records, candlePeriod: candlePeriod)
         }
+        .onChange(of: chartRange) { _, range in
+            viewModel.refreshRemoteChart(range: range)
+        }
         .onChange(of: candlePeriod) { _, period in
             viewModel.refresh(records: store.records, candlePeriod: period)
         }
-        .onChange(of: holdingGramsText) { _, _ in capturePositionIfValid() }
-        .onChange(of: holdingAverageCostText) { _, _ in capturePositionIfValid() }
+        .onChange(of: appSettings.goldAutoCalibrationEnabled) { _, _ in
+            // 设置页切换自动校准后立即重算，不等下一次金价刷新
+            viewModel.refresh(records: store.records, candlePeriod: candlePeriod)
+        }
+        .onChange(of: holdingGramsText) { _, newValue in
+            capturePositionIfValid()
+            CloudSyncStore.shared.setString(newValue, for: .goldHoldingGrams)
+        }
+        .onChange(of: holdingAverageCostText) { _, newValue in
+            capturePositionIfValid()
+            CloudSyncStore.shared.setString(newValue, for: .goldHoldingAverageCost)
+        }
         .onDisappear {
             viewModel.cancel()
         }
+    }
+
+    @ViewBuilder
+    private var technicalDetails: some View {
+        DisclosureGroup(isExpanded: $showTechnicalDetails) {
+            VStack(spacing: 8) {
+                if let snapshot = viewModel.snapshot {
+                    indicatorGrid(snapshot: snapshot)
+                }
+
+                if let signal = viewModel.signal {
+                    SignalCardView(signal: signal)
+                }
+
+                if let advancedReport = viewModel.advancedReport {
+                    AdvancedStrategyCard(report: advancedReport)
+                    MarketContextCard(
+                        context: advancedReport.marketContext,
+                        isLoading: viewModel.isMarketContextLoading
+                    )
+                    PredictionLearningCard(
+                        summary: learningStore.summary,
+                        records: learningStore.records
+                    )
+                    BeginnerGlossaryCard()
+                }
+            }
+            .padding(.top, 8)
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(AppTheme.gold)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(LocalizedString.l(
+                        appSettings.language,
+                        en: "Deep analysis",
+                        zh: "深度分析",
+                        ja: "詳細分析",
+                        ko: "심층 분석"
+                    ))
+                    .font(.system(size: 11, weight: .semibold))
+                    Text(LocalizedString.l(
+                        appSettings.language,
+                        en: "Indicators, signals, macro and validation",
+                        zh: "技术指标、交易信号、宏观与历史验证",
+                        ja: "指標・シグナル・マクロ・検証",
+                        ko: "지표, 신호, 거시 및 검증"
+                    ))
+                    .font(.system(size: 8))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
+                Spacer()
+            }
+        }
+        .tint(AppTheme.gold)
+        .padding(10)
+        .background(panelBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
     
     private var tint: Color {
@@ -410,21 +622,56 @@ struct GoldAnalysisView: View {
     }
 
     private func header(statistics: PriceStatistics) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let quote = store.latestQuote
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(LocalizedString.gold("source_name", lang: appSettings.language))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    HStack(spacing: 5) {
+                        Text(LocalizedString.gold("source_name", lang: appSettings.language))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                        if quote?.isMarketClosed == true {
+                            Text(LocalizedString.l(
+                                appSettings.language,
+                                en: "Closed",
+                                zh: "休市",
+                                ja: "休場",
+                                ko: "휴장"
+                            ))
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.textSecondary(colorScheme).opacity(0.14), in: Capsule())
+                        }
+                    }
                     Text("¥\(statistics.currentPrice.goldPriceNumber)/g")
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                    // 官方昨收价（回退源不提供时隐藏）
+                    if let yesterday = quote?.yesterdayPrice {
+                        Text(LocalizedString.l(
+                            appSettings.language,
+                            en: "Prev close ¥\(yesterday.goldPriceNumber)",
+                            zh: "昨收 ¥\(yesterday.goldPriceNumber)",
+                            ja: "前日終値 ¥\(yesterday.goldPriceNumber)",
+                            ko: "전일 종가 ¥\(yesterday.goldPriceNumber)"
+                        ))
+                        .font(.system(size: 9))
+                        .monospacedDigit()
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    }
                 }
 
                 Spacer(minLength: 8)
 
-                ChangeBadge(change: statistics.change, percent: statistics.changePercent)
+                // 优先展示官方涨跌，无官方数据时回落本地统计
+                if let quote, let change = quote.changeAmount, let rate = quote.changeRatePercent {
+                    ChangeBadge(change: change, percent: rate)
+                } else {
+                    ChangeBadge(change: statistics.change, percent: statistics.changePercent)
+                }
                 
                 // 数据健康状态指示
                 if store.dataHealth.isHealthy == false {
@@ -432,17 +679,19 @@ struct GoldAnalysisView: View {
                 }
             }
 
-            // 数据更新时间
-            HStack(spacing: 6) {
-                if let age = store.lastPriceAge {
-                    Label(String(format: LocalizedString.gold("seconds_ago_format", lang: appSettings.language), Int(age)), systemImage: "clock")
-                        .font(.system(size: 9))
-                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
-                }
-                if let interval = store.priceUpdateInterval {
-                    Text(String(format: LocalizedString.gold("refresh_interval_format", lang: appSettings.language), interval.singleDigitNumber))
-                        .font(.system(size: 9))
-                        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.6))
+            // 数据更新时间（TimelineView 每 30 秒重算，不依赖网络成功回调）
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                HStack(spacing: 6) {
+                    if let age = store.lastPriceAge {
+                        Label(LocalizedString.goldAge(age, lang: appSettings.language), systemImage: "clock")
+                            .font(.system(size: 9))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    }
+                    if let interval = store.priceUpdateInterval {
+                        Text(String(format: LocalizedString.gold("refresh_interval_format", lang: appSettings.language), interval.singleDigitNumber))
+                            .font(.system(size: 9))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.6))
+                    }
                 }
             }
             .padding(.bottom, 2)
@@ -483,7 +732,7 @@ struct GoldAnalysisView: View {
                 Button {
                     candlePeriod = period
                 } label: {
-                    Text(period.rawValue)
+                    Text(period.displayName)
                         .font(.system(size: 10, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 5)
@@ -505,31 +754,197 @@ struct GoldAnalysisView: View {
         }
     }
 
-    private var candleStrip: some View {
-        HStack(spacing: 3) {
-            let visibleCandles = viewModel.candles.suffix(28)
-            let maximumChange = max(visibleCandles.map { abs($0.changePercent) }.max() ?? 0.01, 0.01)
-            if visibleCandles.isEmpty {
-                Text(LocalizedString.gold("waiting_candle", lang: appSettings.language))
-                    .font(.system(size: 11, weight: .medium))
+    private var marketChartCard: some View {
+        VStack(spacing: 7) {
+            HStack {
+                Label(
+                    LocalizedString.l(
+                        appSettings.language,
+                        en: "Price trend",
+                        zh: "价格走势",
+                        ja: "価格推移",
+                        ko: "가격 추세"
+                    ),
+                    systemImage: "chart.xyaxis.line"
+                )
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                Spacer()
+                if viewModel.isRemoteChartLoading {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else if viewModel.remoteChartRange != chartRange {
+                    // 远端失败回落本地采样数据时提示
+                    Text(LocalizedString.l(
+                        appSettings.language,
+                        en: "Local data",
+                        zh: "本地数据",
+                        ja: "ローカル",
+                        ko: "로컬"
+                    ))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
-                    .frame(maxWidth: .infinity, minHeight: 42)
-            } else {
-                ForEach(Array(visibleCandles)) { candle in
-                    Capsule()
-                        .fill(candle.isUp ? AppTheme.healthy : AppTheme.critical)
-                        .frame(width: 4, height: candleHeight(candle, maximumChange: maximumChange))
-                        .frame(maxHeight: 42, alignment: candle.isUp ? .bottom : .top)
-                        .opacity(0.85)
-                        .help("\(candle.period.rawValue) \(candle.changePercent.signedPercentText)")
+                }
+                Text(viewModel.statistics?.trendDescription ?? "")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(tint)
+            }
+
+            chartRangePicker
+
+            PriceLineChart(records: chartRecords)
+                .frame(height: 76)
+
+            // 时间轴起止标签（按界面语言本地化格式）
+            if let axis = chartTimeAxis {
+                HStack {
+                    Text(axis.start)
+                    Spacer()
+                    Text(axis.end)
+                }
+                .font(.system(size: 7.5, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.75))
+            }
+
+            // 选中范围的区间概览
+            if let summary = chartSummary {
+                HStack(spacing: 8) {
+                    chartMetric(
+                        label: LocalizedString.gold("high", lang: appSettings.language),
+                        value: summary.high.goldPriceNumber
+                    )
+                    chartMetric(
+                        label: LocalizedString.gold("low", lang: appSettings.language),
+                        value: summary.low.goldPriceNumber
+                    )
+                    chartMetric(
+                        label: LocalizedString.l(
+                            appSettings.language,
+                            en: "Change",
+                            zh: "区间涨跌",
+                            ja: "騰落",
+                            ko: "등락"
+                        ),
+                        value: summary.changePercent.signedPercentText,
+                        tint: summary.changePercent >= 0 ? AppTheme.healthy : AppTheme.critical
+                    )
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03))
                 }
             }
+
+            periodPicker
+
+            HStack(spacing: 3) {
+                let visibleCandles = viewModel.candles.suffix(28)
+                let maximumChange = max(visibleCandles.map { abs($0.changePercent) }.max() ?? 0.01, 0.01)
+                if visibleCandles.isEmpty {
+                    Text(LocalizedString.gold("waiting_candle", lang: appSettings.language))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                        .frame(maxWidth: .infinity, minHeight: 28)
+                } else {
+                    ForEach(Array(visibleCandles)) { candle in
+                        Capsule()
+                            .fill(candle.isUp ? AppTheme.healthy : AppTheme.critical)
+                            .frame(width: 4, height: candleHeight(candle, maximumChange: maximumChange) * 0.68)
+                            .frame(maxHeight: 30, alignment: candle.isUp ? .bottom : .top)
+                            .opacity(0.82)
+                            .help("\(candle.period.rawValue) \(candle.changePercent.signedPercentText)")
+                    }
+                }
+            }
+            .frame(height: 30)
         }
-        .frame(height: 46)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(10)
         .background(panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    // 走势图数据：官方数据就绪且范围匹配时优先，否则回落本地采样
+    private var chartRecords: [GoldPriceRecord] {
+        if viewModel.remoteChartRange == chartRange, !viewModel.remoteChartPoints.isEmpty {
+            return viewModel.remoteChartPoints
+        }
+        return viewModel.displayRecords
+    }
+
+    // 选中范围的区间高/低/涨跌幅
+    private var chartSummary: (high: Double, low: Double, changePercent: Double)? {
+        let prices = chartRecords.map(\.price)
+        guard let first = prices.first, first > 0,
+              let last = prices.last,
+              let high = prices.max(),
+              let low = prices.min() else { return nil }
+        return (high, low, (last - first) / first * 100)
+    }
+
+    // 图表起止时间标签：今日显示时刻，其余显示日期，随界面语言本地化
+    private var chartTimeAxis: (start: String, end: String)? {
+        guard let first = chartRecords.first?.timestamp,
+              let last = chartRecords.last?.timestamp,
+              first < last else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.locale = appSettings.language.locale
+        switch chartRange {
+        case .today:
+            formatter.setLocalizedDateFormatFromTemplate("jm")
+        case .week, .month, .quarter:
+            formatter.setLocalizedDateFormatFromTemplate("Md")
+        case .halfYear, .year:
+            formatter.setLocalizedDateFormatFromTemplate("yMd")
+        }
+        return (formatter.string(from: first), formatter.string(from: last))
+    }
+
+    private func chartMetric(label: String, value: String, tint: Color? = nil) -> some View {
+        HStack(spacing: 3) {
+            Text(label)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            Text(value)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(tint ?? AppTheme.textPrimary(colorScheme))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var chartRangePicker: some View {
+        HStack(spacing: 3) {
+            ForEach(GoldChartRange.allCases, id: \.self) { range in
+                Button {
+                    chartRange = range
+                } label: {
+                    Text(range.shortLabel)
+                        .font(.system(size: 9, weight: .semibold))
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .foregroundStyle(chartRange == range ? amber : AppTheme.textSecondary(colorScheme))
+                        .background {
+                            if chartRange == range {
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(amber.opacity(colorScheme == .dark ? 0.18 : 0.14))
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.035))
+        }
     }
 
     private var loadingCard: some View {
@@ -579,16 +994,33 @@ struct GoldAnalysisView: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
+            Image(systemName: store.lastFetchFailed ? "wifi.exclamationmark" : "chart.line.uptrend.xyaxis")
                 .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(amber)
-            Text(LocalizedString.gold("waiting_refresh", lang: appSettings.language))
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(AppTheme.textPrimary(colorScheme))
-            Text(LocalizedString.gold("refresh_hint", lang: appSettings.language))
-                .font(.system(size: 11))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .foregroundStyle(store.lastFetchFailed ? AppTheme.critical : amber)
+            // 区分"网络失败"与"等待首次数据"，失败时给重试按钮
+            if store.lastFetchFailed {
+                Text(LocalizedString.goldPrice("network_error", lang: appSettings.language))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                Button {
+                    manualRefresh()
+                } label: {
+                    Label(
+                        LocalizedString.l(appSettings.language, en: "Retry", zh: "重试", ja: "再試行", ko: "재시도"),
+                        systemImage: "arrow.clockwise"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                }
+                .disabled(isManualRefreshing)
+            } else {
+                Text(LocalizedString.gold("waiting_refresh", lang: appSettings.language))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                Text(LocalizedString.gold("refresh_hint", lang: appSettings.language))
+                    .font(.system(size: 11))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 190)
         .padding(12)
@@ -596,12 +1028,28 @@ struct GoldAnalysisView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
+    // 手动刷新：先拉菜单栏同源金价，再刷新分析与行情卡片
+    private func manualRefresh() {
+        guard !isManualRefreshing else { return }
+        isManualRefreshing = true
+        Task {
+            if let delegate = NSApp.delegate as? MacAppDelegate {
+                await delegate.refreshGoldPriceNow()
+            }
+            viewModel.refresh(records: store.records, candlePeriod: candlePeriod)
+            viewModel.refreshRemoteChart(range: chartRange)
+            viewModel.refreshMultiSourcePrices()
+            viewModel.refreshGlobalMarket()
+            isManualRefreshing = false
+        }
+    }
+
     private var panelBackground: some ShapeStyle {
         colorScheme == .dark ? Color.black.opacity(0.30) : Color.white.opacity(0.55)
     }
 
     private var amber: Color {
-        Color(red: 0.88, green: 0.57, blue: 0.16)
+        AppTheme.gold
     }
 
     private func candleHeight(_ candle: GoldCandlestick, maximumChange: Double) -> CGFloat {
@@ -657,6 +1105,117 @@ struct GoldAnalysisView: View {
     }
 }
 
+struct GoldDecisionSummaryCard: View {
+    let report: GoldAdvancedStrategyReport
+    @ObservedObject private var settings = AppSettings.shared
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var tint: Color {
+        switch report.beginnerTone {
+        case .positive: AppTheme.healthy
+        case .cautious: AppTheme.gold
+        case .defensive: AppTheme.critical
+        }
+    }
+
+    private var iconName: String {
+        switch report.beginnerTone {
+        case .positive: "arrow.up.right.circle.fill"
+        case .cautious: "pause.circle.fill"
+        case .defensive: "shield.lefthalf.filled"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(tint)
+                .frame(width: 3)
+                .padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 6) {
+                    Label(
+                        LocalizedString.l(
+                            settings.language,
+                            en: "Current view",
+                            zh: "当前建议",
+                            ja: "現在の見方",
+                            ko: "현재 제안"
+                        ),
+                        systemImage: iconName
+                    )
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(tint)
+
+                    Spacer()
+
+                    Text("\(Int(report.confidence * 100))%")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(tint)
+                    Text(LocalizedString.gold("confidence", lang: settings.language))
+                        .font(.system(size: 9))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
+
+                Text(report.beginnerAction)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.textPrimary(colorScheme))
+
+                Text(report.beginnerReason)
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 5) {
+                    decisionChip(report.regime.regime.displayName, icon: "waveform.path")
+                    decisionChip(report.risk.riskLevel, icon: "shield")
+                    decisionChip(report.risk.suggestedExposure.percentNumber, icon: "chart.pie")
+                }
+
+                Text(LocalizedString.l(
+                    settings.language,
+                    en: "For decision support only, not investment advice.",
+                    zh: "仅作辅助判断，不构成投资建议。",
+                    ja: "判断補助のみで、投資助言ではありません。",
+                    ko: "판단 보조용이며 투자 조언이 아닙니다."
+                ))
+                .font(.system(size: 9))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.72))
+            }
+            .padding(.leading, 10)
+        }
+        .padding(10)
+        .background {
+            ZStack {
+                AppTheme.elevatedSurface(colorScheme)
+                LinearGradient(
+                    colors: [tint.opacity(colorScheme == .dark ? 0.10 : 0.07), .clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(tint.opacity(0.16), lineWidth: 0.5)
+        }
+    }
+
+    private func decisionChip(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(AppTheme.progressBg(colorScheme), in: Capsule())
+    }
+}
+
 private struct PriceLineChart: View {
     let records: [GoldPriceRecord]
     @Environment(\.colorScheme) private var colorScheme
@@ -669,27 +1228,64 @@ private struct PriceLineChart: View {
             guard let minPrice = prices.min(), let maxPrice = prices.max() else { return }
             let range = max(maxPrice - minPrice, 0.01)
 
+            // 水平网格参考线
+            let gridColor = Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06)
+            for fraction in [0.25, 0.5, 0.75] {
+                var gridPath = Path()
+                let y = size.height * CGFloat(fraction)
+                gridPath.move(to: CGPoint(x: 0, y: y))
+                gridPath.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(gridPath, with: .color(gridColor), style: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+            }
+
             var path = Path()
+            var lastPoint = CGPoint.zero
             for (index, price) in prices.enumerated() {
                 let x = size.width * CGFloat(index) / CGFloat(max(prices.count - 1, 1))
                 let y = size.height - (CGFloat((price - minPrice) / range) * size.height)
+                lastPoint = CGPoint(x: x, y: y)
                 if index == 0 {
-                    path.move(to: CGPoint(x: x, y: y))
+                    path.move(to: lastPoint)
                 } else {
-                    path.addLine(to: CGPoint(x: x, y: y))
+                    path.addLine(to: lastPoint)
                 }
             }
 
             let lineColor = (prices.last ?? 0) >= (prices.first ?? 0)
                 ? NSColor.systemGreen
                 : NSColor.systemRed
-            context.stroke(path, with: .color(Color(nsColor: lineColor)), lineWidth: 2)
+            let tint = Color(nsColor: lineColor)
 
+            // 渐变填充：线色向下淡出
             var fillPath = path
             fillPath.addLine(to: CGPoint(x: size.width, y: size.height))
             fillPath.addLine(to: CGPoint(x: 0, y: size.height))
             fillPath.closeSubpath()
-            context.fill(fillPath, with: .color(Color(nsColor: lineColor).opacity(colorScheme == .dark ? 0.18 : 0.12)))
+            context.fill(
+                fillPath,
+                with: .linearGradient(
+                    Gradient(colors: [
+                        tint.opacity(colorScheme == .dark ? 0.28 : 0.20),
+                        tint.opacity(0.02)
+                    ]),
+                    startPoint: .zero,
+                    endPoint: CGPoint(x: 0, y: size.height)
+                )
+            )
+
+            context.stroke(path, with: .color(tint), style: StrokeStyle(lineWidth: 1.6, lineJoin: .round))
+
+            // 最新价端点
+            let dotRadius: CGFloat = 2.4
+            context.fill(
+                Path(ellipseIn: CGRect(
+                    x: lastPoint.x - dotRadius,
+                    y: lastPoint.y - dotRadius,
+                    width: dotRadius * 2,
+                    height: dotRadius * 2
+                )),
+                with: .color(tint)
+            )
         }
     }
 }
@@ -1283,6 +1879,17 @@ private struct MarketContextCard: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                if !context.newsItems.isEmpty {
+                    Divider()
+                        .opacity(0.45)
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(Array(context.newsItems.prefix(6))) { item in
+                            newsRow(item)
+                        }
+                    }
+                }
             } else {
                 Text(isLoading ? LocalizedString.gold("macro_loading") : LocalizedString.gold("macro_unavailable"))
                     .font(.system(size: 10))
@@ -1307,6 +1914,68 @@ private struct MarketContextCard: View {
         return "\(yield.shortNumber)%"
     }
 
+    @ViewBuilder
+    private func newsRow(_ item: GoldNewsItem) -> some View {
+        let content = HStack(alignment: .top, spacing: 7) {
+            Circle()
+                .fill(newsTint(item))
+                .frame(width: 6, height: 6)
+                .padding(.top, 4)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 5) {
+                    if let source = item.source, !source.isEmpty {
+                        Text(source)
+                    }
+                    if let publishedAt = item.publishedAt {
+                        Text(publishedAt, style: .relative)
+                    }
+                    Text(newsImpactText(item))
+                        .foregroundStyle(newsTint(item))
+                }
+                .font(.system(size: 8.5))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            }
+
+            Spacer(minLength: 0)
+
+            if item.link != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            }
+        }
+
+        if let link = item.link {
+            Link(destination: link) { content }
+                .buttonStyle(.plain)
+        } else {
+            content
+        }
+    }
+
+    private func newsTint(_ item: GoldNewsItem) -> Color {
+        if item.sentimentScore > 0 { return AppTheme.healthy }
+        if item.sentimentScore < 0 { return AppTheme.critical }
+        return AppTheme.textSecondary(colorScheme)
+    }
+
+    private func newsImpactText(_ item: GoldNewsItem) -> String {
+        if item.sentimentScore > 0 {
+            return LocalizedString.l(AppSettings.shared.language, en: "Bullish", zh: "利多", ja: "強気", ko: "호재")
+        }
+        if item.sentimentScore < 0 {
+            return LocalizedString.l(AppSettings.shared.language, en: "Bearish", zh: "利空", ja: "弱気", ko: "악재")
+        }
+        return LocalizedString.l(AppSettings.shared.language, en: "Neutral", zh: "中性", ja: "中立", ko: "중립")
+    }
+
     private func contextStatusText(_ context: GoldMarketContext) -> String {
         if let missing = context.missingDataDescription {
             return String(format: context.isFromCache ? LocalizedString.gold("cached_data_format") : LocalizedString.gold("partial_data_format"), missing)
@@ -1318,10 +1987,22 @@ private struct MarketContextCard: View {
 private struct PredictionLearningCard: View {
     let summary: GoldPredictionLearningSummary
     let records: [GoldPredictionLearningRecord]
+    @ObservedObject private var appSettings = AppSettings.shared
     @Environment(\.colorScheme) private var colorScheme
 
     private var calibration: GoldStrategyCalibration {
         summary.strategyCalibration
+    }
+
+    // 基于已验证样本解释本次校准的依据
+    private var calibrationReason: String? {
+        guard summary.validatedCount >= 8, let hitRate = summary.hitRate else { return nil }
+        return String(
+            format: LocalizedString.gold("calibration_reason_format"),
+            summary.validatedCount,
+            hitRate.percentNumber,
+            summary.averagePredictionBias?.signedPercentNumber ?? "--"
+        )
     }
 
     private var recentRecords: [GoldPredictionLearningRecord] {
@@ -1379,18 +2060,46 @@ private struct PredictionLearningCard: View {
                 .foregroundStyle(AppTheme.textSecondary(colorScheme))
                 .fixedSize(horizontal: false, vertical: true)
 
-            if !calibration.isNeutral {
-                Label(
-                    String(
-                        format: LocalizedString.gold("calibration_applied_format"),
-                        calibration.confidenceMultiplier.twoDigitNumber,
-                        calibration.exposureMultiplier.twoDigitNumber
-                    ),
-                    systemImage: "slider.horizontal.3"
-                )
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(tint)
-                .fixedSize(horizontal: false, vertical: true)
+            if !appSettings.goldAutoCalibrationEnabled {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(LocalizedString.gold("calibration_off_note"), systemImage: "pause.circle")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if !calibration.isNeutral {
+                        Text(String(
+                            format: LocalizedString.gold("calibration_observed_format"),
+                            calibration.confidenceMultiplier.twoDigitNumber,
+                            calibration.exposureMultiplier.twoDigitNumber
+                        ))
+                        .font(.system(size: 10))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } else if !calibration.isNeutral {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(
+                        String(
+                            format: LocalizedString.gold("calibration_applied_format"),
+                            calibration.confidenceMultiplier.twoDigitNumber,
+                            calibration.exposureMultiplier.twoDigitNumber
+                        ),
+                        systemImage: "slider.horizontal.3"
+                    )
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(tint)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    // 解释为什么本次建议被调低/调高
+                    if let calibrationReason {
+                        Text("\(calibration.note) · \(calibrationReason)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
 
             if !recentRecords.isEmpty {
@@ -1653,6 +2362,295 @@ private struct GoldMetric: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct MultiSourcePriceCard: View {
+    let sources: [GoldMultiSourcePrice]
+    let validation: DataValidationResult
+    @ObservedObject private var settings = AppSettings.shared
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Label(
+                    LocalizedString.l(
+                        settings.language,
+                        en: "Cross-platform prices",
+                        zh: "多平台金价",
+                        ja: "プラットフォーム比較",
+                        ko: "플랫폼별 금가"
+                    ),
+                    systemImage: "building.columns"
+                )
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                Spacer()
+                if let updatedAt = sources.compactMap(\.updatedAt).max() {
+                    Text(updatedAt, style: .time)
+                        .font(.system(size: 8))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
+            }
+
+            VStack(spacing: 3) {
+                ForEach(sortedSources) { source in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(sourceTint(for: source))
+                            .frame(width: 4, height: 4)
+                        Text(localizedName(source.name))
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text("¥" + source.price.formatted(.number.precision(.fractionLength(2))))
+                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                            .frame(width: 62, alignment: .trailing)
+                        changeText(for: source)
+                            .frame(width: 48, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.025))
+                    }
+                }
+            }
+
+            HStack {
+                validationFooter
+                Spacer(minLength: 6)
+                if let spread = priceSpread {
+                    Text(LocalizedString.l(
+                        settings.language,
+                        en: "Spread ¥\(spread.formatted(.number.precision(.fractionLength(2))))",
+                        zh: "价差 ¥\(spread.formatted(.number.precision(.fractionLength(2))))",
+                        ja: "価格差 ¥\(spread.formatted(.number.precision(.fractionLength(2))))",
+                        ko: "가격차 ¥\(spread.formatted(.number.precision(.fractionLength(2))))"
+                    ))
+                    .font(.system(size: 8.5, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                }
+            }
+        }
+        .padding(10)
+        .background(colorScheme == .dark ? Color.black.opacity(0.30) : Color.white.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    // 按价格从高到低排列，便于比价
+    private var sortedSources: [GoldMultiSourcePrice] {
+        sources.sorted { $0.price > $1.price }
+    }
+
+    // 各平台最高与最低报价之差
+    private var priceSpread: Double? {
+        guard let high = sources.map(\.price).max(),
+              let low = sources.map(\.price).min(),
+              sources.count > 1 else { return nil }
+        return high - low
+    }
+
+    // 最高价标红、最低价标绿，其余中性色
+    private func sourceTint(for source: GoldMultiSourcePrice) -> Color {
+        if source.price == sources.map(\.price).max() { return AppTheme.critical.opacity(0.7) }
+        if source.price == sources.map(\.price).min() { return AppTheme.healthy.opacity(0.7) }
+        return AppTheme.textSecondary(colorScheme).opacity(0.5)
+    }
+
+    // 接口返回中文平台名（如“新浪-股票|基金API”），映射为四语名称
+    private func localizedName(_ name: String) -> String {
+        let lang = settings.language
+        if name.contains("新浪") {
+            return LocalizedString.l(lang, en: "Sina Finance", zh: "新浪财经", ja: "新浪財経", ko: "시나 파이낸스")
+        }
+        if name.contains("民生") {
+            return LocalizedString.l(lang, en: "Minsheng Bank", zh: "民生银行", ja: "民生銀行", ko: "민생은행")
+        }
+        if name.contains("浙商") {
+            return LocalizedString.l(lang, en: "CZBank", zh: "浙商银行", ja: "浙商銀行", ko: "저상은행")
+        }
+        if name.contains("工商") {
+            return LocalizedString.l(lang, en: "ICBC", zh: "工商银行", ja: "工商銀行", ko: "공상은행")
+        }
+        return name.split(separator: "-").first.map(String.init) ?? name
+    }
+
+    @ViewBuilder
+    private func changeText(for source: GoldMultiSourcePrice) -> some View {
+        if let rate = source.changeRatePercent {
+            Text(rate.formatted(.number.sign(strategy: .always()).precision(.fractionLength(2))) + "%")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(rate >= 0 ? AppTheme.healthy : AppTheme.critical)
+        } else {
+            Text("--")
+                .font(.system(size: 9))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+        }
+    }
+
+    @ViewBuilder
+    private var validationFooter: some View {
+        switch validation {
+        case .valid:
+            footerLabel(
+                icon: "checkmark.seal",
+                color: AppTheme.healthy,
+                text: LocalizedString.l(
+                    settings.language,
+                    en: "Price cross-validated",
+                    zh: "与各平台报价一致",
+                    ja: "価格検証済み",
+                    ko: "가격 교차 검증됨"
+                )
+            )
+        case .multiSourceMismatch(let price, let median):
+            footerLabel(
+                icon: "exclamationmark.triangle",
+                color: Color.orange,
+                text: LocalizedString.l(
+                    settings.language,
+                    en: String(format: "Deviation %.2f%% from median", abs(price - median) / median * 100),
+                    zh: String(format: "与多源中位数偏差 %.2f%%", abs(price - median) / median * 100),
+                    ja: String(format: "中央値との乖離 %.2f%%", abs(price - median) / median * 100),
+                    ko: String(format: "중앙값 대비 편차 %.2f%%", abs(price - median) / median * 100)
+                )
+            )
+        default:
+            EmptyView()
+        }
+    }
+
+    private func footerLabel(icon: String, color: Color, text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 8.5, weight: .medium))
+            .foregroundStyle(color)
+    }
+}
+
+// MARK: - 国际市场参考
+
+private struct GlobalMarketCard: View {
+    let snapshot: GoldGlobalSnapshot
+    let domesticPrice: Double
+    @ObservedObject private var settings = AppSettings.shared
+    @Environment(\.colorScheme) private var colorScheme
+
+    // 国内现价相对国际折算克价的溢价（%）
+    private var premiumPercent: Double? {
+        let converted = snapshot.convertedCnyPerGram
+        guard converted > 0, domesticPrice > 0 else { return nil }
+        return (domesticPrice - converted) / converted * 100
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Label(
+                    LocalizedString.l(
+                        settings.language,
+                        en: "Global market",
+                        zh: "国际市场",
+                        ja: "国際市場",
+                        ko: "국제 시장"
+                    ),
+                    systemImage: "globe"
+                )
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                Spacer()
+                Text(snapshot.updatedAt, style: .time)
+                    .font(.system(size: 8))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+            }
+
+            VStack(spacing: 3) {
+                metricRow(
+                    title: "XAU/USD",
+                    value: "$" + snapshot.xauUsd.formatted(.number.precision(.fractionLength(2))),
+                    change: snapshot.xauChangePercent
+                )
+                if let dollarIndex = snapshot.dollarIndex {
+                    metricRow(
+                        title: LocalizedString.l(settings.language, en: "Dollar index", zh: "美元指数", ja: "ドル指数", ko: "달러 지수"),
+                        value: dollarIndex.formatted(.number.precision(.fractionLength(2))),
+                        change: nil
+                    )
+                }
+                metricRow(
+                    title: "USD/CNY",
+                    value: snapshot.usdCny.formatted(.number.precision(.fractionLength(4))),
+                    change: nil
+                )
+                metricRow(
+                    title: LocalizedString.l(settings.language, en: "Converted ¥/g", zh: "折合克价", ja: "換算グラム単価", ko: "환산 그램당 가격"),
+                    value: "¥" + snapshot.convertedCnyPerGram.formatted(.number.precision(.fractionLength(2))),
+                    change: nil
+                )
+            }
+
+            if let premium = premiumPercent {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 8))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    Text(LocalizedString.l(
+                        settings.language,
+                        en: "Domestic premium vs global",
+                        zh: "国内现价相对国际溢价",
+                        ja: "国内価格の対国際プレミアム",
+                        ko: "국내 가격의 국제 대비 프리미엄"
+                    ))
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    Spacer(minLength: 4)
+                    Text(premium.formatted(.number.sign(strategy: .always()).precision(.fractionLength(2))) + "%")
+                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(premium >= 0 ? AppTheme.critical : AppTheme.healthy)
+                }
+            }
+        }
+        .padding(10)
+        .background(colorScheme == .dark ? Color.black.opacity(0.30) : Color.white.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    private func metricRow(title: String, value: String, change: Double?) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(AppTheme.textSecondary(colorScheme).opacity(0.5))
+                .frame(width: 4, height: 4)
+            Text(title)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(AppTheme.textPrimary(colorScheme))
+            if let change {
+                Text(change.formatted(.number.sign(strategy: .always()).precision(.fractionLength(2))) + "%")
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(change >= 0 ? AppTheme.healthy : AppTheme.critical)
+                    .frame(width: 48, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.025))
+        }
     }
 }
 
