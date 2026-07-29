@@ -1,0 +1,17 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /coolrun-windows
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: cargo
+    directory: /coolrun-windows/src-tauri
+    schedule:
+      interval: monthly

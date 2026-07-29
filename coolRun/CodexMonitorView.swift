@@ -37,7 +37,9 @@ struct CodexMonitorView: View {
 
                 Spacer()
 
-                Button { Task { await viewModel.refresh() } } label: {
+                Button {
+                    Task { await viewModel.refresh() }
+                } label: {
                     if viewModel.isRefreshing {
                         ProgressView().controlSize(.mini)
                     } else {
@@ -49,6 +51,7 @@ struct CodexMonitorView: View {
                 .buttonBorderShape(.circle)
                 .controlSize(.small)
                 .disabled(viewModel.isRefreshing)
+                .accessibilityLabel("刷新 Codex 状态")
                 .help("刷新 Codex 状态")
             }
 
@@ -73,7 +76,6 @@ struct CodexMonitorView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .appCardSurface(cornerRadius: 12)
-        .onAppear { viewModel.start() }
     }
 
     private func readyView(_ snapshot: CodexMonitorSnapshot) -> some View {

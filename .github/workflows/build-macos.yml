@@ -1,0 +1,47 @@
+name: macOS CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      POSTHOG_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Resolve Swift packages
+        run: >
+          xcodebuild
+          -resolvePackageDependencies
+          -project coolRun.xcodeproj
+          -scheme coolRun
+
+      - name: Build and test macOS app
+        run: >
+          xcodebuild
+          -project coolRun.xcodeproj
+          -scheme coolRun
+          -configuration Debug
+          -destination 'platform=macOS'
+          -derivedDataPath '${{ runner.temp }}/coolRun-derived'
+          CODE_SIGNING_ALLOWED=NO
+          test

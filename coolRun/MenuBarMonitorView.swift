@@ -14,6 +14,7 @@ struct MenuBarMonitorView: View {
     @Bindable private var pinState: PopoverPinState
     private let onPinChange: (Bool) -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         viewModel: SystemMonitorViewModel,
@@ -29,7 +30,7 @@ struct MenuBarMonitorView: View {
         VStack(spacing: 0) {
             ModuleNavigationRail(selection: $viewMode) {
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
                         pinState.isPinned.toggle()
                     }
                     onPinChange(pinState.isPinned)
@@ -45,7 +46,7 @@ struct MenuBarMonitorView: View {
                 }
                 .contentShape(Rectangle())
                 .buttonStyle(.plain)
-                .help(pinState.isPinned ? LocalizedString.speech("unpin_popover") : LocalizedString.speech("pin_popover"))
+                .help(pinState.isPinned ? LocalizedString.common("unpin_popover") : LocalizedString.common("pin_popover"))
             }
             .padding(.bottom, 8)
 
@@ -65,12 +66,10 @@ struct MenuBarMonitorView: View {
                     GoldAnalysisView()
                 case .calendar:
                     CalendarView()
-                case .novel:
-                    MenuBarNovelReaderView()
                 case .english:
                     EnglishLearningView()
                 case .codex:
-                    CodexMonitorView()
+                    AIMonitorView()
                 }
             }
             .id(viewMode)

@@ -28,9 +28,9 @@ final class GoldPriceAlertManager {
     }
 
     /// 同方向两次通知的最短间隔。
-    static let minimumInterval: TimeInterval = 30 * 60
+    nonisolated static let minimumInterval: TimeInterval = 30 * 60
     /// 重新武装需要回到阈值内侧的比例（0.5%）。
-    static let rearmMargin = 0.005
+    nonisolated static let rearmMargin = 0.005
 
     private var state = State()
     private var hasRequestedAuthorization = false

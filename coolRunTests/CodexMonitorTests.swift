@@ -162,4 +162,91 @@ final class CodexMonitorTests: XCTestCase {
         XCTAssertEqual(representation.size.width, 304)
         XCTAssertEqual(representation.size.height, 464)
     }
+
+    func testAIOverviewRendersBothProvidersAtMenuBarSize() throws {
+        let defaults = UserDefaults.standard
+        let previousTab = defaults.string(forKey: "ai_monitor_tab")
+        defaults.set("overview", forKey: "ai_monitor_tab")
+        defer {
+            if let previousTab {
+                defaults.set(previousTab, forKey: "ai_monitor_tab")
+            } else {
+                defaults.removeObject(forKey: "ai_monitor_tab")
+            }
+        }
+
+        let now = Date()
+        let codexViewModel = CodexMonitorViewModel(autoStart: false)
+        codexViewModel.state = .ready(
+            CodexMonitorSnapshot(
+                account: "codex@example.com",
+                plan: "Plus",
+                limits: [
+                    CodexQuotaLimit(
+                        id: "codex",
+                        title: "Codex",
+                        windows: [
+                            CodexQuotaWindow(
+                                id: "codex-primary",
+                                title: "主额度",
+                                remainingPercent: 72,
+                                resetsAt: now.addingTimeInterval(3_600),
+                                durationMinutes: 300
+                            ),
+                        ]
+                    ),
+                ],
+                resetCreditsAvailableCount: nil,
+                usage: nil,
+                dailyUsage: [],
+                sessions: [],
+                isRateLimitsStale: false,
+                isUsageStale: false,
+                updatedAt: now
+            )
+        )
+
+        let claudeViewModel = ClaudeMonitorViewModel(autoStart: false)
+        claudeViewModel.state = .ready(
+            ClaudeMonitorSnapshot(
+                account: "Claude Code",
+                plan: "max",
+                windows: [
+                    CodexQuotaWindow(
+                        id: "claude-weekly",
+                        title: "周额度",
+                        remainingPercent: 38,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        durationMinutes: 10_080
+                    ),
+                ],
+                extraUsage: nil,
+                updatedAt: now
+            )
+        )
+
+        let hostingView = NSHostingView(
+            rootView: AIMonitorView(
+                codexViewModel: codexViewModel,
+                claudeViewModel: claudeViewModel
+            )
+            .frame(width: 304, height: 464)
+            .environment(\.colorScheme, .light)
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: 304, height: 464)
+        hostingView.layoutSubtreeIfNeeded()
+        let representation = try XCTUnwrap(
+            hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)
+        )
+        hostingView.cacheDisplay(in: hostingView.bounds, to: representation)
+        let pngData = try XCTUnwrap(
+            representation.representation(using: .png, properties: [:])
+        )
+        let output = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("coolrun-ai-overview-preview.png")
+        try pngData.write(to: output)
+
+        XCTAssertEqual(representation.size.width, 304)
+        XCTAssertEqual(representation.size.height, 464)
+    }
 }

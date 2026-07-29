@@ -6,9 +6,12 @@ struct CalendarView: View {
     @State private var selectedDate = Date()
     @State private var currentMonth = Date()
     @State private var showBirthdayList = false
+    @State private var showCountdownList = false
+    @State private var showAddCountdown = false
     @State private var showBirthdayDetail = false
     @State private var selectedDateBirthdays: [Birthday] = []
     @State private var showYearMonthPicker = false
+    @State private var countdownRevision = 0
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var settings = AppSettings.shared
 
@@ -54,6 +57,15 @@ struct CalendarView: View {
         .sheet(isPresented: $showBirthdayList) {
             BirthdayListView()
         }
+        .sheet(isPresented: $showCountdownList, onDismiss: refreshCountdowns) {
+            CountdownListView(initialDate: selectedDate)
+        }
+        .sheet(isPresented: $showAddCountdown) {
+            CountdownAddView(initialDate: selectedDate) { event in
+                CountdownManager.shared.saveEvent(event)
+                refreshCountdowns()
+            }
+        }
         .sheet(isPresented: $showBirthdayDetail) {
             BirthdayDetailView(birthdays: selectedDateBirthdays, date: selectedDate)
         }
@@ -73,6 +85,7 @@ struct CalendarView: View {
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(previousMonthLabel)
 
             Spacer()
 
@@ -109,7 +122,18 @@ struct CalendarView: View {
                     .foregroundStyle(AppTheme.warning)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(LocalizedString.calendar("birthday_manage"))
             .help(LocalizedString.calendar("birthday_manage"))
+
+            // 倒数日管理按钮
+            Button(action: { showCountdownList = true }) {
+                Image(systemName: "hourglass")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(AppTheme.healthy)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(LocalizedString.countdown("manage"))
+            .help(LocalizedString.countdown("manage"))
 
             // 下一月
             Button(action: { changeMonth(by: 1) }) {
@@ -118,6 +142,7 @@ struct CalendarView: View {
                     .foregroundStyle(AppTheme.textSecondary(colorScheme))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(nextMonthLabel)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -142,6 +167,7 @@ struct CalendarView: View {
     // MARK: - 日历网格
 
     private var calendarGridView: some View {
+        _ = countdownRevision
         let days = generateDaysForMonth()
 
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 2) {
@@ -160,108 +186,133 @@ struct CalendarView: View {
         let lunarDate = LunarCalendar.convertSolarToLunar(date: dayInfo.date)
         let birthdays = BirthdayManager.shared.getBirthdays(for: dayInfo.date)
         let hasBirthday = !birthdays.isEmpty && dayInfo.isCurrentMonth
+        let countdowns = CountdownManager.shared.events(on: dayInfo.date)
+        let hasCountdown = !countdowns.isEmpty && dayInfo.isCurrentMonth
         let holidayInfo = holidayService.getHolidayInfo(for: dayInfo.date)
         let isHoliday = holidayInfo?.type == .holiday && dayInfo.isCurrentMonth
         let isWorkday = holidayInfo?.type == .workday && dayInfo.isCurrentMonth
 
-        return ZStack(alignment: .topLeading) {
-            // 右上角休/班标记
-            ZStack(alignment: .topTrailing) {
-                // 主内容
-                VStack(spacing: 1) {
-                    // 公历日期
-                    Text("\(dayInfo.day)")
-                        .font(.system(size: 12, weight: isSelected ? .bold : .regular))
-                        .foregroundStyle(dayNumberColor(isToday: isToday, isSelected: isSelected, isWeekend: isWeekend, isCurrentMonth: dayInfo.isCurrentMonth))
-                        .frame(height: 14)
-
-                    // 农历/节日/节气
-                    Text(lunarDisplayText(lunarDate: lunarDate, isCurrentMonth: dayInfo.isCurrentMonth))
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(lunarTextColor(lunarDate: lunarDate, isToday: isToday, isSelected: isSelected, isCurrentMonth: dayInfo.isCurrentMonth))
-                        .lineLimit(1)
-
-                    // 生日名称
-                    if hasBirthday {
-                        Text(birthdayDisplayText(birthdays: birthdays))
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(AppTheme.warning)
-                            .lineLimit(1)
-                    } else {
-                        // 占位，保持高度一致
-                        Text(" ")
-                            .font(.system(size: 8))
-                    }
-                }
-                .frame(height: 36)
-                .frame(maxWidth: .infinity)
-
-                // 右上角休/班标记
-                if isHoliday {
-                    Text(LocalizedString.calendar("holiday"))
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(1)
-                        .background {
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(Color(red: 0.2, green: 0.7, blue: 0.3))
-                        }
-                        .offset(x: 2, y: -2)
-                } else if isWorkday {
-                    Text(LocalizedString.calendar("workday"))
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(1)
-                        .background {
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(Color(red: 0.9, green: 0.4, blue: 0.3))
-                        }
-                        .offset(x: 2, y: -2)
-                }
-            }
-
-            // 左上角生日标识
-            if hasBirthday {
-                Image(systemName: "gift.fill")
-                    .font(.system(size: 6))
-                    .foregroundStyle(.white)
-                    .padding(2)
-                    .background {
-                        Circle()
-                            .fill(AppTheme.warning)
-                    }
-                    .offset(x: -2, y: -2)
-            }
-        }
-        .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(AppTheme.accent.opacity(0.18))
-            } else if isToday {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(AppTheme.accent.opacity(0.55), lineWidth: 1)
-            } else if hasBirthday {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(AppTheme.warning.opacity(0.12))
-            } else if isHoliday {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(red: 0.2, green: 0.7, blue: 0.3).opacity(0.1))
-            } else if isWorkday {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(red: 0.9, green: 0.4, blue: 0.3).opacity(0.1))
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
+        return Button {
             withAnimation(.easeInOut(duration: 0.15)) {
                 selectedDate = dayInfo.date
             }
-            // 如果有生日，显示生日详情
             if hasBirthday {
                 selectedDateBirthdays = birthdays
                 showBirthdayDetail = true
             }
+        } label: {
+            ZStack(alignment: .topLeading) {
+                // 右上角休/班标记
+                ZStack(alignment: .topTrailing) {
+                    // 主内容
+                    VStack(spacing: 1) {
+                        // 公历日期
+                        Text("\(dayInfo.day)")
+                            .font(.system(size: 12, weight: isSelected ? .bold : .regular))
+                            .foregroundStyle(dayNumberColor(isToday: isToday, isSelected: isSelected, isWeekend: isWeekend, isCurrentMonth: dayInfo.isCurrentMonth))
+                            .frame(height: 14)
+
+                        // 农历/节日/节气
+                        Text(lunarDisplayText(lunarDate: lunarDate, isCurrentMonth: dayInfo.isCurrentMonth))
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(lunarTextColor(lunarDate: lunarDate, isToday: isToday, isSelected: isSelected, isCurrentMonth: dayInfo.isCurrentMonth))
+                            .lineLimit(1)
+
+                        if hasBirthday {
+                            Text(birthdayDisplayText(birthdays: birthdays))
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(AppTheme.warning)
+                                .lineLimit(1)
+                        } else if hasCountdown {
+                            Text(countdownDisplayText(countdowns))
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(AppTheme.healthy)
+                                .lineLimit(1)
+                        } else {
+                            Text(" ")
+                                .font(.system(size: 8))
+                        }
+                    }
+                    .frame(height: 36)
+                    .frame(maxWidth: .infinity)
+
+                    // 右上角休/班标记
+                    if isHoliday {
+                        Text(LocalizedString.calendar("holiday"))
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(1)
+                            .background {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(Color(red: 0.2, green: 0.7, blue: 0.3))
+                            }
+                            .offset(x: 2, y: -2)
+                    } else if isWorkday {
+                        Text(LocalizedString.calendar("workday"))
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(1)
+                            .background {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(Color(red: 0.9, green: 0.4, blue: 0.3))
+                            }
+                            .offset(x: 2, y: -2)
+                    }
+                }
+
+                // 左上角生日标识
+                if hasBirthday {
+                    Image(systemName: "gift.fill")
+                        .font(.system(size: 6))
+                        .foregroundStyle(.white)
+                        .padding(2)
+                        .background {
+                            Circle()
+                                .fill(AppTheme.warning)
+                        }
+                        .offset(x: -2, y: -2)
+                }
+            }
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(AppTheme.accent.opacity(0.18))
+                } else if isToday {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(AppTheme.accent.opacity(0.55), lineWidth: 1)
+                } else if hasBirthday {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(AppTheme.warning.opacity(0.12))
+                } else if hasCountdown {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(AppTheme.healthy.opacity(0.1))
+                } else if isHoliday {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(red: 0.2, green: 0.7, blue: 0.3).opacity(0.1))
+                } else if isWorkday {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(red: 0.9, green: 0.4, blue: 0.3).opacity(0.1))
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if hasCountdown {
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundStyle(AppTheme.healthy)
+                        .padding(2)
+                        .accessibilityHidden(true)
+                }
+            }
         }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel(
+            dayAccessibilityLabel(
+                dayInfo.date,
+                birthdays: birthdays,
+                countdowns: countdowns
+            )
+        )
     }
 
     // MARK: - 选中日期详情
@@ -269,6 +320,7 @@ struct CalendarView: View {
     private var selectedDateDetailView: some View {
         let lunarDate = LunarCalendar.convertSolarToLunar(date: selectedDate)
         let birthdays = BirthdayManager.shared.getBirthdays(for: selectedDate)
+        let countdowns = CountdownManager.shared.events(on: selectedDate)
         let holidayInfo = holidayService.getHolidayInfo(for: selectedDate)
 
         return VStack(spacing: 4) {
@@ -306,6 +358,17 @@ struct CalendarView: View {
                                            Color(red: 0.9, green: 0.4, blue: 0.3))
                     }
                 }
+
+                Button {
+                    showAddCountdown = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.healthy)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(LocalizedString.countdown("add_selected_date"))
+                .help(LocalizedString.countdown("add_selected_date"))
             }
 
             // 农历详情
@@ -371,12 +434,88 @@ struct CalendarView: View {
                 }
                 .padding(.top, 2)
             }
+
+            if !countdowns.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppTheme.healthy)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(countdowns) { countdown in
+                            HStack(spacing: 4) {
+                                Text(countdown.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(AppTheme.healthy)
+                                if !countdown.note.isEmpty {
+                                    Text("(\(countdown.note))")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 2)
+                .accessibilityElement(children: .combine)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
     }
 
     // MARK: - 辅助方法
+
+    private var previousMonthLabel: String {
+        LocalizedString.l(
+            settings.language,
+            en: "Previous month",
+            zh: "上个月",
+            ja: "前の月",
+            ko: "이전 달"
+        )
+    }
+
+    private var nextMonthLabel: String {
+        LocalizedString.l(
+            settings.language,
+            en: "Next month",
+            zh: "下个月",
+            ja: "次の月",
+            ko: "다음 달"
+        )
+    }
+
+    private func refreshCountdowns() {
+        countdownRevision &+= 1
+    }
+
+    private func countdownDisplayText(_ countdowns: [CountdownEvent]) -> String {
+        guard let first = countdowns.first else { return "" }
+        return countdowns.count == 1
+            ? first.name
+            : first.name + LocalizedString.calendar("and_more")
+    }
+
+    private func dayAccessibilityLabel(
+        _ date: Date,
+        birthdays: [Birthday],
+        countdowns: [CountdownEvent]
+    ) -> String {
+        var parts = [date.formatted(date: .complete, time: .omitted)]
+        if !birthdays.isEmpty {
+            let names = birthdays.map(\.name).joined(separator: "、")
+            parts.append("\(LocalizedString.calendar("birthday")): \(names)")
+        }
+        if !countdowns.isEmpty {
+            let names = countdowns.map(\.name).joined(separator: "、")
+            parts.append("\(LocalizedString.countdown("events")): \(names)")
+        }
+        return parts.joined(separator: "，")
+    }
 
     private var monthYearText: String {
         let formatter = DateFormatter()

@@ -6,15 +6,9 @@ enum AnalyticsEvent: String {
     case appLaunched = "app_launched"
     case popoverOpened = "popover_opened"
     case settingsOpened = "settings_opened"
-    case novelReaderOpened = "novel_reader_opened"
     case goldPriceFetched = "gold_price_fetched"
     case goldPriceFetchFailed = "gold_price_fetch_failed"
     case viewTabSwitched = "view_tab_switched"
-    case novelOpened = "novel_opened"
-    case novelImported = "novel_imported"
-    case novelImportFailed = "novel_import_failed"
-    case bookmarkAdded = "bookmark_added"
-    case novelSpeechStarted = "novel_speech_started"
     case languageChanged = "language_changed"
     case menuBarDisplayModeChanged = "menu_bar_display_mode_changed"
     case holidayDataUpdated = "holiday_data_updated"
@@ -26,12 +20,14 @@ enum Analytics {
     private static let state = AnalyticsState()
     private static let disabledEnvironmentKey = "POSTHOG_DISABLED"
     private static let sensitivePropertyKeys: Set<String> = [
-        "book_title",
-        "chapter_title",
         "error_message",
         "profit_loss",
         "profit_percent",
     ]
+
+    static var isConfigured: Bool {
+        isEnvironmentEnabled && state.isConfigured
+    }
 
     static func configure(projectToken: String, host: String, enabled: Bool) {
         guard isEnvironmentEnabled else {
@@ -40,6 +36,10 @@ enum Analytics {
         }
 
         let trimmedProjectToken = projectToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedProjectToken.isEmpty else {
+            logger.info("PostHog analytics not configured for this build")
+            return
+        }
         guard trimmedProjectToken.hasPrefix("phc_") else {
             logger.error("PostHog setup skipped because the project token format is invalid")
             return
@@ -55,7 +55,8 @@ enum Analytics {
         }
 
         let config = PostHogConfig(projectToken: trimmedProjectToken, host: trimmedHost)
-        config.captureApplicationLifecycleEvents = true
+        // 只发送本文件中明确列出的事件，避免 SDK 自动采集超出隐私说明的生命周期数据。
+        config.captureApplicationLifecycleEvents = false
         config.optOut = !enabled
         PostHogSDK.shared.setup(config)
         state.markConfigured()
@@ -68,7 +69,7 @@ enum Analytics {
     }
 
     static func setEnabled(_ enabled: Bool) {
-        guard isEnvironmentEnabled, state.isConfigured else { return }
+        guard isConfigured else { return }
         if enabled {
             PostHogSDK.shared.optIn()
         } else {

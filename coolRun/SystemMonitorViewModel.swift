@@ -59,7 +59,10 @@ final class SystemMonitorViewModel {
     }
 
     func refresh() {
-        snapshot = sampler.sample()
+        snapshot = sampler.sample(
+            includeProcesses: AppSettings.shared.showProcesses,
+            mergeProcesses: AppSettings.shared.mergeProcesses
+        )
 
         // 更新历史数据
         cpuHistory.append(snapshot.cpu.usage)

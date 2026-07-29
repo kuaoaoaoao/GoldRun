@@ -8,6 +8,7 @@ struct SystemSnapshot: Equatable {
     var network = NetworkMetrics()
     var uptime = UptimeMetrics()
     var temperature = TemperatureMetrics()
+    var processes = ProcessListMetrics()
     var updatedAt = Date()
 }
 
@@ -44,6 +45,24 @@ struct BatteryMetrics: Equatable {
     var level: Double?
     var state: BatteryState = .unknown
     var isLowPowerModeEnabled: Bool = ProcessInfo.processInfo.isLowPowerModeEnabled
+    var health: BatteryHealthMetrics?
+}
+
+// 电池健康详情（来自 AppleSmartBattery，仅 macOS 便携机可用）
+struct BatteryHealthMetrics: Equatable {
+    var cycleCount: Int?
+    var designCapacity: Int?        // mAh
+    var maxCapacity: Int?           // mAh（实际满充容量）
+    var temperatureCelsius: Double?
+    var voltage: Double?            // V
+    var wattage: Double?            // W，正=充电，负=放电
+    var timeRemainingMinutes: Int?  // 充电时=预计充满，放电时=预计用完
+
+    // 健康度 = 满充容量 / 设计容量
+    var healthPercent: Double? {
+        guard let designCapacity, let maxCapacity, designCapacity > 0 else { return nil }
+        return Double(maxCapacity) / Double(designCapacity) * 100
+    }
 }
 
 enum BatteryState: String, Equatable {
@@ -115,6 +134,29 @@ struct TemperatureMetrics: Equatable {
     var cpuTemperature: Double? = nil  // Celsius, nil if unavailable
     var gpuTemperature: Double? = nil  // Celsius
     var sensors: [SensorReading] = []  // 所有温度传感器
+}
+
+struct ProcessListMetrics: Equatable {
+    /// CPU / 内存两个维度的头部进程并集，默认按 CPU 降序
+    var processes: [ProcessMetrics] = []
+    /// 本次采样到的进程总数
+    var totalCount: Int = 0
+}
+
+struct ProcessMetrics: Equatable, Identifiable {
+    var id: pid_t { pid }
+
+    let pid: pid_t
+    let name: String
+    /// 1.0 表示占满一个核心（与活动监视器口径一致），多核进程可超过 1
+    var cpuUsage: Double = 0
+    var memoryBytes: UInt64 = 0
+    /// 合并同名进程后的实例数量
+    var instanceCount: Int = 1
+    /// 合并后包含的全部进程 ID（含代表 pid）
+    var pids: [pid_t] = []
+    /// 可执行文件路径，用于为 Helper / XPC / 命令行进程解析所属应用图标
+    var executablePath: String? = nil
 }
 
 struct SensorReading: Equatable, Identifiable {

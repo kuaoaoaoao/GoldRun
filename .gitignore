@@ -2,6 +2,8 @@
 docs/.DS_Store
 docs/images/.DS_Store
 .env
+.env.*
+!.env.example
 
 # Local IDE / agent state
 .idea/
@@ -25,3 +27,19 @@ skills/
 demo/
 github-public-release/
 coolRun 2026-07-03 17-31-31/
+
+# Xcode user and build output
+**/xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.app
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+
+# Release artifacts belong in GitHub Releases, not source control
+*.dmg
+*.pkg
+*.ipa
+*.zip

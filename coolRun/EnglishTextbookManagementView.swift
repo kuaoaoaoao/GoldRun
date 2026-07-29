@@ -83,7 +83,7 @@ struct EnglishTextbookManagementView: View {
             ),
             titleVisibility: .visible
         ) {
-            Button(LocalizedString.novel("delete"), role: .destructive) {
+            Button(LocalizedString.common("delete"), role: .destructive) {
                 if let textbook = textbookPendingDelete {
                     if browsingTextbookID == textbook.id { browsingTextbookID = nil }
                     textbookStore.removeTextbook(textbook)
@@ -211,7 +211,7 @@ struct EnglishTextbookManagementView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help(LocalizedString.novel("delete"))
+                        .help(LocalizedString.common("delete"))
                     }
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
@@ -246,7 +246,7 @@ struct EnglishTextbookManagementView: View {
         }
         .contextMenu {
             if textbook.isImported {
-                Button(LocalizedString.novel("delete"), role: .destructive) {
+                Button(LocalizedString.common("delete"), role: .destructive) {
                     textbookPendingDelete = textbook
                 }
             }

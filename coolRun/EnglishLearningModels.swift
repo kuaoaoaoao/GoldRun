@@ -1,5 +1,11 @@
 import Foundation
 
+enum SpeechState: Equatable {
+    case idle
+    case playing
+    case paused
+}
+
 enum EnglishLearningCategory: String, CaseIterable, Codable, Identifiable {
     case words
     case sentences

@@ -12,8 +12,8 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     env:
-      POSTHOG_PROJECT_API_KEY: phc_ADRxZPgBzDQVUTZELLGfCFU4uisGEh9zFBUNZD3cjkjU
-      POSTHOG_HOST: https://us.i.posthog.com
+      POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
+      POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
 
     steps:
       - name: Fetch releases
@@ -27,6 +27,7 @@ jobs:
             -o releases.json
 
       - name: Send download snapshots to PostHog
+        if: ${{ env.POSTHOG_PROJECT_API_KEY != '' }}
         run: |
           set -euo pipefail
 

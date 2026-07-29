@@ -12,9 +12,9 @@ struct GoldTradeRecord: Codable, Identifiable, Equatable, Sendable {
     var note: String = ""
 
     /// 成交金额（正=买入支出，负=卖出回款）。
-    var amount: Double { grams * pricePerGram }
+    nonisolated var amount: Double { grams * pricePerGram }
 
-    var isBuy: Bool { grams >= 0 }
+    nonisolated var isBuy: Bool { grams >= 0 }
 }
 
 /// 交易流水存储：持久化到 gold_trades.json，并提供持仓汇总与 CSV 导出的纯函数。

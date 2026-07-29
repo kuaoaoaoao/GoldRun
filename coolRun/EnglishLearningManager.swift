@@ -168,13 +168,11 @@ final class EnglishLearningManager: NSObject, ObservableObject {
 
     func startContinuousPlayback() {
         guard currentItem != nil else { return }
-        NovelSpeechManager.shared.stop()
         startSession(continuous: true, slow: false)
     }
 
     func replay(slow: Bool = false) {
         guard currentItem != nil else { return }
-        NovelSpeechManager.shared.stop()
         startSession(continuous: false, slow: slow)
     }
 

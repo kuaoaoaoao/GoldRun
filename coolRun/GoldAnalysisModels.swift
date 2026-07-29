@@ -6,7 +6,7 @@ struct GoldPriceRecord: Codable, Identifiable, Equatable, Sendable {
     let timestamp: Date
     let source: String
 
-    init(id: UUID = UUID(), price: Double, timestamp: Date = Date(), source: String = "CZB-JCJ") {
+    nonisolated init(id: UUID = UUID(), price: Double, timestamp: Date = Date(), source: String = "CZB-JCJ") {
         self.id = id
         self.price = price
         self.timestamp = timestamp

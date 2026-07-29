@@ -13,8 +13,11 @@ final class SystemSampler {
     private var previousNetworkBytes: (download: UInt64, upload: UInt64)?
     private var previousSampleTime: Date?
     private let smcReader = SMCReader()
+    #if os(macOS)
+    private let processSampler = ProcessSampler()
+    #endif
 
-    func sample() -> SystemSnapshot {
+    func sample(includeProcesses: Bool = true, mergeProcesses: Bool = true) -> SystemSnapshot {
         let now = Date()
         let network = sampleNetwork()
         let uptime = sampleUptime()
@@ -30,8 +33,18 @@ final class SystemSampler {
             network: network,
             uptime: uptime,
             temperature: temperature,
+            processes: sampleProcesses(enabled: includeProcesses, mergeByName: mergeProcesses),
             updatedAt: now
         )
+    }
+
+    private func sampleProcesses(enabled: Bool, mergeByName: Bool) -> ProcessListMetrics {
+        #if os(macOS)
+        guard enabled else { return ProcessListMetrics() }
+        return processSampler.sample(mergeByName: mergeByName)
+        #else
+        return ProcessListMetrics()
+        #endif
     }
 
     private func sampleCPU() -> CPUMetrics {
@@ -162,6 +175,8 @@ final class SystemSampler {
         } else {
             metrics.state = .unplugged
         }
+
+        metrics.health = sampleBatteryHealth()
         #elseif canImport(UIKit)
         UIDevice.current.isBatteryMonitoringEnabled = true
         let level = UIDevice.current.batteryLevel
@@ -187,6 +202,45 @@ final class SystemSampler {
 
         return metrics
     }
+
+    #if os(macOS)
+    // 从 IORegistry 的 AppleSmartBattery 读取健康度、循环、温度与实时功率（只读，无需权限）
+    private func sampleBatteryHealth() -> BatteryHealthMetrics? {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
+        guard service != IO_OBJECT_NULL else { return nil }
+        defer { IOObjectRelease(service) }
+
+        var propsRef: Unmanaged<CFMutableDictionary>?
+        guard IORegistryEntryCreateCFProperties(service, &propsRef, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+              let props = propsRef?.takeRetainedValue() as? [String: Any] else {
+            return nil
+        }
+
+        var health = BatteryHealthMetrics()
+        health.cycleCount = props["CycleCount"] as? Int
+        health.designCapacity = props["DesignCapacity"] as? Int
+        // Apple Silicon 上 MaxCapacity 恒为 100(%)，真实 mAh 在 AppleRawMaxCapacity/NominalChargeCapacity
+        health.maxCapacity = (props["AppleRawMaxCapacity"] as? Int) ?? (props["NominalChargeCapacity"] as? Int)
+
+        if let rawTemperature = props["Temperature"] as? Int {
+            var celsius = Double(rawTemperature) / 100
+            if celsius > 200 { celsius -= 273.15 } // 个别机型上报百分开尔文
+            health.temperatureCelsius = celsius
+        }
+
+        let voltage = (props["Voltage"] as? Int).map { Double($0) / 1000 } // mV -> V
+        health.voltage = voltage
+        if let voltage, let amperage = props["Amperage"] as? Int {
+            // Amperage 为有符号 mA，正充电负放电
+            health.wattage = voltage * Double(amperage) / 1000
+        }
+
+        if let timeRemaining = props["TimeRemaining"] as? Int, timeRemaining > 0, timeRemaining < 0xFFFF {
+            health.timeRemainingMinutes = timeRemaining
+        }
+        return health
+    }
+    #endif
 
     private func sampleNetwork() -> NetworkMetrics {
         let status = currentNetworkStatus()

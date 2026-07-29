@@ -7,8 +7,32 @@
 
 import SwiftUI
 
-private let posthogApiKey = "phc_ADRxZPgBzDQVUTZELLGfCFU4uisGEh9zFBUNZD3cjkjU"
-private let posthogHost = "https://us.i.posthog.com"
+private enum RuntimeConfiguration {
+    static let defaultPostHogHost = "https://us.i.posthog.com"
+
+    static var postHogProjectToken: String {
+        if ProcessInfo.processInfo.environment["POSTHOG_DISABLED"] == "1" {
+            return ""
+        }
+        return value(environmentKey: "POSTHOG_API_KEY", infoKey: "POSTHOG_API_KEY") ?? ""
+    }
+
+    static var postHogHost: String {
+        value(environmentKey: "POSTHOG_HOST", infoKey: "POSTHOG_HOST") ?? defaultPostHogHost
+    }
+
+    private static func value(environmentKey: String, infoKey: String) -> String? {
+        let environmentValue = ProcessInfo.processInfo.environment[environmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let environmentValue, !environmentValue.isEmpty {
+            return environmentValue
+        }
+
+        let bundleValue = (Bundle.main.object(forInfoDictionaryKey: infoKey) as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return bundleValue?.isEmpty == false ? bundleValue : nil
+    }
+}
 
 @main
 struct coolRunApp: App {
@@ -20,9 +44,14 @@ struct coolRunApp: App {
         GoldDataStorage.migrateLegacyGoldPreferencesIfNeeded()
         CloudSyncStore.shared.start()
         CloudSyncStore.shared.pushBirthdaysFromLocalDefaults()
+        let projectToken = RuntimeConfiguration.postHogProjectToken
+        if projectToken.isEmpty {
+            // fork / 本地构建没有令牌时强制保持关闭，之后配置令牌也需要用户重新主动开启。
+            AppSettings.shared.analyticsEnabled = false
+        }
         Analytics.configure(
-            projectToken: ProcessInfo.processInfo.environment["POSTHOG_API_KEY"] ?? posthogApiKey,
-            host: ProcessInfo.processInfo.environment["POSTHOG_HOST"] ?? posthogHost,
+            projectToken: projectToken,
+            host: RuntimeConfiguration.postHogHost,
             enabled: AppSettings.shared.analyticsEnabled
         )
     }

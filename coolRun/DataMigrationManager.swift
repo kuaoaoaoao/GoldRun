@@ -99,15 +99,15 @@ final class DataMigrationManager {
 
     private func buildArchive() -> DataArchive {
         DataArchive(
-            version: 1,
+            version: 2,
             exportedAt: Date(),
             appVersion: AppVersion.current.marketingVersion,
             birthdays: BirthdayManager.shared.getAllBirthdays(),
+            countdownEvents: nonEmpty(CountdownManager.shared.getAllEvents()),
             englishProgress: exportEnglishProgress(),
             goldPriceRecords: GoldPriceStore.shared.records,
             goldPredictionLearningRecords: GoldPredictionLearningStore.shared.records,
             goldTrades: GoldTradeStore.shared.records.isEmpty ? nil : GoldTradeStore.shared.records,
-            novelLibrary: exportNovelLibrary(),
             appSettings: exportSettings()
         )
     }
@@ -120,6 +120,11 @@ final class DataMigrationManager {
             for birthday in archive.birthdays where !existingIDs.contains(birthday.id) {
                 BirthdayManager.shared.saveBirthday(birthday)
             }
+        }
+
+        // 1.5 恢复倒数日（按 UUID 去重，不覆盖本地已有记录）
+        if let countdownEvents = archive.countdownEvents {
+            CountdownManager.shared.mergeEvents(countdownEvents)
         }
 
         // 2. 恢复英语学习进度
@@ -153,12 +158,7 @@ final class DataMigrationManager {
             GoldTradeStore.shared.merge(trades)
         }
 
-        // 4. 恢复小说书签和阅读进度（不含文件本身）
-        if let novelData = archive.novelLibrary {
-            restoreNovelLibrary(novelData)
-        }
-
-        // 5. 恢复应用设置
+        // 4. 恢复应用设置
         if let settingsData = archive.appSettings {
             restoreSettings(settingsData)
         }
@@ -191,47 +191,6 @@ final class DataMigrationManager {
         }
     }
 
-    // MARK: - Novel Library Export/Import
-
-    private func exportNovelLibrary() -> NovelLibraryData? {
-        let books = NovelLibraryManager.shared.books
-        guard !books.isEmpty else { return nil }
-        return NovelLibraryData(
-            books: books.map { book in
-                NovelBookSummary(
-                    title: book.title,
-                    lastReadChapterIndex: book.lastReadChapterIndex,
-                    lastReadParagraphIndex: book.lastReadParagraphIndex,
-                    bookmarks: book.bookmarks,
-                    lastReadAt: book.lastReadAt
-                )
-            }
-        )
-    }
-
-    private func restoreNovelLibrary(_ data: NovelLibraryData) {
-        // 只恢复书签和进度，不恢复文件（需用户重新导入）
-        let manager = NovelLibraryManager.shared
-        for summary in data.books {
-            if let book = manager.books.first(where: { $0.title == summary.title }) {
-                manager.updateProgress(
-                    bookId: book.id,
-                    chapterIndex: summary.lastReadChapterIndex,
-                    paragraphIndex: summary.lastReadParagraphIndex
-                )
-                // 恢复书签
-                for bookmark in summary.bookmarks {
-                    manager.addBookmark(
-                        bookId: book.id,
-                        chapterIndex: bookmark.chapterIndex,
-                        paragraphIndex: bookmark.paragraphIndex,
-                        previewText: bookmark.previewText
-                    )
-                }
-            }
-        }
-    }
-
     // MARK: - Settings Export/Import
 
     private func exportSettings() -> SettingsData? {
@@ -252,7 +211,10 @@ final class DataMigrationManager {
             englishItemInterval: s.englishItemInterval,
             englishDailyTarget: s.englishDailyTarget,
             englishShowTranslation: s.englishShowTranslation,
-            englishSpeakTranslation: s.englishSpeakTranslation
+            englishSpeakTranslation: s.englishSpeakTranslation,
+            aiQuotaAlertEnabled: s.aiQuotaAlertEnabled,
+            goldHoldingGramsText: UserDefaults.standard.string(forKey: "goldHoldingGramsText"),
+            goldHoldingAverageCostText: UserDefaults.standard.string(forKey: "goldHoldingAverageCostText")
         )
     }
 
@@ -274,6 +236,15 @@ final class DataMigrationManager {
         s.englishDailyTarget = data.englishDailyTarget
         s.englishShowTranslation = data.englishShowTranslation
         s.englishSpeakTranslation = data.englishSpeakTranslation
+        if let enabled = data.aiQuotaAlertEnabled {
+            s.aiQuotaAlertEnabled = enabled
+        }
+        if let grams = data.goldHoldingGramsText {
+            UserDefaults.standard.set(grams, forKey: "goldHoldingGramsText")
+        }
+        if let averageCost = data.goldHoldingAverageCostText {
+            UserDefaults.standard.set(averageCost, forKey: "goldHoldingAverageCostText")
+        }
     }
 
     // MARK: - Helpers
@@ -282,6 +253,10 @@ final class DataMigrationManager {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmm"
         return formatter.string(from: Date())
+    }
+
+    private func nonEmpty<T>(_ values: [T]) -> [T]? {
+        values.isEmpty ? nil : values
     }
 
     private func buildImportSummary(_ archive: DataArchive) -> String {
@@ -294,6 +269,9 @@ final class DataMigrationManager {
         if !archive.birthdays.isEmpty {
             parts.append("• \(LocalizedString.migration("birthday_items")) \(archive.birthdays.count)")
         }
+        if let countdownEvents = archive.countdownEvents, !countdownEvents.isEmpty {
+            parts.append("• \(LocalizedString.migration("countdown_items")) \(countdownEvents.count)")
+        }
         if let english = archive.englishProgress, !english.records.isEmpty {
             parts.append("• \(LocalizedString.migration("english_items")) \(english.records.count)")
         }
@@ -302,9 +280,6 @@ final class DataMigrationManager {
         }
         if let trades = archive.goldTrades, !trades.isEmpty {
             parts.append("• \(LocalizedString.migration("gold_trade_items")) \(trades.count)")
-        }
-        if let novel = archive.novelLibrary, !novel.books.isEmpty {
-            parts.append("• \(LocalizedString.migration("novel_items")) \(novel.books.count)")
         }
         if archive.appSettings != nil {
             parts.append("• \(LocalizedString.migration("app_settings"))")
@@ -345,12 +320,13 @@ struct DataArchive: Codable {
     let exportedAt: Date
     let appVersion: String
     let birthdays: [Birthday]
+    // v2 追加：倒数日（可选以兼容 v1 档案）
+    let countdownEvents: [CountdownEvent]?
     let englishProgress: EnglishProgressData?
     let goldPriceRecords: [GoldPriceRecord]
     let goldPredictionLearningRecords: [GoldPredictionLearningRecord]
     // v1.1 追加：交易流水（可选，兼容旧档案 decodeIfPresent）
     let goldTrades: [GoldTradeRecord]?
-    let novelLibrary: NovelLibraryData?
     let appSettings: SettingsData?
 }
 
@@ -361,18 +337,6 @@ struct EnglishProgressData: Codable {
     let records: [String: EnglishItemProgress]
     let activityDays: Set<String>
     let learnedItemIDsByDay: [String: Set<String>]
-}
-
-struct NovelLibraryData: Codable {
-    let books: [NovelBookSummary]
-}
-
-struct NovelBookSummary: Codable {
-    let title: String
-    let lastReadChapterIndex: Int
-    let lastReadParagraphIndex: Int
-    let bookmarks: [NovelBookmark]
-    let lastReadAt: Date?
 }
 
 struct SettingsData: Codable {
@@ -392,4 +356,8 @@ struct SettingsData: Codable {
     let englishDailyTarget: Int
     let englishShowTranslation: Bool
     let englishSpeakTranslation: Bool
+    // v2 追加字段均为可选，旧备份可继续解码。
+    let aiQuotaAlertEnabled: Bool?
+    let goldHoldingGramsText: String?
+    let goldHoldingAverageCostText: String?
 }

@@ -64,11 +64,9 @@ class HolidayService {
         return savedVersion < currentVersion
     }
 
-    /// 更新数据（合并内置数据到缓存）
+    /// 将当前应用版本携带的节假日数据合并到本地缓存。
+    /// 新年份数据随应用版本发布，不伪装成远程网络更新。
     func updateHolidayData() async throws {
-        // 模拟网络延迟
-        try await Task.sleep(nanoseconds: 500_000_000)
-
         // 获取现有缓存
         var cachedData = loadCachedData() ?? [:]
 

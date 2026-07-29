@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - 视图模式
 
@@ -6,7 +7,6 @@ enum ViewMode: String, CaseIterable {
     case monitor
     case gold
     case calendar
-    case novel
     case english
     case codex
 
@@ -15,7 +15,6 @@ enum ViewMode: String, CaseIterable {
         case .monitor: return "chart.bar.fill"
         case .gold: return "chart.line.uptrend.xyaxis"
         case .calendar: return "calendar"
-        case .novel: return "book.pages"
         case .english: return "character.book.closed"
         case .codex: return "sparkles"
         }
@@ -26,7 +25,6 @@ enum ViewMode: String, CaseIterable {
         case .monitor: return LocalizedString.calendar("monitor")
         case .gold: return LocalizedString.goldPrice("gold_price")
         case .calendar: return LocalizedString.calendar("calendar")
-        case .novel: return LocalizedString.novel("novel")
         case .english: return LocalizedString.english("english")
         case .codex: return "Codex"
         }
@@ -37,9 +35,8 @@ enum ViewMode: String, CaseIterable {
         case .monitor: return "1"
         case .gold: return "2"
         case .calendar: return "3"
-        case .novel: return "4"
-        case .english: return "5"
-        case .codex: return "6"
+        case .english: return "4"
+        case .codex: return "5"
         }
     }
 }
@@ -71,12 +68,10 @@ struct ContentView: View {
                     GoldAnalysisView()
                 case .calendar:
                     CalendarView()
-                case .novel:
-                    MenuBarNovelReaderView()
                 case .english:
                     EnglishLearningView()
                 case .codex:
-                    CodexMonitorView()
+                    AIMonitorView()
                 }
             }
             .id(viewMode)
@@ -109,16 +104,17 @@ struct ContentView: View {
 
 struct ModuleNavigationRail<Trailing: View>: View {
     @Binding var selection: ViewMode
-    @ViewBuilder let trailing: () -> Trailing
+    @ViewBuilder let trailing: Trailing
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var selectionAnimation
 
     init(
         selection: Binding<ViewMode>,
-        @ViewBuilder trailing: @escaping () -> Trailing
+        @ViewBuilder trailing: () -> Trailing
     ) {
         _selection = selection
-        self.trailing = trailing
+        self.trailing = trailing()
     }
 
     var body: some View {
@@ -126,7 +122,7 @@ struct ModuleNavigationRail<Trailing: View>: View {
             ForEach(ViewMode.allCases, id: \.self) { mode in
                 Button {
                     guard selection != mode else { return }
-                    withAnimation(.snappy(duration: 0.22, extraBounce: 0.02)) {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.22, extraBounce: 0.02)) {
                         selection = mode
                     }
                     Analytics.capture(.viewTabSwitched, properties: [
@@ -164,7 +160,7 @@ struct ModuleNavigationRail<Trailing: View>: View {
             }
 
             Spacer(minLength: 2)
-            trailing()
+            trailing
         }
         .padding(4)
         .background {
@@ -231,6 +227,10 @@ struct MonitorPanel: View {
                     }
                 }
 
+                if settings.showProcesses {
+                    ProcessSection(metrics: snapshot.processes)
+                }
+
                 if settings.showTemperature {
                     TemperatureSection(
                         metrics: snapshot.temperature,
@@ -294,6 +294,7 @@ struct MonitorPanel: View {
         settings.showCPU
             || settings.showMemory
             || settings.showTemperature
+            || settings.showProcesses
             || showsSecondaryMetrics
     }
 
@@ -750,6 +751,479 @@ private struct ThermalGuide: View {
     }
 }
 
+// MARK: - 进程明细
+
+private struct ProcessSection: View {
+    let metrics: ProcessListMetrics
+    @State private var sortKey: SortKey = .cpu
+    @State private var isExpanded = false
+    // 列表默认收起，用户的展开选择持久化
+    @AppStorage("monitor_process_list_expanded") private var showsList = false
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var settings = AppSettings.shared
+
+    private enum SortKey {
+        case cpu
+        case memory
+    }
+
+    private var collapsedCount: Int { 5 }
+    private var expandedCount: Int { 15 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showsList.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.icon(colorScheme))
+                        .frame(width: 28, height: 28)
+                        .background(
+                            AppTheme.icon(colorScheme).opacity(0.1),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(LocalizedString.monitor("processes", lang: settings.language))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.textPrimary(colorScheme))
+
+                        Text(subtitleText)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.65))
+                        .rotationEffect(.degrees(showsList ? 90 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                showsList
+                    ? LocalizedString.monitor("collapse_hint", lang: settings.language)
+                    : LocalizedString.monitor("expand_hint", lang: settings.language)
+            )
+
+            if showsList {
+                if displayedProcesses.isEmpty {
+                    Label(
+                        LocalizedString.monitor("process_waiting", lang: settings.language),
+                        systemImage: "hourglass"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                    .padding(.vertical, 5)
+                } else {
+                    HStack(spacing: 6) {
+                        Label(
+                            LocalizedString.monitor("sort_by", lang: settings.language),
+                            systemImage: "arrow.up.arrow.down"
+                        )
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme))
+
+                        Spacer()
+                        sortToggle
+                    }
+
+                    VStack(spacing: 1) {
+                        ForEach(displayedProcesses) { process in
+                            ProcessRow(
+                                process: process,
+                                highlightsCPU: sortKey == .cpu,
+                                barFraction: barFraction(for: process)
+                            )
+                        }
+                    }
+
+                    if metrics.processes.count > collapsedCount {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text(
+                                    isExpanded
+                                        ? LocalizedString.monitor("show_less", lang: settings.language)
+                                        : LocalizedString.monitor("show_more", lang: settings.language)
+                                )
+                                Image(systemName: "chevron.down")
+                                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            }
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .monitorCardSurface()
+    }
+
+    /// 副标题：进程总数；收起时附带 CPU 占用最高的进程概览
+    private var subtitleText: String {
+        guard metrics.totalCount > 0 else {
+            return LocalizedString.monitor("process_waiting", lang: settings.language)
+        }
+
+        var text = "\(metrics.totalCount) \(LocalizedString.monitor("process_count_unit", lang: settings.language))"
+        if !showsList, let top = metrics.processes.max(by: { $0.cpuUsage < $1.cpuUsage }), top.cpuUsage > 0 {
+            text += " · \(top.name) \(top.cpuUsage.percentText)"
+        }
+        return text
+    }
+
+    private var sortToggle: some View {
+        HStack(spacing: 2) {
+            sortButton("CPU", systemImage: "cpu", key: .cpu)
+            sortButton(
+                LocalizedString.monitor("memory", lang: settings.language),
+                systemImage: "memorychip",
+                key: .memory
+            )
+        }
+        .padding(2)
+        .background(
+            colorScheme == .dark
+                ? Color.white.opacity(0.06)
+                : Color.black.opacity(0.045),
+            in: Capsule()
+        )
+        .help(LocalizedString.monitor("sort_by", lang: settings.language))
+    }
+
+    private func sortButton(_ title: String, systemImage: String, key: SortKey) -> some View {
+        Button {
+            guard sortKey != key else { return }
+            withAnimation(.easeInOut(duration: 0.18)) {
+                sortKey = key
+            }
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(
+                    sortKey == key
+                        ? AppTheme.accent
+                        : AppTheme.textSecondary(colorScheme)
+                )
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background {
+                    if sortKey == key {
+                        Capsule().fill(AppTheme.accent.opacity(colorScheme == .dark ? 0.2 : 0.12))
+                    }
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sortedProcesses: [ProcessMetrics] {
+        switch sortKey {
+        case .cpu:
+            metrics.processes.sorted { $0.cpuUsage > $1.cpuUsage }
+        case .memory:
+            metrics.processes.sorted { $0.memoryBytes > $1.memoryBytes }
+        }
+    }
+
+    private var displayedProcesses: [ProcessMetrics] {
+        Array(sortedProcesses.prefix(isExpanded ? expandedCount : collapsedCount))
+    }
+
+    private func barFraction(for process: ProcessMetrics) -> Double {
+        switch sortKey {
+        case .cpu:
+            let maxUsage = displayedProcesses.map(\.cpuUsage).max() ?? 0
+            return maxUsage > 0 ? process.cpuUsage / maxUsage : 0
+        case .memory:
+            let maxMemory = displayedProcesses.map(\.memoryBytes).max() ?? 0
+            return maxMemory > 0 ? Double(process.memoryBytes) / Double(maxMemory) : 0
+        }
+    }
+}
+
+private struct ProcessRow: View {
+    let process: ProcessMetrics
+    let highlightsCPU: Bool
+    let barFraction: Double
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var settings = AppSettings.shared
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProcessIcon(process: process)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text(process.name)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(AppTheme.textPrimary(colorScheme))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    if process.instanceCount > 1 {
+                        Text("×\(process.instanceCount)")
+                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                            .foregroundStyle(AppTheme.textSecondary(colorScheme))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                colorScheme == .dark
+                                    ? Color.white.opacity(0.09)
+                                    : Color.black.opacity(0.055),
+                                in: Capsule()
+                            )
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text("PID \(process.pid)")
+                        .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                        .foregroundStyle(AppTheme.textSecondary(colorScheme).opacity(0.8))
+                        .lineLimit(1)
+
+                    ProgressPill(value: barFraction, tint: barTint)
+                        .frame(height: 3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                metricValue(
+                    process.cpuUsage.percentText,
+                    systemImage: "cpu",
+                    isPrimary: highlightsCPU
+                )
+                metricValue(
+                    process.memoryBytes.memoryText,
+                    systemImage: "memorychip",
+                    isPrimary: !highlightsCPU
+                )
+            }
+            .frame(width: 72, alignment: .trailing)
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 5)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovering ? AppTheme.elevatedSurface(colorScheme) : Color.clear)
+        }
+        .contentShape(Rectangle())
+        .help(helpText)
+        .onHover { hovering in
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
+                isHovering = hovering
+            }
+        }
+        .contextMenu {
+            if !containsOwnProcess {
+                Button(role: .destructive) {
+                    for pid in targetPIDs {
+                        kill(pid, SIGTERM)
+                    }
+                } label: {
+                    Label(terminateLabel, systemImage: "xmark.circle")
+                }
+            }
+        }
+    }
+
+    private var targetPIDs: [pid_t] {
+        process.pids.isEmpty ? [process.pid] : process.pids
+    }
+
+    private var containsOwnProcess: Bool {
+        targetPIDs.contains(ProcessInfo.processInfo.processIdentifier)
+    }
+
+    private var terminateLabel: String {
+        let base = LocalizedString.monitor("terminate_process", lang: settings.language)
+        return process.instanceCount > 1 ? "\(base) (\(process.instanceCount))" : base
+    }
+
+    private var helpText: String {
+        let pidText = process.instanceCount > 1
+            ? "PID \(process.pid) ×\(process.instanceCount)"
+            : "PID \(process.pid)"
+        return "\(pidText) · CPU \(process.cpuUsage.percentText) · \(process.memoryBytes.memoryText)"
+    }
+
+    private func metricValue(_ value: String, systemImage: String, isPrimary: Bool) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: systemImage)
+                .font(.system(size: 8, weight: .semibold))
+                .frame(width: 10)
+            Text(value)
+                .font(.system(size: 9, weight: isPrimary ? .bold : .medium, design: .monospaced))
+                .lineLimit(1)
+        }
+        .foregroundStyle(isPrimary ? primaryTint : AppTheme.textSecondary(colorScheme))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var barTint: Color {
+        primaryTint
+    }
+
+    private var primaryTint: Color {
+        highlightsCPU
+            ? AppTheme.healthColor(for: min(process.cpuUsage, 1))
+            : AppTheme.accent
+    }
+}
+
+private struct ProcessIcon: View {
+    let process: ProcessMetrics
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Group {
+            if let resolvedIcon {
+                Image(nsImage: resolvedIcon)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(2)
+            } else {
+                Image(systemName: fallback.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(fallback.tint)
+            }
+        }
+        .frame(width: 28, height: 28)
+        .background(
+            fallback.tint.opacity(colorScheme == .dark ? 0.14 : 0.09),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(AppTheme.stroke(colorScheme), lineWidth: 0.5)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var resolvedIcon: NSImage? {
+        applicationIcon ?? ProcessIconResolver.icon(forExecutableAt: process.executablePath)
+    }
+
+    private var applicationIcon: NSImage? {
+        for pid in candidatePIDs {
+            if let icon = NSRunningApplication(processIdentifier: pid)?.icon {
+                return icon
+            }
+        }
+        return nil
+    }
+
+    private var candidatePIDs: [pid_t] {
+        process.pids.isEmpty ? [process.pid] : process.pids
+    }
+
+    private var fallback: ProcessFallbackIcon {
+        ProcessFallbackIcon(name: process.name)
+    }
+}
+
+private enum ProcessIconResolver {
+    private static let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 256
+        return cache
+    }()
+
+    static func icon(forExecutableAt executablePath: String?) -> NSImage? {
+        guard let executablePath, !executablePath.isEmpty else { return nil }
+
+        // Helper、XPC 与 Framework 子进程优先继承最近一层父 .app 的真实图标。
+        let iconPath = enclosingApplicationPath(for: executablePath) ?? executablePath
+        let cacheKey = iconPath as NSString
+        if let cached = cache.object(forKey: cacheKey) {
+            return cached
+        }
+
+        guard FileManager.default.fileExists(atPath: iconPath) else { return nil }
+        let icon = NSWorkspace.shared.icon(forFile: iconPath)
+        cache.setObject(icon, forKey: cacheKey)
+        return icon
+    }
+
+    private static func enclosingApplicationPath(for executablePath: String) -> String? {
+        var url = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+
+        while url.path != "/" {
+            if url.pathExtension.caseInsensitiveCompare("app") == .orderedSame {
+                return url.path
+            }
+
+            let parent = url.deletingLastPathComponent()
+            guard parent.path != url.path else { break }
+            url = parent
+        }
+
+        return nil
+    }
+}
+
+private struct ProcessFallbackIcon {
+    let symbol: String
+    let tint: Color
+
+    init(name: String) {
+        let normalized = name.lowercased()
+
+        if Self.containsAny(normalized, ["safari", "chrome", "firefox", "edge", "webkit"]) {
+            symbol = "globe"
+            tint = .blue
+        } else if Self.containsAny(normalized, [
+            "xcode", "swift", "clang", "git", "node", "python", "java", "terminal", "code"
+        ]) {
+            symbol = "terminal.fill"
+            tint = .purple
+        } else if Self.containsAny(normalized, [
+            "music", "spotify", "photo", "video", "media", "zoom", "facetime"
+        ]) {
+            symbol = "play.rectangle.fill"
+            tint = .pink
+        } else if Self.containsAny(normalized, [
+            "network", "cloud", "vpn", "wifi", "bluetooth", "sharing"
+        ]) {
+            symbol = "network"
+            tint = .teal
+        } else if Self.containsAny(normalized, [
+            "kernel", "launchd", "windowserver", "system", "daemon", "service", "mds"
+        ]) {
+            symbol = "gearshape.2.fill"
+            tint = .orange
+        } else {
+            symbol = "app.fill"
+            tint = AppTheme.accent
+        }
+    }
+
+    private static func containsAny(_ name: String, _ keywords: [String]) -> Bool {
+        keywords.contains(where: name.contains)
+    }
+}
+
 private struct StorageSection: View {
     let metrics: StorageMetrics
     @Environment(\.colorScheme) private var colorScheme
@@ -783,6 +1257,31 @@ private struct BatterySection: View {
         } content: {
             MetricRow(label: LocalizedString.monitor("status", lang: settings.language), value: batteryStateText)
             MetricRow(label: LocalizedString.monitor("low_power", lang: settings.language), value: metrics.isLowPowerModeEnabled ? LocalizedString.label("on", lang: settings.language) : LocalizedString.label("off", lang: settings.language))
+            if let health = metrics.health {
+                if let healthPercent = health.healthPercent {
+                    MetricRow(label: LocalizedString.monitor("battery_health", lang: settings.language), value: String(format: "%.0f%%", healthPercent))
+                }
+                if let cycleCount = health.cycleCount {
+                    MetricRow(label: LocalizedString.monitor("cycle_count", lang: settings.language), value: "\(cycleCount)")
+                }
+                if let maxCapacity = health.maxCapacity, let designCapacity = health.designCapacity {
+                    MetricRow(label: LocalizedString.monitor("battery_capacity", lang: settings.language), value: "\(maxCapacity) / \(designCapacity) mAh")
+                }
+                if let temperature = health.temperatureCelsius {
+                    MetricRow(label: LocalizedString.monitor("battery_temp", lang: settings.language), value: String(format: "%.1f°C", temperature))
+                }
+                if let wattage = health.wattage, abs(wattage) >= 0.05 {
+                    MetricRow(label: LocalizedString.monitor("battery_power", lang: settings.language), value: String(format: "%@%.1f W", wattage > 0 ? "+" : "", wattage))
+                }
+                if let minutes = health.timeRemainingMinutes {
+                    MetricRow(
+                        label: metrics.state == .charging
+                            ? LocalizedString.monitor("time_to_full", lang: settings.language)
+                            : LocalizedString.monitor("time_to_empty", lang: settings.language),
+                        value: String(format: "%d:%02d", minutes / 60, minutes % 60)
+                    )
+                }
+            }
         }
     }
 
