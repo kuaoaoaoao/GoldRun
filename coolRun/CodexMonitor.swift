@@ -127,7 +127,8 @@ enum CodexMonitorState: Equatable, Sendable {
 @MainActor
 @Observable
 final class CodexMonitorViewModel {
-    static let shared = CodexMonitorViewModel()
+    // 共享实例由 AI 面板的可见性控制，不在应用启动时常驻轮询。
+    static let shared = CodexMonitorViewModel(autoStart: false)
 
     var state: CodexMonitorState = .loading
     var isRefreshing = false
@@ -162,6 +163,18 @@ final class CodexMonitorViewModel {
         }.value
         isRefreshing = false
         state = result
+        if case let .ready(snapshot) = result {
+            QuotaAlertManager.shared.handle(
+                provider: "Codex",
+                windows: snapshot.limits.flatMap { limit in
+                    limit.windows.compactMap { window in
+                        window.remainingPercent.map {
+                            QuotaAlertManager.WindowInfo(id: window.id, title: "\(limit.title) \(window.title)", remainingPercent: $0)
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -571,7 +584,7 @@ private nonisolated final class AppServerClient {
         process.standardOutput = outputPipe
         process.standardError = FileHandle.standardError
         try process.run()
-        _ = try request("initialize", params: ["clientInfo": ["name": "coolRun", "title": "coolRun", "version": "1.0"]], as: InitializeResponse.self)
+        _ = try request("initialize", params: ["clientInfo": ["name": "GoldRun", "title": "GoldRun", "version": "1.0"]], as: InitializeResponse.self)
         try send(method: "initialized", id: nil, params: nil)
     }
 

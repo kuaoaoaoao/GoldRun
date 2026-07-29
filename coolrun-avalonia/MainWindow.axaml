@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:CoolRun.Controls"
         x:Class="CoolRun.MainWindow"
-        Title="coolRun"
+        Title="GoldRun"
         Width="420" Height="640"
         CanResize="False"
         SystemDecorations="None"
@@ -84,7 +84,7 @@
 
       <!-- 底部状态 -->
       <Border DockPanel.Dock="Bottom" BorderBrush="#14FFFFFF" BorderThickness="0,1,0,0" Padding="12,6">
-        <TextBlock x:Name="FooterStatus" Text="coolRun for Windows (Avalonia)" FontSize="11"
+        <TextBlock x:Name="FooterStatus" Text="GoldRun for Windows (Avalonia)" FontSize="11"
                    Foreground="#8B90A0" HorizontalAlignment="Center" />
       </Border>
 

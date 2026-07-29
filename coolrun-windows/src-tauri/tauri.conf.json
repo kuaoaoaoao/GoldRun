@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "coolRun",
+  "productName": "GoldRun",
   "version": "0.1.0",
   "identifier": "com.kuao.coolrun.windows",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "coolRun",
+        "title": "GoldRun",
         "width": 420,
         "height": 640,
         "resizable": false,

@@ -98,7 +98,7 @@ public class App : Application
                 var change = quote.ChangeRatePercent is { } rate ? $" ({rate:+0.00;-0.00}%)" : "";
                 if (_trayIcon is not null)
                 {
-                    _trayIcon.ToolTipText = $"coolRun · 金价 ¥{quote.CnyPerGram:F2}/克{change}";
+                    _trayIcon.ToolTipText = $"GoldRun · 金价 ¥{quote.CnyPerGram:F2}/克{change}";
                 }
             }
             catch

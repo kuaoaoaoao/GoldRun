@@ -1,6 +1,6 @@
-# coolRun for Windows (C# / Avalonia)
+# GoldRun for Windows (C# / Avalonia)
 
-coolRun 的 C# 版 Windows 移植，使用 **Avalonia 11 + .NET 10**，可在 macOS 上开发调试、直接交叉编译出 Windows exe。
+GoldRun 的 C# 版 Windows 移植，使用 **Avalonia 11 + .NET 10**，可在 macOS 上开发调试、直接交叉编译出 Windows exe。
 
 ## 功能
 
@@ -20,7 +20,7 @@ dotnet run
 
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
-# 产物: bin/Release/net10.0/win-x64/publish/coolRun.exe（自带运行时，免安装）
+# 产物: bin/Release/net10.0/win-x64/publish/GoldRun.exe（自带运行时，免安装）
 ```
 
 ## 目录结构

@@ -43,7 +43,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		8FCE25482FBE97330023FC83 /* coolRun.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = coolRun.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8FCE25482FBE97330023FC83 /* GoldRun.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GoldRun.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000001 /* coolRunTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = coolRunTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA7A00000000000000000006 /* coolRun Watch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "coolRun Watch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA7B00000000000000000006 /* coolRun Watch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "coolRun Watch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -132,7 +132,7 @@
 		8FCE25492FBE97330023FC83 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8FCE25482FBE97330023FC83 /* coolRun.app */,
+				8FCE25482FBE97330023FC83 /* GoldRun.app */,
 				A10000000000000000000001 /* coolRunTests.xctest */,
 				DA7A00000000000000000006 /* coolRun Watch.app */,
 				DA7B00000000000000000006 /* coolRun Watch Complication.appex */,
@@ -162,8 +162,8 @@
 			packageProductDependencies = (
 				CAFE02CAFE02CAFE02CAF002 /* PostHog */,
 			);
-			productName = coolRun;
-			productReference = 8FCE25482FBE97330023FC83 /* coolRun.app */;
+			productName = GoldRun;
+			productReference = 8FCE25482FBE97330023FC83 /* GoldRun.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A10000000000000000000006 /* coolRunTests */ = {
@@ -487,7 +487,10 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GoldRun;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_POSTHOG_API_KEY = "$(POSTHOG_API_KEY)";
+				INFOPLIST_KEY_POSTHOG_HOST = "$(POSTHOG_HOST)";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -504,7 +507,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = kuao.coolRun;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = coolRun;
+				PRODUCT_NAME = GoldRun;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -531,7 +535,10 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GoldRun;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_POSTHOG_API_KEY = "$(POSTHOG_API_KEY)";
+				INFOPLIST_KEY_POSTHOG_HOST = "$(POSTHOG_HOST)";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -548,7 +555,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = kuao.coolRun;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = coolRun;
+				PRODUCT_NAME = GoldRun;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -577,7 +585,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/coolRun.app/Contents/MacOS/coolRun";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GoldRun.app/Contents/MacOS/GoldRun";
 			};
 			name = Debug;
 		};
@@ -595,7 +603,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/coolRun.app/Contents/MacOS/coolRun";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GoldRun.app/Contents/MacOS/GoldRun";
 			};
 			name = Release;
 		};
@@ -606,7 +614,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = coolRun;
+				INFOPLIST_KEY_CFBundleDisplayName = GoldRun;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				MARKETING_VERSION = 1.0;
@@ -630,7 +638,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = coolRun;
+				INFOPLIST_KEY_CFBundleDisplayName = GoldRun;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				MARKETING_VERSION = 1.0;

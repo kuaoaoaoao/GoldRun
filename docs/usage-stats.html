@@ -3,20 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="coolRun 匿名使用统计：总用户数、下载趋势、平台和系统版本分布。">
-  <meta property="og:title" content="coolRun - Usage Stats">
-  <meta property="og:description" content="coolRun 的匿名聚合使用统计，不包含个人身份信息。">
+  <meta name="description" content="GoldRun 匿名使用统计：总用户数、下载趋势、平台和系统版本分布。">
+  <meta property="og:title" content="GoldRun - Usage Stats">
+  <meta property="og:description" content="GoldRun 的匿名聚合使用统计，不包含个人身份信息。">
   <meta property="og:type" content="website">
-  <title>coolRun - Usage Stats</title>
-  <script>
-    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once unregister identify set_config reset get_distinct_id get_session_id opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-
-    posthog.init("phc_ADRxZPgBzDQVUTZELLGfCFU4uisGEh9zFBUNZD3cjkjU", {
-      api_host: "https://us.i.posthog.com",
-      capture_pageview: false,
-      person_profiles: "identified_only"
-    });
-  </script>
+  <title>GoldRun - Usage Stats</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -333,7 +324,7 @@
     <nav class="nav" aria-label="统计页导航">
       <a class="brand" href="./">
         <span class="brand-mark" aria-hidden="true"></span>
-        <span>coolRun</span>
+        <span>GoldRun</span>
       </a>
       <a class="download" href="https://github.com/kuaoaoaoao/coolRun/releases" data-analytics-event="download_clicked" data-analytics-location="usage_stats_header" data-analytics-destination="github_releases" data-analytics-platform="macos">↓ 下载最新版</a>
     </nav>
@@ -360,7 +351,7 @@
         id="posthog-stats-frame"
         class="embed-frame"
         name="coolRunUsageStats"
-        title="coolRun PostHog usage stats"
+        title="GoldRun PostHog usage stats"
         src=""
         hidden
       ></iframe>
@@ -398,22 +389,6 @@
       var iframe = document.getElementById("posthog-stats-frame");
       var placeholder = document.getElementById("posthog-placeholder");
 
-      function capture(eventName, properties) {
-        if (!window.posthog || typeof window.posthog.capture !== "function") {
-          return;
-        }
-
-        window.posthog.capture(eventName, Object.assign({
-          page_path: window.location.pathname,
-          page_title: document.title,
-          referrer_host: document.referrer ? new URL(document.referrer).host : ""
-        }, properties || {}));
-      }
-
-      capture("usage_stats_page_viewed", {
-        website: "github_pages"
-      });
-
       if (POSTHOG_DASHBOARD_EMBED_URL) {
         iframe.src = POSTHOG_DASHBOARD_EMBED_URL;
         iframe.hidden = false;
@@ -426,17 +401,6 @@
         }
       });
 
-      document.querySelectorAll("a[data-analytics-event]").forEach(function (link) {
-        link.addEventListener("click", function () {
-          capture(link.dataset.analyticsEvent, {
-            link_text: link.textContent.trim(),
-            link_url: link.href,
-            location: link.dataset.analyticsLocation || "",
-            destination: link.dataset.analyticsDestination || "",
-            platform: link.dataset.analyticsPlatform || ""
-          });
-        });
-      });
     }());
   </script>
 </body>

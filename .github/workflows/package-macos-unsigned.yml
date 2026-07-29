@@ -1,0 +1,67 @@
+name: Package unsigned macOS build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      POSTHOG_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build release app without Developer ID
+        run: >
+          xcodebuild
+          -project coolRun.xcodeproj
+          -scheme coolRun
+          -configuration Release
+          -destination 'platform=macOS'
+          -derivedDataPath '${{ runner.temp }}/coolRun-derived'
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Apply ad hoc signature and verify bundle
+        env:
+          APP_PATH: ${{ runner.temp }}/coolRun-derived/Build/Products/Release/GoldRun.app
+        run: |
+          test -d "$APP_PATH"
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+      - name: Create GoldRun DMG
+        env:
+          APP_PATH: ${{ runner.temp }}/coolRun-derived/Build/Products/Release/GoldRun.app
+          DIST_DIR: ${{ runner.temp }}/coolRun-dist
+          DMG_DIR: ${{ runner.temp }}/GoldRun-dmg
+        run: |
+          mkdir -p "$DIST_DIR"
+          mkdir -p "$DMG_DIR"
+          ditto "$APP_PATH" "$DMG_DIR/GoldRun.app"
+          ln -s /Applications "$DMG_DIR/Applications"
+          hdiutil create \
+            -volname "GoldRun" \
+            -srcfolder "$DMG_DIR" \
+            -ov \
+            -format UDZO \
+            "$DIST_DIR/GoldRun.dmg"
+          test -f "$DIST_DIR/GoldRun.dmg"
+
+      - name: Upload unsigned community build
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoldRun-macOS-unsigned-${{ github.sha }}
+          path: ${{ runner.temp }}/coolRun-dist/GoldRun.dmg
+          if-no-files-found: error
+          retention-days: 30

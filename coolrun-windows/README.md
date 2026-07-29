@@ -1,6 +1,6 @@
-# coolRun for Windows
+# GoldRun for Windows
 
-coolRun macOS 菜单栏应用的 Windows 托盘版，基于 **Tauri 2**（Rust 后端 + TypeScript 前端）。
+GoldRun macOS 菜单栏应用的 Windows 托盘版，基于 **Tauri 2**（Rust 后端 + TypeScript 前端）。
 
 ## 功能
 

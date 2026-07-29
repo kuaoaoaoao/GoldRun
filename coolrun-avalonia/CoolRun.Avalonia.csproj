@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <RootNamespace>CoolRun</RootNamespace>
-    <AssemblyName>coolRun</AssemblyName>
+    <AssemblyName>GoldRun</AssemblyName>
     <ApplicationIcon>Assets/icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <!-- Windows 发布产物瘦身 -->

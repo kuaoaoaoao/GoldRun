@@ -1,85 +1,40 @@
-# PostHog download analytics
+# PostHog release download analytics
 
-coolRun has two download-related analytics paths:
+GoldRun 的 GitHub Pages 当前不加载 PostHog SDK，也不发送页面访问或链接点击事件。网站上的下载按钮直接跳转到 GitHub Releases。
 
-1. Website click tracking in `docs/index.html`
-2. GitHub Release asset download snapshots from GitHub Actions
+## GitHub Release 下载快照
 
-## Website events
-
-The GitHub Pages site initializes PostHog and records:
-
-| Event | Meaning |
-|---|---|
-| `website_page_viewed` | A visitor opened the website |
-| `download_clicked` | A visitor clicked a download link that points to GitHub Releases |
-| `github_link_clicked` | A visitor clicked a GitHub repository link |
-| `feedback_clicked` | A visitor clicked the GitHub Issues feedback link |
-| `usage_stats_clicked` | A visitor clicked a website link to the public usage stats page |
-| `usage_stats_page_viewed` | A visitor opened the public usage stats page |
-
-Useful properties:
-
-| Property | Meaning |
-|---|---|
-| `location` | Link position, such as `hero`, `download_section`, or `footer` |
-| `destination` | Target type, such as `github_releases` or `repository` |
-| `platform` | Intended platform, currently `macos` for download links |
-| `link_url` | The URL the visitor clicked |
-| `referrer_host` | The referring domain when available |
-
-Recommended PostHog insights:
-
-- Trend: `download_clicked`, total count, last 30 days
-- Breakdown: `download_clicked` by `location`
-- Funnel: `website_page_viewed` -> `download_clicked`
-
-## GitHub Release download snapshots
-
-GitHub does not let a project inject JavaScript into the Release page. To count direct downloads from GitHub Releases, the workflow
-`.github/workflows/sync-release-downloads-to-posthog.yml` reads GitHub's Release API once per day and sends PostHog events named:
+GitHub Release 页面不能注入项目自己的 JavaScript。仓库通过
+`.github/workflows/sync-release-downloads-to-posthog.yml` 每天读取一次 GitHub Release API，并可选发送以下事件：
 
 `github_release_download_snapshot`
 
-This event is a daily snapshot, not a single user click. Use the latest value or daily difference to understand actual release asset downloads.
+这是一份 Release 资源累计下载量快照，不代表单个用户点击。工作流只有在仓库配置了
+`POSTHOG_PROJECT_API_KEY` secret 时才会上报；没有 secret 时会安全跳过。
 
-Useful properties:
+常用属性：
 
-| Property | Meaning |
-|---|---|
-| `release_tag` | Release tag, for example `v1.0.0` |
-| `asset_name` | File name, for example `coolRun.dmg` |
-| `download_count` | GitHub's cumulative download count for that asset |
-| `asset_size` | Asset size in bytes |
-| `browser_download_url` | Direct GitHub asset URL |
-| `source` | Always `github_api` |
+| 属性 | 含义 |
+| --- | --- |
+| `release_tag` | Release 标签，例如 `v1.0.0` |
+| `asset_name` | 资源文件名，例如 `GoldRun.dmg` |
+| `download_count` | GitHub 返回的累计下载次数 |
+| `asset_size` | 资源大小，单位为字节 |
+| `browser_download_url` | GitHub 资源下载地址 |
+| `source` | 固定为 `github_api` |
 
-Recommended PostHog insights:
+推荐统计方式：
 
-- Trend: `github_release_download_snapshot`, math `max(download_count)`, breakdown by `asset_name`
-- Table: latest `download_count` by `release_tag` and `asset_name`
-- Trend: daily downloads by subtracting yesterday's `download_count` from today's value in a PostHog SQL insight
+- 按 `asset_name` 查看最新 `download_count`。
+- 用相邻日期的累计值差计算每日下载量。
+- 不要把快照事件当作唯一访客或真实会话数量。
 
-## Manual test
+## 公开统计页
 
-After merging and publishing GitHub Pages:
+公开统计页位于 `docs/usage-stats.html`，默认不加载任何远程看板。需要展示聚合数据时：
 
-1. Open the website.
-2. Click `下载最新版`.
-3. In PostHog, open Activity or Product analytics and search for `download_clicked`.
-4. In GitHub Actions, run `Sync GitHub release downloads to PostHog` manually once.
-5. In PostHog, search for `github_release_download_snapshot`.
+1. 在 PostHog 中创建只包含聚合指标的公开 Dashboard。
+2. 启用公开分享并复制 iframe 地址。
+3. 将地址填入 `docs/usage-stats.html` 的 `POSTHOG_DASHBOARD_EMBED_URL`。
 
-## Public usage stats page
-
-The public stats page lives at `docs/usage-stats.html`.
-
-To make it show live PostHog cards:
-
-1. Open the coolRun dashboard in PostHog.
-2. Click `Share`.
-3. Enable public sharing for the dashboard or the specific insight you want to embed.
-4. Copy the iframe `src` URL.
-5. Paste it into `POSTHOG_DASHBOARD_EMBED_URL` in `docs/usage-stats.html`.
-
-Only publish aggregate, anonymous metrics. Avoid embedding raw events, person lists, session replay, IP addresses, or any table that can identify a user.
+不要公开原始事件、人员列表、会话回放、IP 地址或其他可以识别个人的信息。变更网页统计行为时，也要同步更新根目录的 `PRIVACY.md`。

@@ -57,6 +57,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var textbookStore = EnglishTextbookStore.shared
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
@@ -118,7 +119,7 @@ struct SettingsView: View {
                     .shadow(color: .black.opacity(0.14), radius: 5, y: 2)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("coolRun")
+                    Text("GoldRun")
                         .font(.headline)
                     Text("v\(AppVersion.current.displayText)")
                         .font(.caption2.monospacedDigit())
@@ -129,7 +130,7 @@ struct SettingsView: View {
             VStack(spacing: 4) {
                 ForEach(SettingsCategory.allCases) { category in
                     Button {
-                        withAnimation(.snappy(duration: 0.2)) {
+                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
                             selectedCategory = category
                         }
                     } label: {
@@ -159,6 +160,8 @@ struct SettingsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(category.displayName(lang: settings.language))
+                    .accessibilityAddTraits(selectedCategory == category ? .isSelected : [])
                 }
             }
 
@@ -281,10 +284,13 @@ struct SettingsView: View {
                         title: LocalizedString.settings("share_analytics"),
                         isOn: $settings.analyticsEnabled
                     )
+                    .disabled(!Analytics.isConfigured)
                     Divider().padding(.horizontal, 14)
-                    Text(LocalizedString.settings("privacy_note"))
+                    Text(LocalizedString.settings(
+                        Analytics.isConfigured ? "privacy_note" : "analytics_unavailable"
+                    ))
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Analytics.isConfigured ? Color.secondary : AppTheme.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -351,6 +357,23 @@ struct SettingsView: View {
                         title: LocalizedString.monitor("temperature"),
                         isOn: $settings.showTemperature
                     )
+                    Divider().padding(.horizontal, 14)
+
+                    MonitorToggleRow(
+                        icon: "list.bullet.rectangle",
+                        title: LocalizedString.monitor("processes"),
+                        isOn: $settings.showProcesses
+                    )
+
+                    if settings.showProcesses {
+                        Divider().padding(.horizontal, 14)
+
+                        MonitorToggleRow(
+                            icon: "square.3.layers.3d",
+                            title: LocalizedString.monitor("merge_processes"),
+                            isOn: $settings.mergeProcesses
+                        )
+                    }
                 }
             }
 
@@ -377,6 +400,49 @@ struct SettingsView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
             }
+
+            SettingsCard(
+                icon: "bell.badge.fill",
+                title: LocalizedString.settings("ai_quota_alerts"),
+                description: LocalizedString.settings("ai_quota_alerts_desc")
+            ) {
+                VStack(spacing: 0) {
+                    MonitorToggleRow(
+                        icon: "sparkles",
+                        title: LocalizedString.settings("ai_quota_alerts"),
+                        isOn: $settings.aiQuotaAlertEnabled
+                    )
+                    .onChange(of: settings.aiQuotaAlertEnabled) { _, enabled in
+                        if enabled {
+                            QuotaAlertManager.shared.requestAuthorizationIfNeeded {
+                                refreshNotificationPermission()
+                            }
+                        }
+                    }
+                    .onAppear { refreshNotificationPermission() }
+
+                    if settings.aiQuotaAlertEnabled && notificationPermissionDenied {
+                        Divider().padding(.horizontal, 14)
+                        Label(
+                            LocalizedString.settings("notification_permission_denied"),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppTheme.warning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                    }
+
+                    Divider().padding(.horizontal, 14)
+                    Text(LocalizedString.settings("ai_quota_alerts_note"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                }
+            }
         }
     }
 
@@ -395,7 +461,7 @@ struct SettingsView: View {
                             mode: mode,
                             isSelected: settings.menuBarDisplayMode == mode
                         ) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                                 settings.menuBarDisplayMode = mode
                             }
                             Analytics.capture(.menuBarDisplayModeChanged, properties: [
@@ -415,20 +481,58 @@ struct SettingsView: View {
                 title: LocalizedString.settings("menubar_animation"),
                 description: LocalizedString.settings("menubar_animation_desc")
             ) {
-                HStack(spacing: 10) {
-                    Image(systemName: "circle.dotted.circle")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20)
-                    Text(LocalizedString.settings("coin_animation"))
-                        .font(.system(size: 13))
-                    Spacer()
-                    Picker("", selection: $settings.menuBarAnimationRate) {
-                        ForEach(MenuBarAnimationRate.allCases) { rate in
-                            Text(rate.displayName(lang: settings.language)).tag(rate)
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "circle.circle")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(LocalizedString.settings("coin_appearance"))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: $settings.menuBarCoinAppearance) {
+                            ForEach(MenuBarCoinAppearance.allCases) { appearance in
+                                Text(appearance.displayName(lang: settings.language)).tag(appearance)
+                            }
                         }
+                        .labelsHidden()
+                        .frame(width: 164)
                     }
-                    .labelsHidden()
-                    .frame(width: 160)
+
+                    Divider().padding(.leading, 44)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "wand.and.stars")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(LocalizedString.settings("coin_motion"))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: $settings.menuBarCoinMotion) {
+                            ForEach(MenuBarCoinMotion.allCases) { motion in
+                                Text(motion.displayName(lang: settings.language)).tag(motion)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 164)
+                    }
+
+                    Divider().padding(.leading, 44)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "gauge.with.dots.needle.33percent")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(LocalizedString.settings("animation_rate"))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: $settings.menuBarAnimationRate) {
+                            ForEach(MenuBarAnimationRate.allCases) { rate in
+                                Text(rate.displayName(lang: settings.language)).tag(rate)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 164)
+                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -910,6 +1014,18 @@ struct SettingsView: View {
                     label: LocalizedString.settings("check_update"),
                     url: AppLinks.releases
                 )
+                Divider().padding(.horizontal, 12)
+                LinkRow(
+                    icon: "hand.raised.fill",
+                    label: LocalizedString.settings("privacy_policy"),
+                    url: AppLinks.privacy
+                )
+                Divider().padding(.horizontal, 12)
+                LinkRow(
+                    icon: "ladybug.fill",
+                    label: LocalizedString.settings("report_issue"),
+                    url: AppLinks.issues
+                )
             }
             .appCardSurface(cornerRadius: 12, showsShadow: false)
         }
@@ -922,7 +1038,7 @@ private struct SettingsCard<Content: View>: View {
     let icon: String
     let title: String
     let description: String
-    @ViewBuilder var content: () -> Content
+    @ViewBuilder let content: Content
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -948,7 +1064,7 @@ private struct SettingsCard<Content: View>: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            content()
+            content
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(AppTheme.elevatedSurface(colorScheme))
@@ -1096,19 +1212,19 @@ private struct DataBackupCard: View {
 
     private var dataSummaryText: String {
         let birthdayCount = BirthdayManager.shared.getAllBirthdays().count
+        let countdownCount = CountdownManager.shared.getAllEvents().count
         let englishCount = EnglishProgressStore.shared.records.count
         let goldCount = GoldPriceStore.shared.records.count
-        let novelCount = NovelLibraryManager.shared.books.count
 
         switch settings.language {
         case .chinese:
-            return "\(birthdayCount) 条生日 · \(englishCount) 条进度 · \(goldCount) 条金价 · \(novelCount) 本小说"
+            return "\(birthdayCount) 条生日 · \(countdownCount) 个倒数日 · \(englishCount) 条进度 · \(goldCount) 条金价"
         case .japanese:
-            return "\(birthdayCount) 件の誕生日 · \(englishCount) 件の進捗 · \(goldCount) 件の価格 · \(novelCount) 冊の本"
+            return "\(birthdayCount) 件の誕生日 · \(countdownCount) 件のカウントダウン · \(englishCount) 件の進捗 · \(goldCount) 件の価格"
         case .korean:
-            return "\(birthdayCount) 생일 · \(englishCount) 학습 기록 · \(goldCount) 가격 기록 · \(novelCount) 권의 책"
+            return "\(birthdayCount) 생일 · \(countdownCount) 카운트다운 · \(englishCount) 학습 기록 · \(goldCount) 가격 기록"
         case .english:
-            return "\(birthdayCount) birthdays · \(englishCount) words · \(goldCount) prices · \(novelCount) books"
+            return "\(birthdayCount) birthdays · \(countdownCount) countdowns · \(englishCount) words · \(goldCount) prices"
         }
     }
 
@@ -1534,12 +1650,14 @@ private struct MenuBarDisplayRow: View {
             return LocalizedString.l(settings.language, en: "Live memory utilization", zh: "实时显示内存占用率", ja: "メモリ使用率をリアルタイム表示", ko: "실시간 메모리 사용률")
         case .network:
             return LocalizedString.l(settings.language, en: "Live download and upload speed", zh: "实时显示下载和上传速度", ja: "ダウンロードとアップロード速度をリアルタイム表示", ko: "실시간 다운로드 및 업로드 속도")
-        case .novel:
-            return LocalizedString.l(settings.language, en: "Compact novel reader entry", zh: "显示小说阅读入口", ja: "小説リーダーへの入口を表示", ko: "소설 읽기 입구 표시")
         case .english:
             return LocalizedString.l(settings.language, en: "Current word or spoken sentence", zh: "显示当前单词或正在朗读的句子", ja: "現在の単語または読み上げ中の文を表示", ko: "현재 단어나 읽는 문장 표시")
         case .codex:
             return LocalizedString.l(settings.language, en: "Codex quota remaining", zh: "显示 Codex 剩余额度", ja: "Codex の残り使用量を表示", ko: "Codex 잔여 사용량 표시")
+        case .claude:
+            return LocalizedString.l(settings.language, en: "Claude Code quota remaining", zh: "显示 Claude 剩余额度", ja: "Claude の残り使用量を表示", ko: "Claude 잔여 사용량 표시")
+        case .countdown:
+            return LocalizedString.l(settings.language, en: "Nearest countdown event", zh: "显示最近的倒数日", ja: "直近のカウントダウンを表示", ko: "가장 가까운 카운트다운 표시")
         }
     }
 }
@@ -1634,6 +1752,8 @@ private extension View {
 private enum AppLinks {
     static let repository = URL(string: "https://github.com/kuaoaoaoao/coolRun")!
     static let releases = URL(string: "https://github.com/kuaoaoaoao/coolRun/releases")!
+    static let privacy = URL(string: "https://github.com/kuaoaoaoao/coolRun/blob/main/PRIVACY.md")!
+    static let issues = URL(string: "https://github.com/kuaoaoaoao/coolRun/issues/new/choose")!
 }
 
 // MARK: - Preview

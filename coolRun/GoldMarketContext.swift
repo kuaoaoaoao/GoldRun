@@ -129,6 +129,7 @@ final class GoldMarketContextService {
         let context = GoldMarketContextScorer.makeContext(
             macro: macro,
             newsItems: newsItems,
+            language: AppSettings.shared.language,
             now: now,
             missingDataDescription: missingParts.isEmpty ? nil : String(
                 format: LocalizedString.gold("missing_unavailable_format"),
@@ -284,7 +285,7 @@ final class GoldMarketContextService {
 
     private static func fetchData(session: URLSession, url: URL, timeout: TimeInterval) async throws -> Data {
         var request = URLRequest(url: url, timeoutInterval: timeout)
-        request.setValue("coolRun gold context", forHTTPHeaderField: "User-Agent")
+        request.setValue("GoldRun gold context", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
@@ -321,6 +322,7 @@ enum GoldMarketContextScorer {
     nonisolated static func makeContext(
         macro: GoldMacroSnapshot?,
         newsItems: [GoldNewsItem],
+        language: AppLanguage,
         now: Date = Date(),
         missingDataDescription: String? = nil
     ) -> GoldMarketContext {
@@ -341,7 +343,12 @@ enum GoldMarketContextScorer {
             overallScore: overallScore.clamped(to: -100...100),
             macro: macro,
             newsItems: newsItems,
-            reasons: makeReasons(macro: macro, macroScore: macroScore, newsItems: newsItems),
+            reasons: makeReasons(
+                macro: macro,
+                macroScore: macroScore,
+                newsItems: newsItems,
+                language: language
+            ),
             updatedAt: now,
             isPartial: missingDataDescription != nil,
             missingDataDescription: missingDataDescription,
@@ -390,26 +397,27 @@ enum GoldMarketContextScorer {
     private nonisolated static func makeReasons(
         macro: GoldMacroSnapshot?,
         macroScore: Double,
-        newsItems: [GoldNewsItem]
+        newsItems: [GoldNewsItem],
+        language: AppLanguage
     ) -> [String] {
         var reasons: [String] = []
 
         if let changeBps = macro?.tenYearYieldChangeBps {
             if changeBps <= -3 {
-                reasons.append(LocalizedString.l(AppSettings.shared.language, en: "U.S. 10Y yield fell \(abs(changeBps).oneDigitNumber)bp, usually supportive for gold valuation", zh: "10年期美债收益率回落 \(abs(changeBps).oneDigitNumber)bp，通常利好黄金估值", ja: "米10年債利回りが \(abs(changeBps).oneDigitNumber)bp 低下し、通常は金の評価に追い風です", ko: "미국 10년물 금리가 \(abs(changeBps).oneDigitNumber)bp 하락해 보통 금 가치에 우호적입니다"))
+                reasons.append(LocalizedString.l(language, en: "U.S. 10Y yield fell \(abs(changeBps).oneDigitNumber)bp, usually supportive for gold valuation", zh: "10年期美债收益率回落 \(abs(changeBps).oneDigitNumber)bp，通常利好黄金估值", ja: "米10年債利回りが \(abs(changeBps).oneDigitNumber)bp 低下し、通常は金の評価に追い風です", ko: "미국 10년물 금리가 \(abs(changeBps).oneDigitNumber)bp 하락해 보통 금 가치에 우호적입니다"))
             } else if changeBps >= 3 {
-                reasons.append(LocalizedString.l(AppSettings.shared.language, en: "U.S. 10Y yield rose \(changeBps.oneDigitNumber)bp, usually pressuring gold valuation", zh: "10年期美债收益率上行 \(changeBps.oneDigitNumber)bp，通常压制黄金估值", ja: "米10年債利回りが \(changeBps.oneDigitNumber)bp 上昇し、通常は金の評価を圧迫します", ko: "미국 10년물 금리가 \(changeBps.oneDigitNumber)bp 상승해 보통 금 가치에 부담입니다"))
+                reasons.append(LocalizedString.l(language, en: "U.S. 10Y yield rose \(changeBps.oneDigitNumber)bp, usually pressuring gold valuation", zh: "10年期美债收益率上行 \(changeBps.oneDigitNumber)bp，通常压制黄金估值", ja: "米10年債利回りが \(changeBps.oneDigitNumber)bp 上昇し、通常は金の評価を圧迫します", ko: "미국 10년물 금리가 \(changeBps.oneDigitNumber)bp 상승해 보통 금 가치에 부담입니다"))
             } else {
-                reasons.append(LocalizedString.l(AppSettings.shared.language, en: "U.S. 10Y yield changed little; macro rate impact is neutral", zh: "10年期美债收益率变化不大，宏观利率影响偏中性", ja: "米10年債利回りの変化は小さく、マクロ金利の影響は中立寄りです", ko: "미국 10년물 금리 변화가 크지 않아 매크로 금리 영향은 중립적입니다"))
+                reasons.append(LocalizedString.l(language, en: "U.S. 10Y yield changed little; macro rate impact is neutral", zh: "10年期美债收益率变化不大，宏观利率影响偏中性", ja: "米10年債利回りの変化は小さく、マクロ金利の影響は中立寄りです", ko: "미국 10년물 금리 변화가 크지 않아 매크로 금리 영향은 중립적입니다"))
             }
         } else {
-            reasons.append(LocalizedString.l(AppSettings.shared.language, en: "Treasury yield was unavailable; macro rate factor is treated as neutral", zh: "暂未获取到美债收益率，宏观利率项按中性处理", ja: "米国債利回りを取得できず、マクロ金利項目は中立として扱います", ko: "미국 국채 금리를 가져오지 못해 매크로 금리 항목은 중립으로 처리합니다"))
+            reasons.append(LocalizedString.l(language, en: "Treasury yield was unavailable; macro rate factor is treated as neutral", zh: "暂未获取到美债收益率，宏观利率项按中性处理", ja: "米国債利回りを取得できず、マクロ金利項目は中立として扱います", ko: "미국 국채 금리를 가져오지 못해 매크로 금리 항목은 중립으로 처리합니다"))
         }
 
         if abs(macroScore) >= 25 {
             reasons.append(macroScore > 0
-                ? LocalizedString.l(AppSettings.shared.language, en: "Rate factor is clearly bullish", zh: "利率项明显偏多", ja: "金利要因は明確に強気寄りです", ko: "금리 요인이 뚜렷하게 상승 우세입니다")
-                : LocalizedString.l(AppSettings.shared.language, en: "Rate factor is clearly bearish", zh: "利率项明显偏空", ja: "金利要因は明確に弱気寄りです", ko: "금리 요인이 뚜렷하게 하락 우세입니다"))
+                ? LocalizedString.l(language, en: "Rate factor is clearly bullish", zh: "利率项明显偏多", ja: "金利要因は明確に強気寄りです", ko: "금리 요인이 뚜렷하게 상승 우세입니다")
+                : LocalizedString.l(language, en: "Rate factor is clearly bearish", zh: "利率项明显偏空", ja: "金利要因は明確に弱気寄りです", ko: "금리 요인이 뚜렷하게 하락 우세입니다"))
         }
 
         let strongestNews = newsItems
@@ -420,8 +428,8 @@ enum GoldMarketContextScorer {
 
         if strongestNews.isEmpty {
             reasons.append(newsItems.isEmpty
-                ? LocalizedString.l(AppSettings.shared.language, en: "No news headlines were fetched; news factor is treated as neutral", zh: "暂未获取到新闻标题，新闻项按中性处理", ja: "ニュース見出しを取得できず、ニュース項目は中立として扱います", ko: "뉴스 제목을 가져오지 못해 뉴스 항목은 중립으로 처리합니다")
-                : LocalizedString.l(AppSettings.shared.language, en: "News headlines do not contain clear bullish or bearish keywords", zh: "新闻标题未出现明显多空关键词", ja: "ニュース見出しに明確な強弱キーワードはありません", ko: "뉴스 제목에 뚜렷한 상승/하락 키워드가 없습니다"))
+                ? LocalizedString.l(language, en: "No news headlines were fetched; news factor is treated as neutral", zh: "暂未获取到新闻标题，新闻项按中性处理", ja: "ニュース見出しを取得できず、ニュース項目は中立として扱います", ko: "뉴스 제목을 가져오지 못해 뉴스 항목은 중립으로 처리합니다")
+                : LocalizedString.l(language, en: "News headlines do not contain clear bullish or bearish keywords", zh: "新闻标题未出现明显多空关键词", ja: "ニュース見出しに明確な強弱キーワードはありません", ko: "뉴스 제목에 뚜렷한 상승/하락 키워드가 없습니다"))
         } else {
             reasons.append(contentsOf: strongestNews)
         }

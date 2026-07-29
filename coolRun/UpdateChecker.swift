@@ -133,7 +133,7 @@ final class UpdateChecker {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = LocalizedString.update("new_version")
-        alert.informativeText = "coolRun v\(latestVersion ?? "?") (\(LocalizedString.settings("version")) v\(AppVersion.current.marketingVersion))\n\n\(releaseNotes?.prefix(200) ?? "")"
+        alert.informativeText = "GoldRun v\(latestVersion ?? "?") (\(LocalizedString.settings("version")) v\(AppVersion.current.marketingVersion))\n\n\(releaseNotes?.prefix(200) ?? "")"
         alert.addButton(withTitle: LocalizedString.update("go_download"))
         alert.addButton(withTitle: LocalizedString.update("remind_later"))
 

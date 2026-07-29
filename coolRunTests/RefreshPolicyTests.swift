@@ -14,6 +14,20 @@ final class RefreshPolicyTests: XCTestCase {
         XCTAssertEqual(MenuBarAnimationRate.smooth.framesPerSecond, 20)
     }
 
+    func testCoinMotionStylesHaveSafeSpeedMultipliers() {
+        XCTAssertEqual(MenuBarCoinMotion.allCases.count, 5)
+        XCTAssertTrue(MenuBarCoinMotion.allCases.allSatisfy { motion in
+            motion.speedMultiplier > 0 && motion.speedMultiplier <= 1
+        })
+    }
+
+    func testCoinAppearanceChoicesRemainAvailable() {
+        XCTAssertEqual(MenuBarCoinAppearance.allCases.count, 5)
+        XCTAssertTrue(MenuBarCoinAppearance.allCases.allSatisfy { appearance in
+            !appearance.displayName(lang: .chinese).isEmpty
+        })
+    }
+
     func testGoldRefreshDurations() {
         XCTAssertEqual(GoldRefreshRate.seconds30.duration, .seconds(30))
         XCTAssertEqual(GoldRefreshRate.minute.duration, .seconds(60))
@@ -26,8 +40,8 @@ final class RefreshPolicyTests: XCTestCase {
             "起動"
         )
         XCTAssertEqual(
-            LocalizedString.speech("voice_reading", lang: .korean),
-            "음성 읽기"
+            LocalizedString.english("voice_select", lang: .korean),
+            "시스템 음성"
         )
         XCTAssertEqual(
             LocalizedString.l(.japanese, en: "Fallback", zh: "回退"),

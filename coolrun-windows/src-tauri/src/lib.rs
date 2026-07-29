@@ -1,4 +1,4 @@
-//! coolRun Windows 版入口：托盘应用（系统监控 + 金价分析）。
+//! GoldRun Windows 版入口：托盘应用（系统监控 + 金价分析）。
 
 mod gold;
 mod indicators;
@@ -68,7 +68,7 @@ fn toggle_main_window(app: &AppHandle, click_position: Option<PhysicalPosition<f
 
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let toggle_item = MenuItemBuilder::with_id("toggle", "显示 / 隐藏").build(app)?;
-    let quit_item = MenuItemBuilder::with_id("quit", "退出 coolRun").build(app)?;
+    let quit_item = MenuItemBuilder::with_id("quit", "退出 GoldRun").build(app)?;
     let menu = MenuBuilder::new(app)
         .item(&toggle_item)
         .separator()
@@ -77,7 +77,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().expect("missing window icon").clone())
-        .tooltip("coolRun")
+        .tooltip("GoldRun")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -114,7 +114,7 @@ fn spawn_tray_price_updater(app: &tauri::App) {
                         .map(|rate| format!(" ({rate:+.2}%)"))
                         .unwrap_or_default();
                     let _ = tray.set_tooltip(Some(format!(
-                        "coolRun · 金价 ¥{:.2}/克{change}",
+                        "GoldRun · 金价 ¥{:.2}/克{change}",
                         quote.cny_per_gram
                     )));
                 }
@@ -156,5 +156,5 @@ pub fn run() {
             _ => {}
         })
         .run(tauri::generate_context!())
-        .expect("error while running coolRun");
+        .expect("error while running GoldRun");
 }

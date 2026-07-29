@@ -39,7 +39,7 @@ final class LaunchAtLoginManager: ObservableObject {
             statusMessage = nil
         case .requiresApproval:
             isEnabled = true
-            statusMessage = "需要在系统设置的登录项中允许 coolRun"
+            statusMessage = "需要在系统设置的登录项中允许 GoldRun"
         case .notFound:
             isEnabled = false
             statusMessage = "当前应用位置不支持注册登录项"

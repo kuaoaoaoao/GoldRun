@@ -10,11 +10,11 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let contextPopover = NSPopover()
     private let viewModel = SystemMonitorViewModel()
     private let codexViewModel = CodexMonitorViewModel.shared
+    private let claudeViewModel = ClaudeMonitorViewModel.shared
     private let goldPriceService = GoldPriceService()
     private let settings = AppSettings.shared
     private let englishLearning = EnglishLearningManager.shared
     private var windowCloseObserver: NSObjectProtocol?
-    private var novelWindowController: NSWindowController?
     private var textbookWindowController: NSWindowController?
     private var iconTimer: Timer?
     private var goldPriceTask: Task<Void, Never>?
@@ -33,7 +33,11 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         if let button = statusItem.button {
             button.imagePosition = .imageLeft
-            button.image = CoinIconRenderer.image(phase: coinPhase)
+            button.image = CoinIconRenderer.image(
+                phase: coinPhase,
+                motion: settings.menuBarCoinMotion,
+                appearance: settings.menuBarCoinAppearance
+            )
             button.font = Self.statusTitleFont
             button.lineBreakMode = .byTruncatingTail
             button.title = " \(goldPriceText)"
@@ -60,7 +64,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         contextPopover.behavior = .transient
         contextPopover.animates = false
-        contextPopover.contentSize = NSSize(width: 216, height: 264)
+        contextPopover.contentSize = NSSize(width: 216, height: 232)
         contextPopover.contentViewController = NSHostingController(
             rootView: StatusContextMenuView(
                 toggleEnglishPlayback: { [weak self] in
@@ -77,9 +81,6 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 },
                 selectDisplayMode: { [weak self] mode in
                     self?.selectDisplayModeFromContextMenu(mode)
-                },
-                openNovelReader: { [weak self] in
-                    self?.openNovelReaderFromContextMenu()
                 },
                 openSettings: { [weak self] in
                     self?.openSettingsFromContextMenu()
@@ -128,6 +129,24 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             }
             .store(in: &cancellables)
 
+        settings.$menuBarCoinMotion
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.coinPhase = 0
+                self?.startIconAnimation()
+            }
+            .store(in: &cancellables)
+
+        settings.$menuBarCoinAppearance
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.coinPhase = 0
+                self?.startIconAnimation()
+            }
+            .store(in: &cancellables)
+
         settings.$goldRefreshRate
             .dropFirst()
             .receive(on: DispatchQueue.main)
@@ -168,6 +187,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         viewModel.stop()
         codexViewModel.stop()
+        claudeViewModel.stop()
     }
 
     @objc private func handleStatusItemClick() {
@@ -194,6 +214,10 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             }
             closeMonitorPopover()
         } else {
+            if settings.lastViewModeRaw == ViewMode.codex.rawValue {
+                codexViewModel.start()
+                claudeViewModel.start()
+            }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             Analytics.capture(.popoverOpened)
         }
@@ -251,13 +275,16 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func popoverDidClose(_ notification: Notification) {
         guard
             let closedPopover = notification.object as? NSPopover,
-            closedPopover === popover,
-            popoverPinState.isPinned
-        else {
-            return
-        }
+            closedPopover === popover
+        else { return }
 
-        setPopoverPinned(false)
+        // NSPopover 会保留 hosting controller；显式停止，避免关闭后仍轮询 AI 接口。
+        codexViewModel.stop()
+        claudeViewModel.stop()
+
+        if popoverPinState.isPinned {
+            setPopoverPinned(false)
+        }
     }
 
     private func openSettingsFromContextMenu() {
@@ -265,30 +292,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         Analytics.capture(.settingsOpened)
     }
 
-    private func openNovelReaderFromContextMenu() {
-        prepareToOpenSettings()
-        Analytics.capture(.novelReaderOpened)
-
-        if let window = novelWindowController?.window {
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        let hostingController = NSHostingController(rootView: NovelLibraryView())
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = LocalizedString.novel("novel_reader")
-        window.setContentSize(NSSize(width: 820, height: 620))
-        window.minSize = NSSize(width: 760, height: 560)
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.isReleasedWhenClosed = false
-        window.center()
-
-        let controller = NSWindowController(window: window)
-        novelWindowController = controller
-        controller.showWindow(nil)
-    }
-
-    // 课本管理面板 660x520，不能在 320pt 弹窗里用 sheet 弹出，改用独立窗口（同小说书库）
+    // 课本管理面板 660x520，不能在 320pt 弹窗里用 sheet 弹出，改用独立窗口。
     func openEnglishTextbookManagerWindow() {
         prepareToOpenSettings()
 
@@ -356,7 +360,11 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         if activeAnimationFramesPerSecond == nil {
             coinPhase = 0
-            statusItem?.button?.image = CoinIconRenderer.image(phase: coinPhase)
+            statusItem?.button?.image = CoinIconRenderer.image(
+                phase: coinPhase,
+                motion: settings.menuBarCoinMotion,
+                appearance: settings.menuBarCoinAppearance
+            )
         }
 
         // 动画关闭时仍以 1Hz 更新日期、CPU、内存和网速文本。
@@ -375,10 +383,14 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func refreshIcon() {
         if let framesPerSecond = activeAnimationFramesPerSecond {
             let cpuUsage = min(max(viewModel.snapshot.cpu.usage, 0), 1)
-            let revolutionsPerSecond = 0.35 + cpuUsage * 2.15
+            let revolutionsPerSecond = (0.35 + cpuUsage * 2.15) * settings.menuBarCoinMotion.speedMultiplier
             coinPhase = (coinPhase + (.pi * 2 * revolutionsPerSecond / framesPerSecond))
                 .truncatingRemainder(dividingBy: .pi * 2)
-            statusItem?.button?.image = CoinIconRenderer.image(phase: coinPhase)
+            statusItem?.button?.image = CoinIconRenderer.image(
+                phase: coinPhase,
+                motion: settings.menuBarCoinMotion,
+                appearance: settings.menuBarCoinAppearance
+            )
         }
 
         // 根据设置显示菜单栏标题，保持每种模式都有固定宽度上限。
@@ -395,13 +407,15 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .network:
             let network = viewModel.snapshot.network
             nextTitle = " ↓\(compactNetworkSpeedText(network.downloadSpeed)) ↑\(compactNetworkSpeedText(network.uploadSpeed))"
-        case .novel:
-            nextTitle = " \(LocalizedString.novel("novel", lang: settings.language))"
         case .english:
             let playback = englishLearning.state == .playing ? " ▶" : ""
             nextTitle = " \(compactStatusText(englishLearning.menuBarText, limit: 12))\(playback)"
         case .codex:
             nextTitle = " \(codexMenuBarText)"
+        case .claude:
+            nextTitle = " \(claudeMenuBarText)"
+        case .countdown:
+            nextTitle = " \(countdownMenuBarText)"
         }
 
         let compactTitle = compactStatusText(nextTitle, limit: statusTitleLimit)
@@ -459,9 +473,9 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .date: return 12
         case .cpu, .memory: return 8
         case .network: return 14
-        case .novel: return 5
         case .english: return 14
-        case .codex: return 10
+        case .codex, .claude: return 18
+        case .countdown: return 14
         }
     }
 
@@ -481,9 +495,9 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .date: return 82
         case .cpu, .memory: return 72
         case .network: return 116
-        case .novel: return 56
         case .english: return 92
-        case .codex: return 76
+        case .codex, .claude: return 76
+        case .countdown: return 76
         }
     }
 
@@ -493,9 +507,9 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .date: return 124
         case .cpu, .memory: return 84
         case .network: return 136
-        case .novel: return 68
         case .english: return 142
-        case .codex: return 104
+        case .codex, .claude: return 150
+        case .countdown: return 132
         }
     }
 
@@ -505,7 +519,39 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
               let remaining = window.remainingPercent else {
             return "Codex"
         }
-        return "Codex \(remaining)%"
+        return "Codex \(quotaMeterText(remaining)) \(remaining)%"
+    }
+
+    private var claudeMenuBarText: String {
+        guard case let .ready(snapshot) = claudeViewModel.state,
+              let window = snapshot.windows.first,
+              let remaining = window.remainingPercent else {
+            return "Claude"
+        }
+        return "Claude \(quotaMeterText(remaining)) \(remaining)%"
+    }
+
+    // 字符版迷你用量条，例如 ▰▰▰▱▱
+    private func quotaMeterText(_ remainingPercent: Int) -> String {
+        let segments = 5
+        let filled = max(0, min(segments, Int((Double(remainingPercent) / 100 * Double(segments)).rounded())))
+        return String(repeating: "▰", count: filled) + String(repeating: "▱", count: segments - filled)
+    }
+
+    private var countdownMenuBarText: String {
+        guard let nearest = CountdownManager.shared.nearestUpcoming() else {
+            return MenuBarDisplayMode.countdown.displayName(lang: settings.language)
+        }
+        if nearest.days == 0 {
+            return "\(nearest.event.name) \(LocalizedString.countdown("today", lang: settings.language))"
+        }
+        return LocalizedString.l(
+            settings.language,
+            en: "\(nearest.event.name) \(nearest.days)d",
+            zh: "\(nearest.event.name) \(nearest.days)天",
+            ja: "\(nearest.event.name) \(nearest.days)日",
+            ko: "\(nearest.event.name) \(nearest.days)일"
+        )
     }
 
     private static let statusTitleFont = NSFont.monospacedDigitSystemFont(
@@ -582,7 +628,6 @@ private struct StatusContextMenuView: View {
     let nextEnglishItem: () -> Void
     let stopEnglishPlayback: () -> Void
     let selectDisplayMode: (MenuBarDisplayMode) -> Void
-    let openNovelReader: () -> Void
     let openSettings: () -> Void
     let quit: () -> Void
     @ObservedObject private var englishLearning = EnglishLearningManager.shared
@@ -612,16 +657,6 @@ private struct StatusContextMenuView: View {
                 contextButton(LocalizedString.common("next", lang: settings.language), systemImage: "forward.end.fill", action: nextEnglishItem)
                 contextButton(LocalizedString.common("stop", lang: settings.language), systemImage: "stop.fill", action: stopEnglishPlayback)
             }
-            .frame(height: 32)
-
-            Divider()
-
-            Button(action: openNovelReader) {
-                Label(LocalizedString.novel("novel_reader", lang: settings.language), systemImage: "books.vertical")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
             .frame(height: 32)
 
             Divider()
@@ -660,9 +695,9 @@ private struct StatusContextMenuView: View {
                         selectDisplayMode(mode)
                     } label: {
                         Image(systemName: mode.icon)
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(settings.menuBarDisplayMode == mode ? Color.accentColor : .secondary)
-                            .frame(width: 28, height: 24)
+                            .frame(maxWidth: .infinity, minHeight: 28)
                             .background {
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                                     .fill(settings.menuBarDisplayMode == mode ? Color.accentColor.opacity(0.14) : Color.clear)
@@ -679,7 +714,7 @@ private struct StatusContextMenuView: View {
     }
 
     private var displayModeColumns: [GridItem] {
-        Array(repeating: GridItem(.fixed(28), spacing: 4), count: 4)
+        Array(repeating: GridItem(.flexible(minimum: 28), spacing: 4), count: 5)
     }
 
     private var englishPlaybackTitle: String {
@@ -701,36 +736,71 @@ private struct StatusContextMenuView: View {
     }
 }
 
-private enum CoinIconRenderer {
-    static func image(phase: Double) -> NSImage {
+enum CoinIconRenderer {
+    private struct MotionState {
+        var centerX: CGFloat = 12
+        var centerY: CGFloat = 9
+        var width: CGFloat = 17
+        var height: CGFloat = 13.2
+        var symbolRotation: CGFloat = 0
+        var shinePhase: CGFloat = 0
+        var sparkleAmount: CGFloat = 0
+        var shadowWidth: CGFloat = 0
+        var shadowAlpha: CGFloat = 0
+    }
+
+    private struct Palette {
+        var face: NSColor
+        var rim: NSColor
+        var detail: NSColor
+        var symbol: String?
+        var symbolColor: NSColor
+        var drawsSquareHole = false
+    }
+
+    static func image(
+        phase: Double,
+        motion: MenuBarCoinMotion,
+        appearance: MenuBarCoinAppearance
+    ) -> NSImage {
         let size = NSSize(width: 24, height: 18)
         let image = NSImage(size: size)
 
         image.lockFocus()
         defer { image.unlockFocus() }
 
-        let rotation = CGFloat(phase)
-        let faceAmount = abs(cos(rotation))
-        let width = 2.8 + 14.2 * faceAmount
-        let height = 13.2
+        let state = motionState(phase: CGFloat(phase), motion: motion)
+        let palette = palette(appearance: appearance)
+
+        if state.shadowAlpha > 0 {
+            let shadowRect = NSRect(
+                x: state.centerX - state.shadowWidth / 2,
+                y: 1.1,
+                width: state.shadowWidth,
+                height: 2.2
+            )
+            NSColor.black.withAlphaComponent(state.shadowAlpha).setFill()
+            NSBezierPath(ovalIn: shadowRect).fill()
+        }
+
         let coinRect = NSRect(
-            x: (size.width - width) / 2,
-            y: (size.height - height) / 2,
-            width: width,
-            height: height
+            x: state.centerX - state.width / 2,
+            y: state.centerY - state.height / 2,
+            width: state.width,
+            height: state.height
         )
 
         let coin = NSBezierPath(ovalIn: coinRect)
-        NSColor(calibratedRed: 1.0, green: 0.76, blue: 0.18, alpha: 1).setFill()
+        palette.face.setFill()
         coin.fill()
 
-        NSColor(calibratedRed: 0.86, green: 0.48, blue: 0.05, alpha: 1).setStroke()
+        palette.rim.setStroke()
         coin.lineWidth = 1.4
         coin.stroke()
 
-        if width > 6.6 {
+        if state.width > 6.6 {
             let inner = NSBezierPath(ovalIn: coinRect.insetBy(dx: 2.1, dy: 2.1))
-            NSColor(calibratedRed: 0.96, green: 0.62, blue: 0.08, alpha: 0.55).setStroke()
+            palette.detail.withAlphaComponent(0.62).setStroke()
             inner.lineWidth = 0.9
             inner.stroke()
 
@@ -738,33 +808,197 @@ private enum CoinIconRenderer {
             shine.lineWidth = 1.0
             shine.lineCapStyle = .round
             NSColor.white.withAlphaComponent(0.75).setStroke()
-            let shineOffset = sin(rotation) * width * 0.14
-            shine.move(to: NSPoint(x: coinRect.midX - width * 0.20 + shineOffset, y: coinRect.midY + 3.1))
-            shine.line(to: NSPoint(x: coinRect.midX + width * 0.10 + shineOffset, y: coinRect.midY + 3.8))
+            let shineOffset = sin(state.shinePhase) * state.width * 0.18
+            shine.move(to: NSPoint(x: coinRect.midX - state.width * 0.20 + shineOffset, y: coinRect.midY + 3.1))
+            shine.line(to: NSPoint(x: coinRect.midX + state.width * 0.10 + shineOffset, y: coinRect.midY + 3.8))
             shine.stroke()
 
-            let symbol = "¥" as NSString
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 8.5, weight: .bold),
-                .foregroundColor: NSColor(calibratedRed: 0.82, green: 0.42, blue: 0.02, alpha: 1)
-            ]
-            let symbolSize = symbol.size(withAttributes: attributes)
-            symbol.draw(
-                at: NSPoint(x: coinRect.midX - symbolSize.width / 2, y: coinRect.midY - symbolSize.height / 2),
-                withAttributes: attributes
-            )
+            if palette.drawsSquareHole {
+                drawSquareHole(in: coinRect, palette: palette)
+            } else if let symbolText = palette.symbol {
+                drawSymbol(
+                    symbolText,
+                    color: palette.symbolColor,
+                    center: NSPoint(x: coinRect.midX, y: coinRect.midY),
+                    rotation: state.symbolRotation,
+                    compact: symbolText == "福"
+                )
+            }
         } else {
             let edge = NSBezierPath()
             edge.lineWidth = 1.8
             edge.lineCapStyle = .round
-            NSColor(calibratedRed: 0.82, green: 0.42, blue: 0.02, alpha: 1).setStroke()
+            palette.detail.setStroke()
             edge.move(to: NSPoint(x: coinRect.midX, y: coinRect.minY + 1.4))
             edge.line(to: NSPoint(x: coinRect.midX, y: coinRect.maxY - 1.4))
             edge.stroke()
         }
 
+        let appearanceSparkle: CGFloat = appearance == .starlight ? 0.55 : 0
+        drawSparkle(
+            amount: max(state.sparkleAmount, appearanceSparkle),
+            at: NSPoint(x: min(size.width - 2.1, coinRect.maxX + 1.2), y: min(size.height - 2.1, coinRect.maxY + 0.2)),
+            color: appearance == .rising ? NSColor.systemGreen : NSColor.systemYellow
+        )
+
         image.isTemplate = false
         return image
+    }
+
+    private static func motionState(phase: CGFloat, motion: MenuBarCoinMotion) -> MotionState {
+        switch motion {
+        case .classicFlip:
+            let faceAmount = abs(cos(phase))
+            return MotionState(
+                width: 2.8 + 14.2 * faceAmount,
+                shinePhase: phase
+            )
+        case .luckyBounce:
+            let bounce = abs(sin(phase))
+            return MotionState(
+                centerY: 8.6 + 2.5 * bounce,
+                width: 16.4 - 1.2 * bounce,
+                height: 12.8 + 0.9 * bounce,
+                symbolRotation: sin(phase) * 0.12,
+                shinePhase: phase * 1.4,
+                sparkleAmount: max(0, sin(phase - 0.35)) * 0.75,
+                shadowWidth: 13 - 4 * bounce,
+                shadowAlpha: 0.16 - 0.08 * bounce
+            )
+        case .coinToss:
+            let lift = abs(sin(phase))
+            let faceAmount = abs(cos(phase * 2))
+            return MotionState(
+                centerY: 8.3 + 3.3 * lift,
+                width: 2.9 + 13.6 * faceAmount,
+                symbolRotation: phase,
+                shinePhase: phase * 2,
+                sparkleAmount: max(0, sin(phase)) * 0.6,
+                shadowWidth: 14 - 6 * lift,
+                shadowAlpha: 0.18 - 0.1 * lift
+            )
+        case .rolling:
+            return MotionState(
+                centerX: 12 + sin(phase) * 3.2,
+                centerY: 8.8 + abs(cos(phase)) * 0.7,
+                width: 16.2,
+                symbolRotation: -phase,
+                shinePhase: phase * 1.8,
+                shadowWidth: 13.5,
+                shadowAlpha: 0.14
+            )
+        case .shimmer:
+            let pulse = 1 + sin(phase) * 0.035
+            return MotionState(
+                width: 16.6 * pulse,
+                height: 13.2 * pulse,
+                shinePhase: phase * 2.4,
+                sparkleAmount: max(0, sin(phase)) * 0.95
+            )
+        }
+    }
+
+    private static func palette(appearance: MenuBarCoinAppearance) -> Palette {
+        switch appearance {
+        case .yuan:
+            return Palette(
+                face: NSColor(calibratedRed: 1.0, green: 0.76, blue: 0.18, alpha: 1),
+                rim: NSColor(calibratedRed: 0.86, green: 0.48, blue: 0.05, alpha: 1),
+                detail: NSColor(calibratedRed: 0.82, green: 0.42, blue: 0.02, alpha: 1),
+                symbol: "¥",
+                symbolColor: NSColor(calibratedRed: 0.78, green: 0.36, blue: 0.01, alpha: 1)
+            )
+        case .lucky:
+            return Palette(
+                face: NSColor(calibratedRed: 1.0, green: 0.70, blue: 0.12, alpha: 1),
+                rim: NSColor(calibratedRed: 0.78, green: 0.22, blue: 0.08, alpha: 1),
+                detail: NSColor(calibratedRed: 0.86, green: 0.34, blue: 0.04, alpha: 1),
+                symbol: "福",
+                symbolColor: NSColor(calibratedRed: 0.72, green: 0.08, blue: 0.04, alpha: 1)
+            )
+        case .rising:
+            return Palette(
+                face: NSColor(calibratedRed: 1.0, green: 0.80, blue: 0.24, alpha: 1),
+                rim: NSColor(calibratedRed: 0.24, green: 0.58, blue: 0.28, alpha: 1),
+                detail: NSColor(calibratedRed: 0.19, green: 0.50, blue: 0.24, alpha: 1),
+                symbol: "↗",
+                symbolColor: NSColor(calibratedRed: 0.08, green: 0.42, blue: 0.19, alpha: 1)
+            )
+        case .ancient:
+            return Palette(
+                face: NSColor(calibratedRed: 0.88, green: 0.58, blue: 0.15, alpha: 1),
+                rim: NSColor(calibratedRed: 0.48, green: 0.27, blue: 0.08, alpha: 1),
+                detail: NSColor(calibratedRed: 0.40, green: 0.22, blue: 0.06, alpha: 1),
+                symbol: nil,
+                symbolColor: .clear,
+                drawsSquareHole: true
+            )
+        case .starlight:
+            return Palette(
+                face: NSColor(calibratedRed: 1.0, green: 0.86, blue: 0.38, alpha: 1),
+                rim: NSColor(calibratedRed: 0.73, green: 0.48, blue: 0.12, alpha: 1),
+                detail: NSColor(calibratedRed: 0.68, green: 0.42, blue: 0.08, alpha: 1),
+                symbol: "✦",
+                symbolColor: NSColor(calibratedRed: 0.46, green: 0.26, blue: 0.04, alpha: 1)
+            )
+        }
+    }
+
+    private static func drawSymbol(
+        _ text: String,
+        color: NSColor,
+        center: NSPoint,
+        rotation: CGFloat,
+        compact: Bool
+    ) {
+        let symbol = text as NSString
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: compact ? 7.1 : 8.5, weight: .bold),
+            .foregroundColor: color
+        ]
+        let symbolSize = symbol.size(withAttributes: attributes)
+
+        NSGraphicsContext.saveGraphicsState()
+        let transform = NSAffineTransform()
+        transform.translateX(by: center.x, yBy: center.y)
+        transform.rotate(byRadians: rotation)
+        transform.translateX(by: -center.x, yBy: -center.y)
+        transform.concat()
+        symbol.draw(
+            at: NSPoint(x: center.x - symbolSize.width / 2, y: center.y - symbolSize.height / 2),
+            withAttributes: attributes
+        )
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private static func drawSquareHole(in coinRect: NSRect, palette: Palette) {
+        let side = min(4.5, coinRect.width * 0.34)
+        let holeRect = NSRect(
+            x: coinRect.midX - side / 2,
+            y: coinRect.midY - side / 2,
+            width: side,
+            height: side
+        )
+        palette.detail.withAlphaComponent(0.88).setFill()
+        NSBezierPath(roundedRect: holeRect, xRadius: 0.6, yRadius: 0.6).fill()
+        NSColor.white.withAlphaComponent(0.32).setStroke()
+        let rim = NSBezierPath(roundedRect: holeRect.insetBy(dx: 0.7, dy: 0.7), xRadius: 0.3, yRadius: 0.3)
+        rim.lineWidth = 0.6
+        rim.stroke()
+    }
+
+    private static func drawSparkle(amount: CGFloat, at point: NSPoint, color: NSColor) {
+        guard amount > 0.05 else { return }
+        let radius = 1 + amount * 1.5
+        let sparkle = NSBezierPath()
+        sparkle.lineCapStyle = .round
+        sparkle.lineWidth = 0.8 + amount * 0.45
+        sparkle.move(to: NSPoint(x: point.x - radius, y: point.y))
+        sparkle.line(to: NSPoint(x: point.x + radius, y: point.y))
+        sparkle.move(to: NSPoint(x: point.x, y: point.y - radius))
+        sparkle.line(to: NSPoint(x: point.x, y: point.y + radius))
+        color.withAlphaComponent(0.45 + amount * 0.5).setStroke()
+        sparkle.stroke()
     }
 }
 

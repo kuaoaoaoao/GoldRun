@@ -1,0 +1,72 @@
+name: 缺陷报告
+description: 报告可稳定复现的功能问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先确认问题可以在最新 Release 或 main 分支复现，并移除截图、日志中的账号和个人数据。
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - macOS 主应用
+        - watchOS
+        - Windows Tauri 实验版
+        - Avalonia 实验版
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GoldRun 版本
+      placeholder: 例如 1.0 (build 1) 或 commit SHA
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: 系统版本与设备
+      placeholder: 例如 macOS 15.5 / Apple M2
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 出现……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 请删除账号、Token、小说正文、生日、持仓等隐私内容。
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue，没有找到相同问题。
+          required: true
+        - label: 我确认附件中不包含凭据或个人隐私。
+          required: true

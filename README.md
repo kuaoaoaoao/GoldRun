@@ -1,35 +1,40 @@
-# coolRun
+# GoldRun
 
-coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历生日和小说阅读放进一个轻量悬浮窗里。
+[![macOS CI](https://github.com/kuaoaoaoao/coolRun/actions/workflows/build-macos.yml/badge.svg)](https://github.com/kuaoaoaoao/coolRun/actions/workflows/build-macos.yml)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-它默认常驻菜单栏，不占 Dock。菜单栏可以显示浙商银行积存金价格或日期；点击后打开悬浮面板，查看系统监控、金价分析、日历和小说。悬浮窗支持固定，适合一边工作一边看小说或听语音朗读。
+GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时金价、日历倒数日、英语学习和 AI 额度放进一个轻量悬浮窗。
 
-![coolRun 动态演示](docs/images/coolRunShowDemo.gif)
+它默认常驻菜单栏，不占 Dock。菜单栏可以显示金价、日期、系统状态、英语内容、最近倒数日或 Codex/Claude 剩余额度；点击后打开悬浮面板。悬浮窗支持固定，适合边工作边查看信息或学习英语。
+
+![GoldRun 动态演示](docs/images/coolRunShowDemo.gif)
 
 官网：[kuaoaoaoao.github.io/coolRun](https://kuaoaoaoao.github.io/coolRun/)
 
 下载：[GitHub Releases](https://github.com/kuaoaoaoao/coolRun/releases)
 
-## Star History
+## GitHub Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/coolRun&type=Date)](https://star-history.com/#kuaoaoaoao/coolRun&Date)
+[![GoldRun Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/coolRun&type=Date)](https://star-history.com/#kuaoaoaoao/coolRun&Date)
 
-## 这次更新做了什么
+## 当前重点功能
 
+- 新增 Codex / Claude 额度总览：展示最紧张的额度窗口、剩余比例、重置时间和使用节奏。
+- 新增倒数日：支持公历、农历、闰月、一次性和每年重复，并与日历选中日期联动。
+- 新增英语学习：内置分级词汇、句子、短文、复习进度、系统语音和可选 Kokoro TTS。
 - 金价模块从“看价格”升级为“看分析”：记录历史价格，展示折线图、K 线、RSI、MACD、均线、波动率、买卖倾向和新手解释。
 - 新增高级策略分析：市场状态识别、均值回归、蒙特卡洛模拟、网格区间、风险仓位和更直白的新手建议。
 - 新增个人持仓建议：输入持有克数和买入均价后，自动计算成本、现值、浮盈浮亏，并按亏损/盈利状态给出分批补仓、观望、继续持有或部分止盈建议。
-- 新增小说阅读模块：支持导入 txt、自动章节解析、阅读进度、书签、主题、滚动/翻页模式。
-- 新增语音朗读：使用系统语音合成朗读小说，可暂停、继续、前后句跳转、调节语速、音调、音量和声音。
-- 菜单栏悬浮窗新增“小说”入口和图钉固定功能，固定后不会因为点击其他位置而自动关闭，方便悬浮看小说。
-- 优化菜单栏面板布局：顶部切换变成四列紧凑入口，减少文字挤压和内容遮挡。
+- 菜单栏悬浮窗支持图钉固定，固定后不会因为点击其他位置而自动关闭。
+- 数据备份可迁移生日、倒数日、英语进度、金价记录与持仓和应用设置。
 
 ## 适合你如果
 
 - 你想把金价固定在 macOS 菜单栏里，随手看一眼。
 - 你想知道 Mac 当前是不是高负载、内存是否紧张、温度是否偏高。
 - 你想要一个小白也能看懂的金价分析面板，而不只是技术指标。
-- 你想在菜单栏悬浮窗里看 txt 小说，或者用系统语音朗读小说。
+- 你同时使用 Codex 或 Claude Code，希望随手查看额度和重置时间。
+- 你想把考试、纪念日等公历或农历日期固定在菜单栏。
 - 你喜欢小巧、原生、不会占 Dock 的菜单栏工具。
 - 你想参考一个 SwiftUI + AppKit 的 macOS 菜单栏应用实现。
 
@@ -38,9 +43,11 @@ coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历�
 ### 菜单栏常驻
 
 - 不占用 Dock，不打断当前工作。
-- 菜单栏可显示实时金价、日期、CPU、内存或实时网速。
-- 金币图标根据 CPU 占用动态旋转，负载越高转得越快。
-- 金币动画支持关闭、节能和流畅档位。
+- 菜单栏可显示实时金价、日期、CPU、内存、实时网速、英语内容、AI 额度或最近倒数日。
+- 金币图标根据 CPU 占用动态加速，负载越高动作越快。
+- 支持经典翻面、招财弹跳、抛金币、金币滚动和金光闪闪 5 种动作。
+- 支持人民币金币、招财福币、上涨金币、方孔古钱和星光金币 5 种外观。
+- 动画流畅度可以关闭，或选择节能与流畅档位。
 - 左键打开悬浮面板，右键打开快捷菜单。
 - 悬浮面板支持固定，固定后可以停在屏幕上继续操作其他应用。
 
@@ -49,10 +56,11 @@ coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历�
 - CPU：核心数、实时占用、动态占用条、趋势图、健康状态颜色。
 - 内存：已用内存、总内存、内存压力、趋势图。
 - 储存：已用空间、可用空间、使用进度。
-- 电池：电量、充电状态、低电量模式。
+- 电池：电量、充电状态、健康度、循环次数、温度、功率和预计充放电时间。
 - 网络：连接状态、本地 IP、活动接口数量、上传/下载速度。
 - 温度：CPU 和 GPU 温度，通过 SMC 传感器读取。
 - 运行时间：系统已运行时长。
+- 进程：按 CPU 或内存排序，可合并同名进程，并在确认后结束进程。
 - 点击指标可复制到剪贴板。
 
 ### 金价分析
@@ -80,35 +88,34 @@ coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历�
 - 菜单栏面板内置日历视图。
 - 支持农历显示、节假日/调休标记。
 - 支持生日管理和选中日期详情。
+- 支持公历/农历倒数日，并可直接为选中日期创建事件。
 - 菜单栏也可切换为日期显示模式。
 
-### 小说阅读
+### AI 额度
 
-- 支持导入 txt 小说。
-- 自动识别章节并保存书库。
-- 记住上次阅读章节和段落。
-- 支持书签。
-- 支持滚动阅读和翻页阅读。
-- 支持明亮、暖色、复古、暗夜、水墨主题。
-- 可调整字号和行距。
-- 独立小说窗口适合完整阅读，菜单栏迷你阅读器适合悬浮阅读。
+- 统一展示 Codex 与 Claude Code 用量状态。
+- 自动选择剩余最少的额度窗口作为总览重点。
+- 展示剩余比例、预计重置时间和当前使用节奏。
+- Codex 可查看近期本地任务；Claude 使用本机 Claude Code 登录凭据读取官方 usage 接口。
+- 只在 AI 面板可见时刷新，避免后台空转和接口限频。
+- 额度提醒默认关闭，用户主动开启后才请求通知权限。
 
-### 语音朗读
+### 英语学习
 
-- 使用 macOS 系统语音合成朗读小说。
-- 支持播放、暂停、停止、上一句、下一句。
-- 支持自动跟随朗读段落。
-- 支持语速、音调、音量和语音选择。
-- 章节结束后可自动继续朗读下一章。
+- 内置日常、小学、初中、高中、CET、IELTS、TOEFL 等词汇内容。
+- 支持单词、句子、短文与每日内容。
+- 记录学习次数、掌握程度、收藏、待复习项目和连续学习天数。
+- 使用 macOS 系统语音朗读；高级用户可配置本机 Kokoro TTS。
 
 ### 设置与更新
 
 - 多语言：简体中文、English、日本語、한국어。
 - 可选择菜单栏显示金价、日期、CPU、内存或实时网速。
 - 支持登录 Mac 时自动启动。
-- 可调整系统采样、金币动画和金价更新频率。
-- 可随时关闭匿名使用数据统计。
+- 可分别调整金币外观、动作、动画流畅度、系统采样和金价更新频率。
+- 匿名使用数据统计默认关闭；未配置分析令牌的开源构建无法开启。
 - 可开关各个系统监控模块。
+- 支持本地备份和兼容旧版本的合并导入。
 - 设置页可打开 GitHub 项目主页和 Releases。
 
 ## 界面预览
@@ -133,9 +140,9 @@ coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历�
       <sub>金价分析</sub>
     </td>
     <td align="center">
-      <img src="docs/images/novel.png" width="300" alt="小说阅读">
+      <img src="docs/images/dark-main.png" width="300" alt="深色主界面">
       <br>
-      <sub>小说阅读</sub>
+      <sub>深色主界面</sub>
     </td>
   </tr>
   <tr>
@@ -157,36 +164,28 @@ coolRun 是一款 macOS 菜单栏工具，把实时金价、Mac 状态、日历�
 ### 从 GitHub Releases 安装
 
 1. 打开 [GitHub Releases](https://github.com/kuaoaoaoao/coolRun/releases)。
-2. 下载最新版本的 `coolRun.dmg` 或 `coolRun.zip`。
-3. 如果是 DMG，双击打开后将 `coolRun.app` 拖入 `Applications` 文件夹。
-4. 启动 `coolRun`。
-5. 启动后在 macOS 菜单栏找到金币图标。
+2. 下载最新的 `GoldRun.dmg`，双击打开。
+3. 将 `GoldRun.app` 拖入 `Applications` 文件夹。
+4. 启动后，在 macOS 菜单栏找到金币图标。
 
-如果 macOS 提示“无法验证开发者”，可以右键点击 `coolRun.app`，选择“打开”，再在弹窗中确认打开。
-
-如果打开 app 时提示“文件已损坏”，这是因为 coolRun 目前未经过 Apple 公证，macOS 会阻止打开。安装后在终端执行：
-
-```bash
-sudo xattr -cr /Applications/coolRun.app
-```
+> 当前安装包未经 Apple 公证。若首次启动被 macOS 拦截，请打开“系统设置 → 隐私与安全性”，在安全性区域选择“仍要打开”。请只从本项目的 GitHub Releases 下载。
 
 ## 使用方式
 
 - 左键点击菜单栏金币图标：打开或关闭悬浮面板。
 - 点击图钉按钮：固定或取消固定悬浮面板。
-- 固定后可切到小说页，一边使用其他应用一边看小说或听朗读。
+- 固定后可一边使用其他应用，一边查看数据或学习英语。
 - 右键点击菜单栏金币图标：打开快捷菜单。
-- 快捷菜单中的“小说阅读”：打开完整小说书架窗口。
 - 快捷菜单中的“设置”：打开设置页面。
-- 快捷菜单中的“退出程序”：退出 coolRun。
+- 快捷菜单中的“退出程序”：退出 GoldRun。
 
 ## 从源码运行
 
 ### 环境要求
 
-- macOS
-- Xcode
-- Swift / SwiftUI
+- macOS 15 或更高版本
+- Xcode 16.4 或更高版本，建议使用最新稳定版
+- Swift Package Manager（Xcode 内置）
 
 ### 运行项目
 
@@ -207,18 +206,32 @@ sudo xattr -cr /Applications/coolRun.app
 4. 运行目标选择 `My Mac`。
 5. 点击运行。
 
+### 运行测试
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild \
+  -project coolRun.xcodeproj \
+  -scheme coolRun \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath /tmp/coolRun-derived \
+  CODE_SIGNING_ALLOWED=NO \
+  test
+```
+
+匿名统计不参与测试。fork 或本地构建默认不配置 PostHog；维护者配置方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 平台状态
+
+- `GoldRun`：主要维护的 macOS SwiftUI + AppKit 应用；内部 Xcode target 和 scheme 暂时保留为 `coolRun`。
+- `GoldRun Watch`：watchOS 辅助目标，功能范围较小。
+- `coolrun-windows`：Tauri 实验版，不保证与 macOS 功能一致。
+- `coolrun-avalonia`：Avalonia 技术验证版本，不保证功能一致。
+
 ## 打包发布
 
-### 使用 Xcode 导出 App
-
-1. 使用 Xcode 打开 `coolRun.xcodeproj`。
-2. 选择菜单栏：
-
-   ```text
-   Product > Archive
-   ```
-
-3. Archive 完成后，在 Organizer 中导出 `coolRun.app`。
+仓库的 `Package unsigned macOS build` Action 可以在不配置 Apple 账号的情况下生成 `GoldRun.dmg`。它会先运行 Release 构建，再应用 ad hoc 临时签名并验证 App Bundle。该签名不能代替 Developer ID 或 Apple 公证。Action 生成的文件默认保留 30 天，发布者核对后可手动上传到 GitHub Release。
 
 ### 制作 DMG
 
@@ -231,32 +244,27 @@ sudo xattr -cr /Applications/coolRun.app
 也可以手动指定 app 路径：
 
 ```bash
-./scripts/create-dmg.sh /path/to/coolRun.app
+./scripts/create-dmg.sh /path/to/GoldRun.app
 ```
 
-脚本会在项目根目录生成 `coolRun.dmg`。
+DMG 不会自动获得 Developer ID 签名或公证，公开发布时需要明确说明。
+
+脚本会在项目根目录生成 `GoldRun.dmg`。
 
 ## 金价数据说明
 
-当前金价来源：
+当前行情与市场背景来自多个公开接口：
 
 ```text
-https://api.jdjygold.com/gw2/generic/produTools/h5/m/getGoldPrice?goldCode=CZB-JCJ
+ms.jr.jd.com
+api.jdjygold.com
+gold.rsky.cn
+hq.sinajs.cn
+news.google.com
+home.treasury.gov
 ```
 
-应用会读取接口返回值中的：
-
-```text
-resultData.data.lastPrice
-```
-
-并展示为：
-
-```text
-¥973.24/g
-```
-
-金价接口由第三方提供，稳定性和数据准确性取决于接口服务方。coolRun 仅展示接口返回数据和基于历史样本的分析结果，不构成投资建议。
+接口均由第三方提供，稳定性和数据准确性取决于服务方。部分数据不可用时，应用会使用缓存或降低分析完整度。GoldRun 仅展示接口数据和基于历史样本的规则分析，不构成投资建议。
 
 ## 项目结构
 
@@ -268,7 +276,6 @@ coolRun
 │   ├── MacAppDelegate.swift
 │   ├── ContentView.swift
 │   ├── MenuBarMonitorView.swift
-│   ├── MenuBarNovelReaderView.swift
 │   ├── SettingsView.swift
 │   ├── GoldPriceService.swift
 │   ├── GoldPriceStore.swift
@@ -276,10 +283,12 @@ coolRun
 │   ├── GoldAnalysisEngine.swift
 │   ├── GoldAdvancedStrategy.swift
 │   ├── GoldPositionAdvisor.swift
-│   ├── NovelLibraryView.swift
-│   ├── NovelReaderView.swift
-│   ├── NovelSpeechManager.swift
+│   ├── GoldTradeStore.swift
 │   ├── CalendarView.swift
+│   ├── CountdownModel.swift
+│   ├── CodexMonitor.swift
+│   ├── ClaudeMonitor.swift
+│   ├── EnglishLearningManager.swift
 │   ├── SystemMonitorViewModel.swift
 │   ├── SystemSampler.swift
 │   ├── SystemMetrics.swift
@@ -290,6 +299,10 @@ coolRun
 │   └── index.html
 ├── scripts
 │   └── create-dmg.sh
+├── coolRunTests
+├── CONTRIBUTING.md
+├── PRIVACY.md
+├── SECURITY.md
 ├── README.md
 └── LICENSE
 ```
@@ -299,36 +312,30 @@ coolRun
 - `MacAppDelegate.swift`：菜单栏图标、金币动画、悬浮窗、固定逻辑、右键菜单和金价刷新。
 - `ContentView.swift`：主面板视图模式、系统监控面板和公共 UI 组件。
 - `MenuBarMonitorView.swift`：菜单栏悬浮面板。
-- `MenuBarNovelReaderView.swift`：菜单栏迷你小说阅读器。
 - `GoldAnalysisView.swift`：金价分析 UI。
 - `GoldAnalysisEngine.swift`：基础统计、技术指标快照和交易信号。
 - `GoldAdvancedStrategy.swift`：高级量化策略分析。
 - `GoldPositionAdvisor.swift`：个人持仓盈亏和建议。
-- `NovelLibraryView.swift`：小说书架。
-- `NovelReaderView.swift`：完整小说阅读器。
-- `NovelSpeechManager.swift`：小说语音朗读。
 - `CalendarView.swift`：日历、农历、节假日和生日入口。
+- `CountdownModel.swift`：公历/农历倒数日和日期匹配。
+- `CodexMonitor.swift`、`ClaudeMonitor.swift`：本机 AI 客户端额度与任务状态。
+- `EnglishLearningManager.swift`：英语内容队列、学习进度和语音流程。
 - `SettingsView.swift`：设置页面。
 - `scripts/create-dmg.sh`：DMG 打包脚本。
 
 ## 隐私说明
 
-coolRun 不收集用户隐私数据，不上传系统监控信息。
-
-系统状态数据仅在本机采样并展示。小说文件会复制到本机应用支持目录，书库、阅读进度、书签和个人持仓输入保存在本机。应用会发起网络请求获取金价数据，请求目标为金价接口服务方。
+系统监控、生日、倒数日、学习进度和持仓默认只保存在本机。匿名统计默认关闭，AI 凭据不会进入备份或统计。完整的数据保存位置、网络目标和统计事件范围见 [PRIVACY.md](PRIVACY.md)。
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request。
+欢迎提交 Issue 和 Pull Request。开始前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)；涉及凭据或隐私泄露的问题请按 [SECURITY.md](SECURITY.md) 私下报告。
 
 可以改进的方向：
 
-- 更多菜单栏显示样式。
-- 自定义金价刷新频率。
 - 更多贵金属或自定义数据源。
-- 更完善的自动更新能力。
 - 更完整的金价分析回测。
-- 更丰富的小说格式支持。
+- 更完善的多平台功能对齐。
 
 ## 许可证
 

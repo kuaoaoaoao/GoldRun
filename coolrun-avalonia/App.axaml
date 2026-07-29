@@ -9,13 +9,13 @@
   <TrayIcon.Icons>
     <TrayIcons>
       <TrayIcon Icon="/Assets/icon.ico"
-                ToolTipText="coolRun"
+                ToolTipText="GoldRun"
                 Clicked="OnTrayClicked">
         <TrayIcon.Menu>
           <NativeMenu>
             <NativeMenuItem Header="显示 / 隐藏" Click="OnToggleMenuClicked" />
             <NativeMenuItemSeparator />
-            <NativeMenuItem Header="退出 coolRun" Click="OnQuitMenuClicked" />
+            <NativeMenuItem Header="退出 GoldRun" Click="OnQuitMenuClicked" />
           </NativeMenu>
         </TrayIcon.Menu>
       </TrayIcon>

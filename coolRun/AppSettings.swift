@@ -39,6 +39,12 @@ class AppSettings: ObservableObject {
     @Published var showTemperature: Bool {
         didSet { userDefaults.set(showTemperature, forKey: "monitor_temperature") }
     }
+    @Published var showProcesses: Bool {
+        didSet { userDefaults.set(showProcesses, forKey: "monitor_processes") }
+    }
+    @Published var mergeProcesses: Bool {
+        didSet { userDefaults.set(mergeProcesses, forKey: "monitor_process_merge") }
+    }
 
     // 常驻刷新策略
     @Published var systemRefreshRate: SystemRefreshRate {
@@ -47,6 +53,14 @@ class AppSettings: ObservableObject {
 
     @Published var menuBarAnimationRate: MenuBarAnimationRate {
         didSet { userDefaults.set(menuBarAnimationRate.rawValue, forKey: "menubar_animation_rate") }
+    }
+
+    @Published var menuBarCoinMotion: MenuBarCoinMotion {
+        didSet { userDefaults.set(menuBarCoinMotion.rawValue, forKey: "menubar_coin_motion") }
+    }
+
+    @Published var menuBarCoinAppearance: MenuBarCoinAppearance {
+        didSet { userDefaults.set(menuBarCoinAppearance.rawValue, forKey: "menubar_coin_appearance") }
     }
 
     @Published var goldRefreshRate: GoldRefreshRate {
@@ -67,6 +81,11 @@ class AppSettings: ObservableObject {
     }
     @Published var goldAlertLowerText: String {
         didSet { userDefaults.set(goldAlertLowerText, forKey: "gold_alert_lower") }
+    }
+
+    // AI 额度提醒：默认关闭，只有用户主动开启后才请求通知权限。
+    @Published var aiQuotaAlertEnabled: Bool {
+        didSet { userDefaults.set(aiQuotaAlertEnabled, forKey: "ai_quota_alert_enabled") }
     }
 
     // 隐私设置
@@ -155,12 +174,20 @@ class AppSettings: ObservableObject {
         self.showNetwork = userDefaults.object(forKey: "monitor_network") as? Bool ?? true
         self.showUptime = userDefaults.object(forKey: "monitor_uptime") as? Bool ?? true
         self.showTemperature = userDefaults.object(forKey: "monitor_temperature") as? Bool ?? true
+        self.showProcesses = userDefaults.object(forKey: "monitor_processes") as? Bool ?? true
+        self.mergeProcesses = userDefaults.object(forKey: "monitor_process_merge") as? Bool ?? true
 
         let systemRefreshRaw = userDefaults.string(forKey: "system_refresh_rate") ?? SystemRefreshRate.balanced.rawValue
         self.systemRefreshRate = SystemRefreshRate(rawValue: systemRefreshRaw) ?? .balanced
 
         let animationRaw = userDefaults.string(forKey: "menubar_animation_rate") ?? MenuBarAnimationRate.energySaving.rawValue
         self.menuBarAnimationRate = MenuBarAnimationRate(rawValue: animationRaw) ?? .energySaving
+
+        let coinMotionRaw = userDefaults.string(forKey: "menubar_coin_motion") ?? MenuBarCoinMotion.classicFlip.rawValue
+        self.menuBarCoinMotion = MenuBarCoinMotion(rawValue: coinMotionRaw) ?? .classicFlip
+
+        let coinAppearanceRaw = userDefaults.string(forKey: "menubar_coin_appearance") ?? MenuBarCoinAppearance.yuan.rawValue
+        self.menuBarCoinAppearance = MenuBarCoinAppearance(rawValue: coinAppearanceRaw) ?? .yuan
 
         let goldRefreshRaw = userDefaults.string(forKey: "gold_refresh_rate") ?? GoldRefreshRate.minute.rawValue
         self.goldRefreshRate = GoldRefreshRate(rawValue: goldRefreshRaw) ?? .minute
@@ -170,8 +197,10 @@ class AppSettings: ObservableObject {
         self.goldAlertEnabled = userDefaults.object(forKey: "gold_alert_enabled") as? Bool ?? false
         self.goldAlertUpperText = userDefaults.string(forKey: "gold_alert_upper") ?? ""
         self.goldAlertLowerText = userDefaults.string(forKey: "gold_alert_lower") ?? ""
+        self.aiQuotaAlertEnabled = userDefaults.object(forKey: "ai_quota_alert_enabled") as? Bool ?? false
 
-        self.analyticsEnabled = userDefaults.object(forKey: "analytics_enabled") as? Bool ?? true
+        // 新安装和开源 fork 默认不发送遥测；已有用户的明确选择保持不变。
+        self.analyticsEnabled = userDefaults.object(forKey: "analytics_enabled") as? Bool ?? false
 
         self.lastViewModeRaw = userDefaults.string(forKey: "last_view_mode") ?? ""
 
@@ -205,7 +234,7 @@ class AppSettings: ObservableObject {
 
 // MARK: - 语言枚举
 
-enum AppLanguage: String, CaseIterable, Identifiable {
+enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     case chinese = "zh"
     case english = "en"
     case japanese = "ja"
@@ -235,9 +264,10 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     case cpu = "cpu"
     case memory = "memory"
     case network = "network"
-    case novel = "novel"
     case english = "english"
     case codex = "codex"
+    case claude = "claude"
+    case countdown = "countdown"
 
     var id: String { rawValue }
 
@@ -254,25 +284,28 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
             return LocalizedString.l(currentLang, en: "Memory Usage", zh: "内存占用", ja: "メモリ使用率", ko: "메모리 사용량")
         case .network:
             return LocalizedString.l(currentLang, en: "Network Speed", zh: "实时网速", ja: "ネットワーク速度", ko: "네트워크 속도")
-        case .novel:
-            return LocalizedString.l(currentLang, en: "Novel", zh: "小说", ja: "小説", ko: "소설")
         case .english:
             return LocalizedString.l(currentLang, en: "English Learning", zh: "英语学习", ja: "英語学習", ko: "영어 학습")
         case .codex:
             return "Codex"
+        case .claude:
+            return "Claude"
+        case .countdown:
+            return LocalizedString.l(currentLang, en: "Countdown", zh: "倒数日", ja: "カウントダウン", ko: "카운트다운")
         }
     }
 
     var icon: String {
         switch self {
-        case .goldPrice: return "dollarsign.circle"
+        case .goldPrice: return "chart.line.uptrend.xyaxis"
         case .date: return "calendar"
         case .cpu: return "cpu"
         case .memory: return "memorychip"
-        case .network: return "arrow.up.arrow.down"
-        case .novel: return "book.pages"
+        case .network: return "arrow.up.arrow.down.circle"
         case .english: return "character.book.closed"
-        case .codex: return "sparkles"
+        case .codex: return "terminal"
+        case .claude: return "sparkles"
+        case .countdown: return "timer"
         }
     }
 }
@@ -327,6 +360,66 @@ enum MenuBarAnimationRate: String, CaseIterable, Identifiable {
     }
 }
 
+enum MenuBarCoinMotion: String, CaseIterable, Identifiable {
+    case classicFlip = "classic_flip"
+    case luckyBounce = "lucky_bounce"
+    case coinToss = "coin_toss"
+    case rolling = "rolling"
+    case shimmer = "shimmer"
+
+    var id: String { rawValue }
+
+    var speedMultiplier: Double {
+        switch self {
+        case .classicFlip: return 1
+        case .luckyBounce: return 0.82
+        case .coinToss: return 0.68
+        case .rolling: return 0.74
+        case .shimmer: return 0.46
+        }
+    }
+
+    func displayName(lang: AppLanguage) -> String {
+        switch self {
+        case .classicFlip:
+            return LocalizedString.l(lang, en: "Classic Flip", zh: "经典翻面", ja: "クラシック反転", ko: "클래식 뒤집기")
+        case .luckyBounce:
+            return LocalizedString.l(lang, en: "Lucky Bounce", zh: "招财弹跳", ja: "幸運バウンド", ko: "행운 바운스")
+        case .coinToss:
+            return LocalizedString.l(lang, en: "Coin Toss", zh: "抛金币", ja: "コイントス", ko: "동전 던지기")
+        case .rolling:
+            return LocalizedString.l(lang, en: "Rolling Coin", zh: "金币滚动", ja: "コインロール", ko: "동전 굴리기")
+        case .shimmer:
+            return LocalizedString.l(lang, en: "Golden Shimmer", zh: "金光闪闪", ja: "金色のきらめき", ko: "황금 반짝임")
+        }
+    }
+}
+
+enum MenuBarCoinAppearance: String, CaseIterable, Identifiable {
+    case yuan
+    case lucky
+    case rising
+    case ancient
+    case starlight
+
+    var id: String { rawValue }
+
+    func displayName(lang: AppLanguage) -> String {
+        switch self {
+        case .yuan:
+            return LocalizedString.l(lang, en: "Yuan Coin", zh: "人民币金币", ja: "元コイン", ko: "위안 금화")
+        case .lucky:
+            return LocalizedString.l(lang, en: "Lucky Coin", zh: "招财福币", ja: "招福コイン", ko: "행운 복주화")
+        case .rising:
+            return LocalizedString.l(lang, en: "Rising Coin", zh: "上涨金币", ja: "上昇コイン", ko: "상승 금화")
+        case .ancient:
+            return LocalizedString.l(lang, en: "Ancient Coin", zh: "方孔古钱", ja: "古銭", ko: "옛날 엽전")
+        case .starlight:
+            return LocalizedString.l(lang, en: "Starlight Coin", zh: "星光金币", ja: "星光コイン", ko: "별빛 금화")
+        }
+    }
+}
+
 enum GoldRefreshRate: String, CaseIterable, Identifiable {
     case seconds30 = "30_seconds"
     case minute = "1_minute"
@@ -356,7 +449,7 @@ enum GoldRefreshRate: String, CaseIterable, Identifiable {
 enum LocalizedString {
     // MARK: - Helper
 
-    static func l(
+    nonisolated static func l(
         _ lang: AppLanguage,
         en: String,
         zh: String,
@@ -392,6 +485,8 @@ enum LocalizedString {
         case "stop": return l(currentLang, en: "Stop", zh: "停止", ja: "停止", ko: "정지")
         case "play": return l(currentLang, en: "Play", zh: "播放", ja: "再生", ko: "재생")
         case "pause": return l(currentLang, en: "Pause", zh: "暂停", ja: "一時停止", ko: "일시 정지")
+        case "pin_popover": return l(currentLang, en: "Pin floating window", zh: "固定悬浮窗", ja: "フローティングウィンドウを固定", ko: "플로팅 창 고정")
+        case "unpin_popover": return l(currentLang, en: "Unpin floating window", zh: "取消固定悬浮窗", ja: "固定を解除", ko: "플로팅 창 고정 해제")
         default: return key
         }
     }
@@ -412,19 +507,25 @@ enum LocalizedString {
         case "platform": return l(currentLang, en: "Platform", zh: "平台", ja: "プラットフォーム", ko: "플랫폼")
         case "project_home": return l(currentLang, en: "Project Home", zh: "项目主页", ja: "プロジェクトページ", ko: "프로젝트 홈")
         case "check_update": return l(currentLang, en: "Check Update", zh: "检查更新", ja: "更新を確認", ko: "업데이트 확인")
+        case "report_issue": return l(currentLang, en: "Report an Issue", zh: "反馈问题", ja: "問題を報告", ko: "문제 신고")
+        case "privacy_policy": return l(currentLang, en: "Privacy Details", zh: "隐私详情", ja: "プライバシー詳細", ko: "개인정보 상세")
         case "startup": return l(currentLang, en: "Startup", zh: "启动", ja: "起動", ko: "시작")
-        case "startup_desc": return l(currentLang, en: "Keep coolRun available after signing in", zh: "登录 Mac 后自动运行 coolRun", ja: "Mac にサインインした後も coolRun を起動", ko: "Mac 로그인 후 coolRun 자동 실행")
+        case "startup_desc": return l(currentLang, en: "Keep GoldRun available after signing in", zh: "登录 Mac 后自动运行 GoldRun", ja: "Mac にサインインした後も GoldRun を起動", ko: "Mac 로그인 후 GoldRun 자동 실행")
         case "launch_at_login": return l(currentLang, en: "Launch at Login", zh: "登录时启动", ja: "ログイン時に起動", ko: "로그인 시 실행")
         case "privacy": return l(currentLang, en: "Privacy", zh: "隐私", ja: "プライバシー", ko: "개인정보")
         case "privacy_desc": return l(currentLang, en: "Control anonymous product analytics", zh: "控制匿名使用数据统计", ja: "匿名の利用統計を管理", ko: "익명 사용 통계 관리")
         case "share_analytics": return l(currentLang, en: "Share Anonymous Usage Data", zh: "共享匿名使用数据", ja: "匿名の利用データを共有", ko: "익명 사용 데이터 공유")
-        case "privacy_note": return l(currentLang, en: "Novel text, birthdays, notes, holdings and profit amounts are never included.", zh: "不会上传小说正文、生日、备注、持仓和盈亏金额。", ja: "小説本文、誕生日、メモ、保有情報、損益額は送信されません。", ko: "소설 본문, 생일, 메모, 보유 정보와 손익 금액은 전송되지 않습니다.")
+        case "privacy_note": return l(currentLang, en: "Off by default. When enabled, only the allowlisted product events are sent; birthdays, notes and holdings are never included.", zh: "默认关闭。开启后仅发送代码中列出的产品事件；生日、备注和持仓不会上传。", ja: "既定ではオフです。有効時も許可済みの操作イベントのみ送信し、誕生日、メモ、保有情報は送信しません。", ko: "기본값은 꺼짐입니다. 켜도 허용된 제품 이벤트만 전송하며 생일, 메모와 보유 정보는 전송하지 않습니다.")
+        case "analytics_unavailable": return l(currentLang, en: "Analytics is not configured in this build. Open-source builds stay local unless a maintainer provides a PostHog project token.", zh: "此构建未配置匿名统计。开源构建默认保持本地，只有维护者提供 PostHog 项目令牌后才可开启。", ja: "このビルドには分析設定がありません。メンテナーが PostHog トークンを指定しない限り、オープンソースビルドはローカルのままです。", ko: "이 빌드에는 분석이 설정되지 않았습니다. 관리자가 PostHog 토큰을 제공하지 않는 한 오픈소스 빌드는 로컬로 유지됩니다.")
         case "refresh_rate": return l(currentLang, en: "Refresh Rate", zh: "刷新频率", ja: "更新頻度", ko: "새로 고침 빈도")
         case "refresh_rate_desc": return l(currentLang, en: "Lower rates reduce background CPU and power usage", zh: "降低频率可以减少后台 CPU 与耗电", ja: "頻度を下げるとバックグラウンドの CPU と電力を節約", ko: "빈도를 낮추면 백그라운드 CPU와 전력 사용량 감소")
         case "system_sampling": return l(currentLang, en: "System Sampling", zh: "系统采样", ja: "システムサンプリング", ko: "시스템 샘플링")
         case "menubar_animation": return l(currentLang, en: "Menu Bar Animation", zh: "菜单栏动画", ja: "メニューバーアニメーション", ko: "메뉴 막대 애니메이션")
-        case "menubar_animation_desc": return l(currentLang, en: "Choose a balance between motion and energy use", zh: "在动画流畅度和能耗之间选择", ja: "動きと消費電力のバランスを選択", ko: "움직임과 에너지 사용량의 균형 선택")
+        case "menubar_animation_desc": return l(currentLang, en: "Choose the coin face, motion and smoothness", zh: "选择金币外观、动作和流畅度", ja: "コインの外観、動き、滑らかさを選択", ko: "동전 모양, 동작 및 부드러움 선택")
         case "coin_animation": return l(currentLang, en: "Coin Animation", zh: "金币动画", ja: "コインアニメーション", ko: "코인 애니메이션")
+        case "coin_appearance": return l(currentLang, en: "Coin Face", zh: "金币外观", ja: "コインの外観", ko: "동전 모양")
+        case "coin_motion": return l(currentLang, en: "Coin Motion", zh: "金币动作", ja: "コインの動き", ko: "동전 동작")
+        case "animation_rate": return l(currentLang, en: "Smoothness", zh: "动画流畅度", ja: "滑らかさ", ko: "애니메이션 부드러움")
         case "gold_updates": return l(currentLang, en: "Gold Price Updates", zh: "金价更新", ja: "金価格の更新", ko: "금 가격 업데이트")
         case "gold_updates_desc": return l(currentLang, en: "Control request frequency to the price provider", zh: "控制向金价数据源发起请求的频率", ja: "価格データ提供元へのリクエスト頻度を管理", ko: "가격 제공자 요청 빈도 관리")
         // 卡片新标题：刷新频率与到价提醒合并在同一卡，标题要能覆盖两者
@@ -434,6 +535,9 @@ enum LocalizedString {
         case "gold_alert_invalid": return l(currentLang, en: "Threshold must be a number greater than 0", zh: "阈值需为大于 0 的数字", ja: "しきい値は 0 より大きい数値を入力してください", ko: "임계값은 0보다 큰 숫자여야 합니다")
         case "gold_alert_inverted": return l(currentLang, en: "Upper limit must be higher than lower limit", zh: "上限价需高于下限价", ja: "上限価格は下限価格より高くしてください", ko: "상한 가격은 하한 가격보다 높아야 합니다")
         case "notification_permission_denied": return l(currentLang, en: "System notifications are disabled. Enable them in System Settings → Notifications.", zh: "系统通知权限未开启，提醒无法送达。可在 系统设置 → 通知 中开启", ja: "システム通知がオフのため通知を届けられません。システム設定 → 通知 で有効にしてください", ko: "시스템 알림이 꺼져 있어 알림을 받을 수 없습니다. 시스템 설정 → 알림에서 켜주세요")
+        case "ai_quota_alerts": return l(currentLang, en: "AI Quota Alerts", zh: "AI 额度提醒", ja: "AI クォータ通知", ko: "AI 할당량 알림")
+        case "ai_quota_alerts_desc": return l(currentLang, en: "Notify only after remaining Codex or Claude quota drops to 10%", zh: "仅在 Codex 或 Claude 剩余额度降至 10% 后提醒", ja: "Codex または Claude の残量が 10% 以下になった時だけ通知", ko: "Codex 또는 Claude 잔여량이 10% 이하일 때만 알림")
+        case "ai_quota_alerts_note": return l(currentLang, en: "The app checks quota only while the AI panel is visible. It re-arms after quota recovers above 30%.", zh: "仅在 AI 面板可见时检查额度；额度恢复到 30% 以上后会重新启用下一次提醒。", ja: "AI パネル表示中のみ確認し、残量が 30% を超えて回復すると次回通知を再度有効にします。", ko: "AI 패널이 표시될 때만 확인하며, 잔여량이 30%를 넘으면 다음 알림을 다시 활성화합니다.")
         case "refresh_every": return l(currentLang, en: "Refresh Every", zh: "刷新间隔", ja: "更新間隔", ko: "새로 고침 간격")
         case "gold_auto_calibration": return l(currentLang, en: "Auto Calibration", zh: "预测自动校准", ja: "予測自動補正", ko: "예측 자동 보정")
         case "gold_auto_calibration_note": return l(currentLang, en: "Adjust confidence and position by historical hit rate. When off, results are observed only.", zh: "根据历史预测命中率自动调整信心和建议仓位；关闭后只展示观察结果，不参与调参。", ja: "履歴的中率に基づき信頼度とポジションを自動調整します。オフにすると観察のみ行います。", ko: "과거 적중률에 따라 신뢰도와 포지션을 자동 조정합니다. 끄면 관찰만 합니다.")
@@ -455,7 +559,7 @@ enum LocalizedString {
         case "export": return l(currentLang, en: "Export", zh: "导出数据", ja: "エクスポート", ko: "내보내기")
         case "import_success": return l(currentLang, en: "Import successful!", zh: "导入成功！", ja: "インポートしました！", ko: "가져오기 완료!")
         case "import_data": return l(currentLang, en: "Import", zh: "导入数据", ja: "インポート", ko: "가져오기")
-        case "data_backup_note": return l(currentLang, en: "Exports birthdays, English progress, gold price history, novel bookmarks and app settings as a single file.", zh: "导出包含生日、英语学习进度、金价历史、小说书签和应用设置。导入时采用合并模式，不会覆盖已有数据。", ja: "誕生日、英語学習の進捗、金価格履歴、小説のしおり、アプリ設定を1つのファイルにエクスポートします。インポートは統合モードで、既存データを上書きしません。", ko: "생일, 영어 학습 진행도, 금 가격 기록, 소설 책갈피와 앱 설정을 하나의 파일로 내보냅니다. 가져오기는 병합 방식이며 기존 데이터를 덮어쓰지 않습니다.")
+        case "data_backup_note": return l(currentLang, en: "Exports birthdays, countdowns, English progress, gold records and holdings, and app settings. Import merges records without deleting existing data.", zh: "导出生日、倒数日、英语进度、金价记录与持仓和应用设置。导入采用合并模式，不会删除已有数据。", ja: "誕生日、カウントダウン、英語進捗、金価格記録と保有情報、アプリ設定を出力します。取り込みは既存データを削除せず統合します。", ko: "생일, 카운트다운, 영어 진행도, 금 가격 기록과 보유 정보 및 앱 설정을 내보냅니다. 가져오기는 기존 데이터를 삭제하지 않고 병합합니다.")
         case "app_updates": return l(currentLang, en: "App Updates", zh: "应用更新", ja: "アプリの更新", ko: "앱 업데이트")
         case "app_updates_desc": return l(currentLang, en: "Check for the latest version from GitHub", zh: "从 GitHub 检查最新版本", ja: "GitHub で最新バージョンを確認", ko: "GitHub에서 최신 버전 확인")
         case "available": return l(currentLang, en: "available", zh: "可用", ja: "利用可能", ko: "사용 가능")
@@ -505,6 +609,13 @@ enum LocalizedString {
         case "pressure": return l(currentLang, en: "Pressure", zh: "压力", ja: "負荷", ko: "압력")
         case "status": return l(currentLang, en: "Status", zh: "状态", ja: "状態", ko: "상태")
         case "low_power": return l(currentLang, en: "Low Power", zh: "低电量模式", ja: "低電力モード", ko: "저전력 모드")
+        case "battery_health": return l(currentLang, en: "Health", zh: "健康度", ja: "健康度", ko: "배터리 성능")
+        case "cycle_count": return l(currentLang, en: "Cycle Count", zh: "循环次数", ja: "充電回数", ko: "사이클 수")
+        case "battery_capacity": return l(currentLang, en: "Capacity", zh: "容量", ja: "容量", ko: "용량")
+        case "battery_temp": return l(currentLang, en: "Battery Temp", zh: "电池温度", ja: "バッテリー温度", ko: "배터리 온도")
+        case "battery_power": return l(currentLang, en: "Power", zh: "实时功率", ja: "電力", ko: "전력")
+        case "time_to_full": return l(currentLang, en: "Time to Full", zh: "预计充满", ja: "満充電まで", ko: "완전 충전까지")
+        case "time_to_empty": return l(currentLang, en: "Time Left", zh: "预计可用", ja: "残り時間", ko: "남은 시간")
         case "local_ip": return l(currentLang, en: "Local IP", zh: "本地 IP", ja: "ローカル IP", ko: "로컬 IP")
         case "interfaces": return l(currentLang, en: "Interfaces", zh: "接口", ja: "インターフェイス", ko: "인터페이스")
         case "download": return l(currentLang, en: "Download", zh: "下载", ja: "ダウンロード", ko: "다운로드")
@@ -512,6 +623,14 @@ enum LocalizedString {
         case "running_time": return l(currentLang, en: "Running", zh: "已运行", ja: "稼働中", ko: "실행 중")
         case "connected": return l(currentLang, en: "Connected", zh: "已连接", ja: "接続済み", ko: "연결됨")
         case "disconnected": return l(currentLang, en: "Disconnected", zh: "未连接", ja: "未接続", ko: "연결 안 됨")
+        case "processes": return l(currentLang, en: "Processes", zh: "进程", ja: "プロセス", ko: "프로세스")
+        case "process_count_unit": return l(currentLang, en: "running", zh: "个运行中", ja: "個実行中", ko: "개 실행 중")
+        case "sort_by": return l(currentLang, en: "Sort by", zh: "排序", ja: "並び替え", ko: "정렬")
+        case "show_more": return l(currentLang, en: "Show more", zh: "显示更多", ja: "もっと見る", ko: "더 보기")
+        case "show_less": return l(currentLang, en: "Show less", zh: "收起", ja: "閉じる", ko: "접기")
+        case "terminate_process": return l(currentLang, en: "Quit Process", zh: "结束进程", ja: "プロセスを終了", ko: "프로세스 종료")
+        case "merge_processes": return l(currentLang, en: "Merge same-name processes", zh: "合并同名进程", ja: "同名プロセスを統合", ko: "동일 이름 프로세스 병합")
+        case "process_waiting": return l(currentLang, en: "Collecting process data...", zh: "正在采集进程数据...", ja: "プロセスデータを収集中...", ko: "프로세스 데이터 수집 중...")
         default: return key
         }
     }
@@ -525,7 +644,7 @@ enum LocalizedString {
         case "date": return l(currentLang, en: "Date", zh: "日期", ja: "日付", ko: "날짜")
         case "settings": return l(currentLang, en: "Settings", zh: "设置", ja: "設定", ko: "설정")
         case "quit": return l(currentLang, en: "Quit", zh: "退出程序", ja: "終了", ko: "종료")
-        case "open_coolrun": return l(currentLang, en: "Open coolRun", zh: "打开 coolRun", ja: "coolRun を開く", ko: "coolRun 열기")
+        case "open_coolrun": return l(currentLang, en: "Open GoldRun", zh: "打开 GoldRun", ja: "GoldRun を開く", ko: "GoldRun 열기")
         case "display_mode": return l(currentLang, en: "Menu Bar Display", zh: "菜单栏显示", ja: "メニューバー表示", ko: "메뉴 막대 표시")
         case "start_english": return l(currentLang, en: "Start English listening", zh: "开始英语听读", ja: "英語の聞き読みを開始", ko: "영어 듣기 시작")
         case "pause_english": return l(currentLang, en: "Pause English listening", zh: "暂停英语听读", ja: "英語の聞き読みを一時停止", ko: "영어 듣기 일시 정지")
@@ -609,6 +728,32 @@ enum LocalizedString {
         case "unnamed": return l(currentLang, en: "Unnamed", zh: "未命名", ja: "名称未設定", ko: "이름 없음")
         case "preview": return l(currentLang, en: "Preview", zh: "预览", ja: "プレビュー", ko: "미리보기")
         case "and_more": return l(currentLang, en: " etc.", zh: "等", ja: " ほか", ko: " 등")
+        default: return key
+        }
+    }
+
+    // MARK: - 倒数日
+
+    static func countdown(_ key: String, lang: AppLanguage? = nil) -> String {
+        let currentLang = lang ?? AppSettings.shared.language
+        switch key {
+        case "manage": return l(currentLang, en: "Countdown", zh: "倒数日管理", ja: "カウントダウン管理", ko: "카운트다운 관리")
+        case "empty": return l(currentLang, en: "No countdowns yet", zh: "还没有倒数日", ja: "カウントダウンはまだありません", ko: "카운트다운이 없습니다")
+        case "empty_hint": return l(currentLang, en: "Add exams, anniversaries and more", zh: "添加考试、纪念日等重要日子", ja: "試験や記念日などを追加", ko: "시험, 기념일 등을 추가하세요")
+        case "lunar": return l(currentLang, en: "Lunar", zh: "农历", ja: "旧暦", ko: "음력")
+        case "solar": return l(currentLang, en: "Solar", zh: "公历", ja: "新暦", ko: "양력")
+        case "today": return l(currentLang, en: "Today", zh: "今天", ja: "今日", ko: "오늘")
+        case "days_left": return l(currentLang, en: "days left", zh: "天后", ja: "日後", ko: "일 후")
+        case "days_ago": return l(currentLang, en: "days ago", zh: "天前", ja: "日前", ko: "일 전")
+        case "add": return l(currentLang, en: "Add Countdown", zh: "添加倒数日", ja: "カウントダウンを追加", ko: "카운트다운 추가")
+        case "edit": return l(currentLang, en: "Edit Countdown", zh: "编辑倒数日", ja: "カウントダウンを編集", ko: "카운트다운 편집")
+        case "event_name": return l(currentLang, en: "Event Name", zh: "事件名称", ja: "イベント名", ko: "이벤트 이름")
+        case "event_name_placeholder": return l(currentLang, en: "e.g.: Exam, Anniversary", zh: "如：高考、纪念日", ja: "例：試験、記念日", ko: "예: 시험, 기념일")
+        case "date_type": return l(currentLang, en: "Date Type", zh: "日期类型", ja: "日付タイプ", ko: "날짜 유형")
+        case "repeat_annually": return l(currentLang, en: "Repeat Annually", zh: "每年重复", ja: "毎年繰り返す", ko: "매년 반복")
+        case "year": return l(currentLang, en: "Year", zh: "年份", ja: "年", ko: "연도")
+        case "add_selected_date": return l(currentLang, en: "Add countdown for selected date", zh: "为选中日期添加倒数日", ja: "選択した日付にカウントダウンを追加", ko: "선택한 날짜에 카운트다운 추가")
+        case "events": return l(currentLang, en: "Countdowns", zh: "倒数日", ja: "カウントダウン", ko: "카운트다운")
         default: return key
         }
     }
@@ -857,68 +1002,6 @@ enum LocalizedString {
         }
     }
 
-    // MARK: - 小说
-
-    static func novel(_ key: String, lang: AppLanguage? = nil) -> String {
-        let currentLang = lang ?? AppSettings.shared.language
-        switch key {
-        case "novel": return l(currentLang, en: "Novel", zh: "小说", ja: "小説", ko: "소설")
-        case "novel_reader": return l(currentLang, en: "Novel Reader", zh: "小说阅读", ja: "小説リーダー", ko: "소설 리더")
-        case "books_count": return l(currentLang, en: "books", zh: "本书", ja: "冊", ko: "권")
-        case "chapters_count": return l(currentLang, en: "chapters", zh: "章", ja: "章", ko: "장")
-        case "import_novel": return l(currentLang, en: "Import Novel", zh: "导入小说", ja: "小説をインポート", ko: "소설 가져오기")
-        case "open_read": return l(currentLang, en: "Open", zh: "打开阅读", ja: "開く", ko: "열기")
-        case "delete": return l(currentLang, en: "Delete", zh: "删除", ja: "削除", ko: "삭제")
-        case "import_failed": return l(currentLang, en: "Import Failed", zh: "导入失败", ja: "インポートに失敗しました", ko: "가져오기 실패")
-        case "confirm_delete": return l(currentLang, en: "Confirm Delete", zh: "确认删除", ja: "削除の確認", ko: "삭제 확인")
-        case "delete_warning": return l(currentLang, en: "Are you sure to delete \"", zh: "确定要删除「", ja: "「", ko: "\"")
-        case "delete_warning_suffix": return l(currentLang, en: "\"? This cannot be undone.", zh: "」吗？此操作不可恢复。", ja: "」を削除しますか？この操作は元に戻せません。", ko: "\"을(를) 삭제할까요? 이 작업은 되돌릴 수 없습니다.")
-        case "empty_library": return l(currentLang, en: "Library is empty", zh: "书架空空如也", ja: "本棚は空です", ko: "책장이 비어 있습니다")
-        case "empty_library_hint": return l(currentLang, en: "Import txt novels to track progress, chapters and bookmarks.", zh: "导入 txt 小说后，coolRun 会记住阅读进度、目录和书签。", ja: "txt 小説をインポートすると、進捗・章・しおりを記録できます。", ko: "txt 소설을 가져오면 진행률, 목차, 책갈피를 기록합니다.")
-        case "book_not_found": return l(currentLang, en: "Book not found", zh: "书籍不存在", ja: "本が見つかりません", ko: "책을 찾을 수 없습니다")
-        case "book_deleted_hint": return l(currentLang, en: "This book may have been deleted.", zh: "这本书可能已经被删除。", ja: "この本は削除された可能性があります。", ko: "이 책은 삭제되었을 수 있습니다.")
-        case "no_content": return l(currentLang, en: "No readable content", zh: "没有可阅读的内容", ja: "読める内容がありません", ko: "읽을 수 있는 내용이 없습니다")
-        case "no_chapter": return l(currentLang, en: "No chapter", zh: "无章节", ja: "章なし", ko: "챕터 없음")
-        case "close": return l(currentLang, en: "Close", zh: "关闭", ja: "閉じる", ko: "닫기")
-        case "toc": return l(currentLang, en: "Contents", zh: "目录", ja: "目次", ko: "목차")
-        case "bookmark": return l(currentLang, en: "Bookmarks", zh: "书签", ja: "しおり", ko: "책갈피")
-        case "add_bookmark": return l(currentLang, en: "Add bookmark", zh: "添加书签", ja: "しおりを追加", ko: "책갈피 추가")
-        case "read_aloud": return l(currentLang, en: "Read aloud", zh: "从当前位置朗读", ja: "現在位置から読み上げ", ko: "현재 위치부터 읽기")
-        case "reading_settings": return l(currentLang, en: "Reading settings", zh: "阅读设置", ja: "読書設定", ko: "읽기 설정")
-        case "prev_chapter": return l(currentLang, en: "Previous", zh: "上一章", ja: "前の章", ko: "이전 장")
-        case "next_chapter": return l(currentLang, en: "Next", zh: "下一章", ja: "次の章", ko: "다음 장")
-        case "chapter_progress": return l(currentLang, en: "Chapter", zh: "本章", ja: "章", ko: "장")
-        case "empty_bookmarks": return l(currentLang, en: "No bookmarks yet", zh: "暂无书签", ja: "しおりはまだありません", ko: "책갈피가 없습니다")
-        case "jump": return l(currentLang, en: "Jump", zh: "跳转", ja: "移動", ko: "이동")
-        case "unknown_chapter": return l(currentLang, en: "Unknown chapter", zh: "未知章节", ja: "不明な章", ko: "알 수 없는 장")
-        case "default_menu_hint": return l(currentLang, en: "Import a txt novel and pin this panel in the menu bar to read while you work.", zh: "导入 txt 小说后，可以把这块固定在菜单栏里边看边工作。", ja: "txt 小説をインポートすると、このパネルをメニューバーに固定して作業中に読めます。", ko: "txt 소설을 가져오면 이 패널을 메뉴 막대에 고정해 작업하면서 읽을 수 있습니다.")
-        case "import_txt_help": return l(currentLang, en: "Import txt novel", zh: "导入 txt 小说", ja: "txt 小説をインポート", ko: "txt 소설 가져오기")
-        case "chapter_counter_format": return l(currentLang, en: "Chapter %d / %d", zh: "第 %d / %d 章", ja: "第 %d / %d 章", ko: "%d / %d장")
-        case "paragraph_counter_format": return l(currentLang, en: "Paragraph %d", zh: "段落 %d", ja: "段落 %d", ko: "%d번째 단락")
-        case "read_from_here_hint": return l(currentLang, en: "Start reading aloud from the current paragraph, useful with the pinned menu bar window.", zh: "可从当前段落开始朗读，适合把窗口固定后听书。", ja: "現在の段落から読み上げを開始できます。メニューバーに固定して聞く時に便利です。", ko: "현재 단락부터 읽을 수 있어 메뉴 막대 창을 고정해 들을 때 좋습니다.")
-        case "empty_menu_title": return l(currentLang, en: "No novels imported", zh: "还没有导入小说", ja: "小説はまだインポートされていません", ko: "가져온 소설이 없습니다")
-        case "empty_menu_hint": return l(currentLang, en: "Import txt files, then pin this menu bar window to read or listen while you work.", zh: "导入 txt 后，可以固定这个菜单栏窗口，一边工作一边看小说或听朗读。", ja: "txt をインポートすると、このメニューバーウィンドウを固定して作業中に読んだり聞いたりできます。", ko: "txt를 가져온 뒤 이 메뉴 막대 창을 고정해 작업하면서 읽거나 들을 수 있습니다.")
-        case "import_txt": return l(currentLang, en: "Import txt", zh: "导入 txt", ja: "txt をインポート", ko: "txt 가져오기")
-        case "reading_mode": return l(currentLang, en: "Reading Mode", zh: "阅读模式", ja: "読書モード", ko: "읽기 모드")
-        case "font_size": return l(currentLang, en: "Font Size", zh: "字体大小", ja: "フォントサイズ", ko: "글자 크기")
-        case "line_spacing": return l(currentLang, en: "Line Spacing", zh: "行间距", ja: "行間", ko: "줄 간격")
-        case "reading_theme": return l(currentLang, en: "Reading Theme", zh: "阅读主题", ja: "読書テーマ", ko: "읽기 테마")
-        case "preview_effect": return l(currentLang, en: "Preview", zh: "预览效果", ja: "プレビュー", ko: "미리보기")
-        case "preview_title": return l(currentLang, en: "Chapter 1 Into the World", zh: "第一章 初入江湖", ja: "第一章 旅立ち", ko: "제1장 첫걸음")
-        case "preview_body": return l(currentLang, en: "The young traveler carried a long sword and stepped onto the winding road. Faraway mountains rose through mist, with temple eaves faintly visible.", zh: "少年背负长剑，踏上了漫漫江湖路。远方群山连绵，云雾缭绕间隐约可见古寺的飞檐。", ja: "少年は長剣を背負い、長い旅路へ踏み出した。遠くの山々は霧に包まれ、古寺の軒がかすかに見えた。", ko: "소년은 긴 검을 메고 먼 여정에 올랐다. 멀리 산들이 안개에 잠기고, 오래된 절의 처마가 희미하게 보였다.")
-        // ReadingMode
-        case "scroll": return l(currentLang, en: "Scroll", zh: "滚动", ja: "スクロール", ko: "스크롤")
-        case "page": return l(currentLang, en: "Page", zh: "翻页", ja: "ページ", ko: "페이지")
-        // ReaderTheme
-        case "theme_light": return l(currentLang, en: "Light", zh: "明亮", ja: "ライト", ko: "밝게")
-        case "theme_warm": return l(currentLang, en: "Warm", zh: "暖色", ja: "ウォーム", ko: "따뜻하게")
-        case "theme_sepia": return l(currentLang, en: "Sepia", zh: "复古", ja: "セピア", ko: "세피아")
-        case "theme_dark": return l(currentLang, en: "Dark", zh: "暗夜", ja: "ダーク", ko: "어둡게")
-        case "theme_ink": return l(currentLang, en: "Ink", zh: "水墨", ja: "墨", ko: "먹색")
-        default: return key
-        }
-    }
-
     // MARK: - 英语学习
 
     static func english(_ key: String, lang: AppLanguage? = nil) -> String {
@@ -1000,7 +1083,7 @@ enum LocalizedString {
         case "voice_better_subtitle": return l(currentLang, en: "Download Apple Neural voices for natural speech", zh: "下载 Apple Neural 语音，读单词像真人", ja: "Apple Neural 音声をダウンロードして自然に読み上げ", ko: "Apple Neural 음성으로 더 자연스럽게 읽기")
         case "voice_step1": return l(currentLang, en: "Open System Settings → Accessibility → Spoken Content → System Voice → Manage Voices", zh: "打开系统设置 → 辅助功能 → 朗读内容 → 系统语音 → 管理语音", ja: "システム設定 → アクセシビリティ → 読み上げコンテンツ → システム音声 → 音声を管理 を開く", ko: "시스템 설정 → 손쉬운 사용 → 음성 콘텐츠 → 시스템 음성 → 음성 관리 열기")
         case "voice_step2": return l(currentLang, en: "Hover over an English voice and click the download icon", zh: "鼠标移到英语音色上，点击右侧的下载图标（ℹ︎ 感叹号）即可下载", ja: "英語音声にカーソルを合わせ、ダウンロードアイコンをクリック", ko: "영어 음성 위에 마우스를 올리고 다운로드 아이콘 클릭")
-        case "voice_step3": return l(currentLang, en: "Come back and coolRun will auto-select the best voice", zh: "下载完回来，coolRun 会自动选中质量最高的那个音色", ja: "戻ると coolRun が最適な音声を自動選択します", ko: "돌아오면 coolRun이 가장 좋은 음성을 자동 선택합니다")
+        case "voice_step3": return l(currentLang, en: "Come back and GoldRun will auto-select the best voice", zh: "下载完回来，GoldRun 会自动选中质量最高的那个音色", ja: "戻ると GoldRun が最適な音声を自動選択します", ko: "돌아오면 GoldRun이 가장 좋은 음성을 자동 선택합니다")
         case "voice_recommend": return l(currentLang, en: "Recommended voices (60–150MB, one-time download)", zh: "推荐音色（体积约 60–150MB，一次下载永久使用）", ja: "おすすめ音声（60-150MB、一度だけダウンロード）", ko: "추천 음성(60-150MB, 한 번만 다운로드)")
         case "later": return l(currentLang, en: "Later", zh: "以后再说", ja: "後で", ko: "나중에")
         case "go_download": return l(currentLang, en: "Open Settings", zh: "打开语音设置", ja: "設定を開く", ko: "설정 열기")
@@ -1060,34 +1143,6 @@ enum LocalizedString {
         }
     }
 
-    // MARK: - 小说朗读
-
-    static func speech(_ key: String, lang: AppLanguage? = nil) -> String {
-        let currentLang = lang ?? AppSettings.shared.language
-        switch key {
-        case "previous_sentence": return l(currentLang, en: "Previous sentence", zh: "上一句", ja: "前の文", ko: "이전 문장")
-        case "next_sentence": return l(currentLang, en: "Next sentence", zh: "下一句", ja: "次の文", ko: "다음 문장")
-        case "pause_reading": return l(currentLang, en: "Pause reading", zh: "暂停朗读", ja: "読み上げを一時停止", ko: "읽기 일시 정지")
-        case "start_reading": return l(currentLang, en: "Start reading", zh: "开始朗读", ja: "読み上げ開始", ko: "읽기 시작")
-        case "stop_reading": return l(currentLang, en: "Stop reading", zh: "停止朗读", ja: "読み上げ停止", ko: "읽기 중지")
-        case "voice_settings": return l(currentLang, en: "Voice settings", zh: "语音设置", ja: "音声設定", ko: "음성 설정")
-        case "start_hint": return l(currentLang, en: "Click play to start reading aloud", zh: "点击播放开始语音朗读", ja: "再生をクリックして読み上げを開始", ko: "재생을 눌러 음성 읽기 시작")
-        case "system_voice_hint": return l(currentLang, en: "Read the current chapter with the system voice", zh: "使用系统语音合成朗读当前章节", ja: "システム音声で現在の章を読み上げ", ko: "시스템 음성으로 현재 장 읽기")
-        case "chapter_sentence_format": return l(currentLang, en: "Chapter %d · Sentence %d/%d", zh: "第 %d 章 · 第 %d/%d 句", ja: "第 %d 章 · %d/%d 文", ko: "%d장 · %d/%d문장")
-        case "voice_reading": return l(currentLang, en: "Read Aloud", zh: "语音朗读", ja: "読み上げ", ko: "음성 읽기")
-        case "voice": return l(currentLang, en: "Voice", zh: "语音", ja: "音声", ko: "음성")
-        case "default_chinese_voice": return l(currentLang, en: "System default Chinese", zh: "系统默认中文", ja: "システム既定の中国語", ko: "시스템 기본 중국어")
-        case "rate": return l(currentLang, en: "Rate", zh: "语速", ja: "速度", ko: "속도")
-        case "pitch": return l(currentLang, en: "Pitch", zh: "音调", ja: "ピッチ", ko: "음높이")
-        case "volume": return l(currentLang, en: "Volume", zh: "音量", ja: "音量", ko: "음량")
-        case "auto_scroll": return l(currentLang, en: "Auto-scroll while reading", zh: "朗读时自动滚动", ja: "読み上げ中に自動スクロール", ko: "읽는 동안 자동 스크롤")
-        case "auto_continue": return l(currentLang, en: "Continue after chapter ends", zh: "章节结束后自动继续", ja: "章の終了後に自動で続行", ko: "장이 끝나면 자동 계속")
-        case "pin_popover": return l(currentLang, en: "Pin floating window", zh: "固定悬浮窗", ja: "フローティングウィンドウを固定", ko: "플로팅 창 고정")
-        case "unpin_popover": return l(currentLang, en: "Unpin floating window", zh: "取消固定悬浮窗", ja: "固定を解除", ko: "플로팅 창 고정 해제")
-        default: return key
-        }
-    }
-
     // MARK: - 更新检查
 
     static func update(_ key: String, lang: AppLanguage? = nil) -> String {
@@ -1112,9 +1167,9 @@ enum LocalizedString {
     static func migration(_ key: String, lang: AppLanguage? = nil) -> String {
         let currentLang = lang ?? AppSettings.shared.language
         switch key {
-        case "export_title": return l(currentLang, en: "Export coolRun Data", zh: "导出 coolRun 数据", ja: "coolRun データをエクスポート", ko: "coolRun 데이터 내보내기")
+        case "export_title": return l(currentLang, en: "Export GoldRun Data", zh: "导出 GoldRun 数据", ja: "GoldRun データをエクスポート", ko: "GoldRun 데이터 내보내기")
         case "export_failed": return l(currentLang, en: "Export Failed", zh: "导出失败", ja: "エクスポートに失敗しました", ko: "내보내기 실패")
-        case "import_title": return l(currentLang, en: "Import coolRun Data", zh: "导入 coolRun 数据", ja: "coolRun データをインポート", ko: "coolRun 데이터 가져오기")
+        case "import_title": return l(currentLang, en: "Import GoldRun Data", zh: "导入 GoldRun 数据", ja: "GoldRun データをインポート", ko: "GoldRun 데이터 가져오기")
         case "import_confirm": return l(currentLang, en: "Confirm Import", zh: "确认导入数据", ja: "インポートの確認", ko: "가져오기 확인")
         case "import_failed": return l(currentLang, en: "Import Failed", zh: "导入失败", ja: "インポートに失敗しました", ko: "가져오기 실패")
         case "import_corrupt": return l(currentLang, en: "File format is invalid or corrupted", zh: "文件格式不正确或已损坏", ja: "ファイル形式が無効、または破損しています", ko: "파일 형식이 올바르지 않거나 손상되었습니다")
@@ -1122,10 +1177,10 @@ enum LocalizedString {
         case "source_version": return l(currentLang, en: "Source version:", zh: "来源版本：", ja: "元バージョン：", ko: "원본 버전:")
         case "merge_hint": return l(currentLang, en: "The following data will be imported (merge mode, won't overwrite existing):", zh: "将导入以下数据（合并模式，不会覆盖已有数据）：", ja: "次のデータをインポートします（統合モード、既存データは上書きしません）：", ko: "다음 데이터를 가져옵니다(병합 모드, 기존 데이터는 덮어쓰지 않음):")
         case "birthday_items": return l(currentLang, en: "Birthdays", zh: "生日", ja: "誕生日", ko: "생일")
+        case "countdown_items": return l(currentLang, en: "Countdowns", zh: "倒数日", ja: "カウントダウン", ko: "카운트다운")
         case "english_items": return l(currentLang, en: "English progress", zh: "英语学习进度", ja: "英語学習の進捗", ko: "영어 학습 진행도")
         case "gold_items": return l(currentLang, en: "Gold price history", zh: "金价历史", ja: "金価格履歴", ko: "금 가격 기록")
         case "gold_trade_items": return l(currentLang, en: "Gold trade records", zh: "黄金交易流水", ja: "金の取引履歴", ko: "금 거래 내역")
-        case "novel_items": return l(currentLang, en: "Novel progress/bookmarks", zh: "小说进度/书签", ja: "小説の進捗/しおり", ko: "소설 진행도/책갈피")
         case "app_settings": return l(currentLang, en: "App settings", zh: "应用设置", ja: "アプリ設定", ko: "앱 설정")
         default: return key
         }

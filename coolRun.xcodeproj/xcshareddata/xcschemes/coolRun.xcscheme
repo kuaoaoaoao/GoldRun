@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8FCE25472FBE97330023FC83"
-               BuildableName = "coolRun.app"
+               BuildableName = "GoldRun.app"
                BlueprintName = "coolRun"
                ReferencedContainer = "container:coolRun.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8FCE25472FBE97330023FC83"
-            BuildableName = "coolRun.app"
+            BuildableName = "GoldRun.app"
             BlueprintName = "coolRun"
             ReferencedContainer = "container:coolRun.xcodeproj">
          </BuildableReference>
@@ -67,7 +67,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8FCE25472FBE97330023FC83"
-            BuildableName = "coolRun.app"
+            BuildableName = "GoldRun.app"
             BlueprintName = "coolRun"
             ReferencedContainer = "container:coolRun.xcodeproj">
          </BuildableReference>
@@ -84,7 +84,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8FCE25472FBE97330023FC83"
-            BuildableName = "coolRun.app"
+            BuildableName = "GoldRun.app"
             BlueprintName = "coolRun"
             ReferencedContainer = "container:coolRun.xcodeproj">
          </BuildableReference>

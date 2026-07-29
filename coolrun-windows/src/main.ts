@@ -153,7 +153,7 @@ async function refreshSystem() {
       sensorsCard.hidden = true;
     }
 
-    $("footer-status").textContent = `coolRun for Windows · ${new Date().toLocaleTimeString("zh-CN")}`;
+    $("footer-status").textContent = `GoldRun for Windows · ${new Date().toLocaleTimeString("zh-CN")}`;
   } catch (error) {
     $("footer-status").textContent = `系统采样失败: ${error}`;
   }
