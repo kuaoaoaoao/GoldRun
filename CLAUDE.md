@@ -4,25 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-coolRun is a macOS menu bar utility that displays system monitoring metrics (CPU, memory, storage, battery, network) and real-time gold prices from 浙商银行积存金 API. It runs as a menu bar-only app (no Dock icon by default).
+GoldRun is a macOS menu bar utility that displays system monitoring metrics (CPU, memory, storage, battery, network) and real-time gold prices from 浙商银行积存金 API. It runs as a menu bar-only app (no Dock icon by default).
 
 ## Build & Run
 
-Open `coolRun.xcodeproj` in Xcode, select the `coolRun` scheme with target `My Mac`, and click Run. The project includes a `coolRunTests` unit-test target; there is currently no linter configuration.
+Open `GoldRun.xcodeproj` in Xcode, select the `GoldRun` scheme with target `My Mac`, and click Run. The project includes a `GoldRunTests` unit-test target; there is currently no linter configuration.
 
 To build from command line (if needed):
 ```bash
-xcodebuild -project coolRun.xcodeproj -scheme coolRun -configuration Debug build
+xcodebuild -project GoldRun.xcodeproj -scheme GoldRun -configuration Debug build
 ```
 
 To run unit tests:
 ```bash
-xcodebuild -project coolRun.xcodeproj -scheme coolRun -destination 'platform=macOS' test
+xcodebuild -project GoldRun.xcodeproj -scheme GoldRun -destination 'platform=macOS' test
 ```
 
 To create a DMG for distribution:
 ```bash
-./scripts/create-dmg.sh /path/to/coolRun.app
+./scripts/create-dmg.sh /path/to/GoldRun.app
 ```
 
 ## Architecture
@@ -35,7 +35,7 @@ The app uses SwiftUI with an `NSApplicationDelegateAdaptor` pattern to bridge Ap
 
 **Key components:**
 
-- `coolRunApp.swift` — Entry point. Registers `MacAppDelegate` on macOS; provides `Settings` scene (not a window group).
+- `GoldRunApp.swift` — Entry point. Registers `MacAppDelegate` on macOS; provides `Settings` scene (not a window group).
 - `MacAppDelegate.swift` — Core orchestrator. Manages `NSStatusItem`, popover panels, coin icon animation (CPU-driven rotation speed), gold price polling (default 1s interval via `goldPriceRefreshInterval`), and Dock icon visibility toggling. Contains `CoinIconRenderer` (programmatic NSImage drawing) and `StatusContextMenuView`.
 - `SystemSampler.swift` — Raw system data collection using Mach kernel APIs (`host_statistics`, `host_statistics64`), IOKit (`IOPSCopyPowerSourcesInfo`), and POSIX (`getifaddrs`). Tracks CPU tick deltas across calls.
 - `SystemMonitorViewModel.swift` — `@Observable` + `@MainActor` wrapper. Holds a `SystemSnapshot` and drives a 1-second refresh loop via `Task.sleep`.
@@ -78,6 +78,6 @@ The app uses SwiftUI with an `NSApplicationDelegateAdaptor` pattern to bridge Ap
 ## Conventions
 
 - UI strings are in Chinese (Simplified).
-- All source files are in the flat `coolRun/` directory — no subdirectories or module separation.
+- All source files are in the flat `GoldRun/` directory — no subdirectories or module separation.
 - No external package dependencies (Sparkle was removed).
 - The gold price refresh interval is configurable in `MacAppDelegate.swift` (`goldPriceRefreshInterval`).

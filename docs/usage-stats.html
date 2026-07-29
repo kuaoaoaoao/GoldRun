@@ -350,7 +350,7 @@
       <iframe
         id="posthog-stats-frame"
         class="embed-frame"
-        name="coolRunUsageStats"
+        name="GoldRunUsageStats"
         title="GoldRun PostHog usage stats"
         src=""
         hidden
@@ -396,7 +396,7 @@
       }
 
       window.addEventListener("message", function (event) {
-        if (event.data && event.data.event === "posthog:dimensions" && event.data.name === "coolRunUsageStats") {
+        if (event.data && event.data.event === "posthog:dimensions" && event.data.name === "GoldRunUsageStats") {
           iframe.height = event.data.height;
         }
       });

@@ -17,11 +17,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # 查找最新的 Xcode 构建产物
 find_latest_app() {
   local latest_dir
-  latest_dir=$(ls -dt "$SCRIPT_DIR"/GoldRun\ 2* "$SCRIPT_DIR"/coolRun\ 2* 2>/dev/null | head -1 || true)
+  latest_dir=$(ls -dt "$SCRIPT_DIR"/GoldRun\ 2* 2>/dev/null | head -1 || true)
   if [ -n "$latest_dir" ] && [ -d "$latest_dir/GoldRun.app" ]; then
     echo "$latest_dir/GoldRun.app"
-  elif [ -n "$latest_dir" ] && [ -d "$latest_dir/coolRun.app" ]; then
-    echo "$latest_dir/coolRun.app"
   fi
 }
 

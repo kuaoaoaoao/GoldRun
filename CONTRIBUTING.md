@@ -1,6 +1,6 @@
 # 参与贡献
 
-感谢你帮助改进 GoldRun。macOS 菜单栏应用是当前主实现；`coolrun-windows` 和 `coolrun-avalonia` 是实验性端口，不保证功能一致。
+感谢你帮助改进 GoldRun。macOS 菜单栏应用是当前主实现；`goldrun-windows` 和 `goldrun-avalonia` 是实验性端口，不保证功能一致。
 
 ## 开发环境
 
@@ -12,8 +12,8 @@
 
 ```bash
 git clone https://github.com/kuaoaoaoao/GoldRun.git
-cd coolRun
-open coolRun.xcodeproj
+cd GoldRun
+open GoldRun.xcodeproj
 ```
 
 命令行构建与测试：
@@ -21,11 +21,11 @@ open coolRun.xcodeproj
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild \
-  -project coolRun.xcodeproj \
-  -scheme coolRun \
+  -project GoldRun.xcodeproj \
+  -scheme GoldRun \
   -configuration Debug \
   -destination 'platform=macOS' \
-  -derivedDataPath /tmp/coolRun-derived \
+  -derivedDataPath /tmp/GoldRun-derived \
   CODE_SIGNING_ALLOWED=NO \
   test
 ```

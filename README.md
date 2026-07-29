@@ -7,7 +7,7 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 
 它默认常驻菜单栏，不占 Dock。菜单栏可以显示金价、日期、系统状态、英语内容、最近倒数日或 Codex/Claude 剩余额度；点击后打开悬浮面板。悬浮窗支持固定，适合边工作边查看信息或学习英语。
 
-![GoldRun 动态演示](docs/images/coolRunShowDemo.gif)
+![GoldRun 动态演示](docs/images/GoldRunShowDemo.gif)
 
 官网：[kuaoaoaoao.github.io/GoldRun](https://kuaoaoaoao.github.io/GoldRun/)
 
@@ -193,16 +193,16 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 
    ```bash
    git clone https://github.com/kuaoaoaoao/GoldRun.git
-   cd coolRun
+   cd GoldRun
    ```
 
 2. 使用 Xcode 打开：
 
    ```bash
-   open coolRun.xcodeproj
+   open GoldRun.xcodeproj
    ```
 
-3. 选择 `coolRun` scheme。
+3. 选择 `GoldRun` scheme。
 4. 运行目标选择 `My Mac`。
 5. 点击运行。
 
@@ -211,11 +211,11 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild \
-  -project coolRun.xcodeproj \
-  -scheme coolRun \
+  -project GoldRun.xcodeproj \
+  -scheme GoldRun \
   -configuration Debug \
   -destination 'platform=macOS' \
-  -derivedDataPath /tmp/coolRun-derived \
+  -derivedDataPath /tmp/GoldRun-derived \
   CODE_SIGNING_ALLOWED=NO \
   test
 ```
@@ -224,10 +224,10 @@ xcodebuild \
 
 ## 平台状态
 
-- `GoldRun`：主要维护的 macOS SwiftUI + AppKit 应用；内部 Xcode target 和 scheme 暂时保留为 `coolRun`。
+- `GoldRun`：主要维护的 macOS SwiftUI + AppKit 应用；Xcode project、target 和 scheme 均使用 `GoldRun`。
 - `GoldRun Watch`：watchOS 辅助目标，功能范围较小。
-- `coolrun-windows`：Tauri 实验版，不保证与 macOS 功能一致。
-- `coolrun-avalonia`：Avalonia 技术验证版本，不保证功能一致。
+- `goldrun-windows`：Tauri 实验版，不保证与 macOS 功能一致。
+- `goldrun-avalonia`：Avalonia 技术验证版本，不保证功能一致。
 
 ## 打包发布
 
@@ -269,10 +269,10 @@ home.treasury.gov
 ## 项目结构
 
 ```text
-coolRun
-├── coolRun.xcodeproj
-├── coolRun
-│   ├── coolRunApp.swift
+GoldRun
+├── GoldRun.xcodeproj
+├── GoldRun
+│   ├── GoldRunApp.swift
 │   ├── MacAppDelegate.swift
 │   ├── ContentView.swift
 │   ├── MenuBarMonitorView.swift
@@ -293,13 +293,13 @@ coolRun
 │   ├── SystemSampler.swift
 │   ├── SystemMetrics.swift
 │   ├── AppVersion.swift
-│   ├── coolRun.entitlements
+│   ├── GoldRun.entitlements
 │   └── Assets.xcassets
 ├── docs
 │   └── index.html
 ├── scripts
 │   └── create-dmg.sh
-├── coolRunTests
+├── GoldRunTests
 ├── CONTRIBUTING.md
 ├── PRIVACY.md
 ├── SECURITY.md

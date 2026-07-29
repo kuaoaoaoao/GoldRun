@@ -1,10 +1,10 @@
 # Sparkle update setup
 
-coolRun has Sparkle wired into the app, but Sparkle needs a signing key and an appcast before real updates can be shipped.
+GoldRun has Sparkle wired into the app, but Sparkle needs a signing key and an appcast before real updates can be shipped.
 
 ## 1. Resolve Sparkle in Xcode
 
-Open `coolRun.xcodeproj` in Xcode. Xcode should resolve this Swift Package:
+Open `GoldRun.xcodeproj` in Xcode. Xcode should resolve this Swift Package:
 
 `https://github.com/sparkle-project/Sparkle`
 

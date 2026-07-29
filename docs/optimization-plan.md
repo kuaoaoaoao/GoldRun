@@ -30,7 +30,7 @@
 ## 第二批：验证与发布前收尾
 
 - [ ] 联网解析依赖后运行：
-  - `xcodebuild -project coolRun.xcodeproj -scheme coolRun -configuration Debug -derivedDataPath /private/tmp/coolRun-derived CODE_SIGNING_ALLOWED=NO test`
+  - `xcodebuild -project GoldRun.xcodeproj -scheme GoldRun -configuration Debug -derivedDataPath /private/tmp/GoldRun-derived CODE_SIGNING_ALLOWED=NO test`
 - [ ] 在 macOS 本机启动 App，检查设置变更是否无需重启生效。
 - [ ] 检查菜单栏文字在 CPU、内存、网速、金价和日期模式下是否过宽。
 - [ ] 检查关闭动画后菜单栏仍能正常显示当前选择内容。
@@ -63,7 +63,7 @@
 
 ## 执行记录
 
-- 2026-07-14：建立计划；确认工作区已有 `.idea/workspace.xml` 与 `coolRun.dmg` 用户改动，本轮不修改这两项。
+- 2026-07-14：建立计划；确认工作区已有 `.idea/workspace.xml` 与 `GoldRun.dmg` 用户改动，本轮不修改这两项。
 - 2026-07-14：完成资源策略、隐私开关、登录项和菜单栏显示扩展；加入三组单元测试。
 - 2026-07-14：菜单栏弹窗改为复用后台监控实例，消除打开弹窗时的重复系统采样。
 - 2026-07-14：修复 `MenuBarMonitorView` 默认参数跨 actor 初始化错误，改为显式注入监控实例。

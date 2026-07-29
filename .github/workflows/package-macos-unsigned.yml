@@ -24,17 +24,17 @@ jobs:
       - name: Build release app without Developer ID
         run: >
           xcodebuild
-          -project coolRun.xcodeproj
-          -scheme coolRun
+          -project GoldRun.xcodeproj
+          -scheme GoldRun
           -configuration Release
           -destination 'platform=macOS'
-          -derivedDataPath '${{ runner.temp }}/coolRun-derived'
+          -derivedDataPath '${{ runner.temp }}/GoldRun-derived'
           CODE_SIGNING_ALLOWED=NO
           build
 
       - name: Apply ad hoc signature and verify bundle
         env:
-          APP_PATH: ${{ runner.temp }}/coolRun-derived/Build/Products/Release/GoldRun.app
+          APP_PATH: ${{ runner.temp }}/GoldRun-derived/Build/Products/Release/GoldRun.app
         run: |
           test -d "$APP_PATH"
           codesign --force --deep --sign - "$APP_PATH"
@@ -42,8 +42,8 @@ jobs:
 
       - name: Create GoldRun DMG
         env:
-          APP_PATH: ${{ runner.temp }}/coolRun-derived/Build/Products/Release/GoldRun.app
-          DIST_DIR: ${{ runner.temp }}/coolRun-dist
+          APP_PATH: ${{ runner.temp }}/GoldRun-derived/Build/Products/Release/GoldRun.app
+          DIST_DIR: ${{ runner.temp }}/GoldRun-dist
           DMG_DIR: ${{ runner.temp }}/GoldRun-dmg
         run: |
           mkdir -p "$DIST_DIR"
@@ -62,6 +62,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GoldRun-macOS-unsigned-${{ github.sha }}
-          path: ${{ runner.temp }}/coolRun-dist/GoldRun.dmg
+          path: ${{ runner.temp }}/GoldRun-dist/GoldRun.dmg
           if-no-files-found: error
           retention-days: 30

@@ -10,7 +10,7 @@ import re
 import collections
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "coolRun"
+ROOT = Path(__file__).resolve().parent.parent / "GoldRun"
 TARGET = 1000
 STAGES = ["daily", "primary_school", "middle_school", "high_school",
           "cet4", "cet6", "ielts", "toefl"]
