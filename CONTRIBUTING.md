@@ -11,7 +11,7 @@
 打开工程：
 
 ```bash
-git clone https://github.com/kuaoaoaoao/coolRun.git
+git clone https://github.com/kuaoaoaoao/GoldRun.git
 cd coolRun
 open coolRun.xcodeproj
 ```

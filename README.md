@@ -1,6 +1,6 @@
 # GoldRun
 
-[![macOS CI](https://github.com/kuaoaoaoao/coolRun/actions/workflows/build-macos.yml/badge.svg)](https://github.com/kuaoaoaoao/coolRun/actions/workflows/build-macos.yml)
+[![macOS CI](https://github.com/kuaoaoaoao/GoldRun/actions/workflows/build-macos.yml/badge.svg)](https://github.com/kuaoaoaoao/GoldRun/actions/workflows/build-macos.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时金价、日历倒数日、英语学习和 AI 额度放进一个轻量悬浮窗。
@@ -9,13 +9,13 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 
 ![GoldRun 动态演示](docs/images/coolRunShowDemo.gif)
 
-官网：[kuaoaoaoao.github.io/coolRun](https://kuaoaoaoao.github.io/coolRun/)
+官网：[kuaoaoaoao.github.io/GoldRun](https://kuaoaoaoao.github.io/GoldRun/)
 
-下载：[GitHub Releases](https://github.com/kuaoaoaoao/coolRun/releases)
+下载：[GitHub Releases](https://github.com/kuaoaoaoao/GoldRun/releases)
 
 ## GitHub Star History
 
-[![GoldRun Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/coolRun&type=Date)](https://star-history.com/#kuaoaoaoao/coolRun&Date)
+[![GoldRun Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/GoldRun&type=Date)](https://star-history.com/#kuaoaoaoao/GoldRun&Date)
 
 ## 当前重点功能
 
@@ -163,7 +163,7 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 
 ### 从 GitHub Releases 安装
 
-1. 打开 [GitHub Releases](https://github.com/kuaoaoaoao/coolRun/releases)。
+1. 打开 [GitHub Releases](https://github.com/kuaoaoaoao/GoldRun/releases)。
 2. 下载最新的 `GoldRun.dmg`，双击打开。
 3. 将 `GoldRun.app` 拖入 `Applications` 文件夹。
 4. 启动后，在 macOS 菜单栏找到金币图标。
@@ -192,7 +192,7 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 1. 克隆项目：
 
    ```bash
-   git clone https://github.com/kuaoaoaoao/coolRun.git
+   git clone https://github.com/kuaoaoaoao/GoldRun.git
    cd coolRun
    ```
 
@@ -344,4 +344,4 @@ coolRun
 ## 作者
 
 - 作者：kuaoaoaoao
-- GitHub：[github.com/kuaoaoaoao/coolRun](https://github.com/kuaoaoaoao/coolRun)
+- GitHub：[github.com/kuaoaoaoao/GoldRun](https://github.com/kuaoaoaoao/GoldRun)

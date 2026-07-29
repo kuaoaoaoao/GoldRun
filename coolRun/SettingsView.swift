@@ -1750,10 +1750,10 @@ private extension View {
 // MARK: - Data
 
 private enum AppLinks {
-    static let repository = URL(string: "https://github.com/kuaoaoaoao/coolRun")!
-    static let releases = URL(string: "https://github.com/kuaoaoaoao/coolRun/releases")!
-    static let privacy = URL(string: "https://github.com/kuaoaoaoao/coolRun/blob/main/PRIVACY.md")!
-    static let issues = URL(string: "https://github.com/kuaoaoaoao/coolRun/issues/new/choose")!
+    static let repository = URL(string: "https://github.com/kuaoaoaoao/GoldRun")!
+    static let releases = URL(string: "https://github.com/kuaoaoaoao/GoldRun/releases")!
+    static let privacy = URL(string: "https://github.com/kuaoaoaoao/GoldRun/blob/main/PRIVACY.md")!
+    static let issues = URL(string: "https://github.com/kuaoaoaoao/GoldRun/issues/new/choose")!
 }
 
 // MARK: - Preview

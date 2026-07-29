@@ -24,7 +24,7 @@ final class UpdateChecker {
 
     private let session: URLSession
     private let owner = "kuaoaoaoao"
-    private let repo = "coolRun"
+    private let repo = "GoldRun"
     private var autoCheckTask: Task<Void, Never>?
 
     private init(session: URLSession = .shared) {

@@ -24,7 +24,7 @@ It is currently set to:
 
 The current feed URL placeholder is:
 
-`https://github.com/kuaoaoaoao/coolRun/releases/download/appcast/appcast.xml`
+`https://github.com/kuaoaoaoao/GoldRun/releases/download/appcast/appcast.xml`
 
 You can replace `INFOPLIST_KEY_SUFeedURL` with any stable HTTPS URL that hosts your appcast.
 
