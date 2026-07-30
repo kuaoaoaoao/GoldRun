@@ -1,7 +1,7 @@
 # GoldRun
 
 [![macOS CI](https://github.com/kuaoaoaoao/GoldRun/actions/workflows/build-macos.yml/badge.svg)](https://github.com/kuaoaoaoao/GoldRun/actions/workflows/build-macos.yml)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PolyForm Noncommercial License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg)](LICENSE)
 
 GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时金价、日历倒数日、英语学习和 AI 额度放进一个轻量悬浮窗。
 
@@ -113,7 +113,7 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 - 可选择菜单栏显示金价、日期、CPU、内存或实时网速。
 - 支持登录 Mac 时自动启动。
 - 可分别调整金币外观、动作、动画流畅度、系统采样和金价更新频率。
-- 匿名使用数据统计默认关闭；未配置分析令牌的开源构建无法开启。
+- 匿名使用数据统计默认关闭；未配置分析令牌的源码构建无法开启。
 - 可开关各个系统监控模块。
 - 支持本地备份和兼容旧版本的合并导入。
 - 设置页可打开 GitHub 项目主页和 Releases。
@@ -339,7 +339,13 @@ GoldRun
 
 ## 许可证
 
-本项目基于 MIT License 开源，详见 [LICENSE](./LICENSE)。
+本项目源代码采用 [PolyForm Noncommercial License 1.0.0](LICENSE)：
+
+- 个人学习、研究、实验、测试及其他非商业用途可以免费使用；
+- 任何商业用途都必须事先取得版权所有者的明确书面授权；
+- 商业用途范围、独立实现边界及授权方式详见 [商业使用与授权说明](COMMERCIAL_USE.md)。
+
+这是一份源码可见的非商业许可证，不是 OSI 定义的开源许可证。第三方内容仍适用其各自的许可证。
 
 ## 作者
 

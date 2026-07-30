@@ -199,7 +199,7 @@ class AppSettings: ObservableObject {
         self.goldAlertLowerText = userDefaults.string(forKey: "gold_alert_lower") ?? ""
         self.aiQuotaAlertEnabled = userDefaults.object(forKey: "ai_quota_alert_enabled") as? Bool ?? false
 
-        // 新安装和开源 fork 默认不发送遥测；已有用户的明确选择保持不变。
+        // 新安装和源码 fork 默认不发送遥测；已有用户的明确选择保持不变。
         self.analyticsEnabled = userDefaults.object(forKey: "analytics_enabled") as? Bool ?? false
 
         self.lastViewModeRaw = userDefaults.string(forKey: "last_view_mode") ?? ""
@@ -516,7 +516,7 @@ enum LocalizedString {
         case "privacy_desc": return l(currentLang, en: "Control anonymous product analytics", zh: "控制匿名使用数据统计", ja: "匿名の利用統計を管理", ko: "익명 사용 통계 관리")
         case "share_analytics": return l(currentLang, en: "Share Anonymous Usage Data", zh: "共享匿名使用数据", ja: "匿名の利用データを共有", ko: "익명 사용 데이터 공유")
         case "privacy_note": return l(currentLang, en: "Off by default. When enabled, only the allowlisted product events are sent; birthdays, notes and holdings are never included.", zh: "默认关闭。开启后仅发送代码中列出的产品事件；生日、备注和持仓不会上传。", ja: "既定ではオフです。有効時も許可済みの操作イベントのみ送信し、誕生日、メモ、保有情報は送信しません。", ko: "기본값은 꺼짐입니다. 켜도 허용된 제품 이벤트만 전송하며 생일, 메모와 보유 정보는 전송하지 않습니다.")
-        case "analytics_unavailable": return l(currentLang, en: "Analytics is not configured in this build. Open-source builds stay local unless a maintainer provides a PostHog project token.", zh: "此构建未配置匿名统计。开源构建默认保持本地，只有维护者提供 PostHog 项目令牌后才可开启。", ja: "このビルドには分析設定がありません。メンテナーが PostHog トークンを指定しない限り、オープンソースビルドはローカルのままです。", ko: "이 빌드에는 분석이 설정되지 않았습니다. 관리자가 PostHog 토큰을 제공하지 않는 한 오픈소스 빌드는 로컬로 유지됩니다.")
+        case "analytics_unavailable": return l(currentLang, en: "Analytics is not configured in this build. Source builds stay local unless a maintainer provides a PostHog project token.", zh: "此构建未配置匿名统计。源码构建默认保持本地，只有维护者提供 PostHog 项目令牌后才可开启。", ja: "このビルドには分析設定がありません。メンテナーが PostHog トークンを指定しない限り、ソースビルドはローカルのままです。", ko: "이 빌드에는 분석이 설정되지 않았습니다. 관리자가 PostHog 토큰을 제공하지 않는 한 소스 빌드는 로컬로 유지됩니다.")
         case "refresh_rate": return l(currentLang, en: "Refresh Rate", zh: "刷新频率", ja: "更新頻度", ko: "새로 고침 빈도")
         case "refresh_rate_desc": return l(currentLang, en: "Lower rates reduce background CPU and power usage", zh: "降低频率可以减少后台 CPU 与耗电", ja: "頻度を下げるとバックグラウンドの CPU と電力を節約", ko: "빈도를 낮추면 백그라운드 CPU와 전력 사용량 감소")
         case "system_sampling": return l(currentLang, en: "System Sampling", zh: "系统采样", ja: "システムサンプリング", ko: "시스템 샘플링")
