@@ -21,9 +21,16 @@ protocol EnglishSpeechProviding: AnyObject {
 
 @MainActor
 final class SystemEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
-    private let synthesizer = AVSpeechSynthesizer()
+    /// `AVSpeechSynthesizer` 偶尔会在多次立即停止/重新播放后保留一个失效的内部音频队列。
+    /// 每次显式停止都换一个实例，并在新语句迟迟没有启动时自动重试一次。
+    private var synthesizer = AVSpeechSynthesizer()
     private var utteranceContinuation: CheckedContinuation<Bool, Never>?
     private var activeUtteranceID: ObjectIdentifier?
+    private var activeRequest: EnglishSpeechRequest?
+    private var startupWatchdog: Task<Void, Never>?
+    private var retryCount = 0
+
+    private static let startupTimeout: Duration = .seconds(3)
 
     override init() {
         super.init()
@@ -32,17 +39,17 @@ final class SystemEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
 
     func speak(_ request: EnglishSpeechRequest) async -> Bool {
         guard !request.text.isEmpty else { return true }
+
+        // 防御并发调用，避免新的 continuation 覆盖仍在等待的旧语句。
+        if utteranceContinuation != nil {
+            cancelCurrentUtterance(replacingSynthesizer: true)
+        }
+
         return await withCheckedContinuation { continuation in
-            let utterance = AVSpeechUtterance(string: request.text)
-            utterance.voice = request.voice
-            utterance.rate = Float(min(max(request.rate, 0.1), 0.65))
-            utterance.volume = EnglishLearningManager.playbackVolume(request.volume)
-            utterance.pitchMultiplier = 1
-            utterance.preUtteranceDelay = 0.08
-            utterance.postUtteranceDelay = 0.15
             utteranceContinuation = continuation
-            activeUtteranceID = ObjectIdentifier(utterance)
-            synthesizer.speak(utterance)
+            activeRequest = request
+            retryCount = 0
+            startUtterance(request, useSelectedVoice: true)
         }
     }
 
@@ -59,22 +66,98 @@ final class SystemEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
     }
 
     func stop() {
-        finishUtterance(id: activeUtteranceID, success: false)
-        if synthesizer.isSpeaking || synthesizer.isPaused {
-            synthesizer.stopSpeaking(at: .immediate)
-        }
+        cancelCurrentUtterance(replacingSynthesizer: true)
     }
 
     private func finishUtterance(id: ObjectIdentifier?, success: Bool) {
         guard id == activeUtteranceID else { return }
+        startupWatchdog?.cancel()
+        startupWatchdog = nil
         let continuation = utteranceContinuation
         utteranceContinuation = nil
         activeUtteranceID = nil
+        activeRequest = nil
+        retryCount = 0
         continuation?.resume(returning: success)
+    }
+
+    private func startUtterance(_ request: EnglishSpeechRequest, useSelectedVoice: Bool) {
+        startupWatchdog?.cancel()
+
+        let utterance = AVSpeechUtterance(string: request.text)
+        utterance.voice = useSelectedVoice
+            ? request.voice
+            : AVSpeechSynthesisVoice(language: request.language)
+        utterance.rate = Float(min(max(request.rate, 0.1), 0.65))
+        utterance.volume = EnglishLearningManager.playbackVolume(request.volume)
+        utterance.pitchMultiplier = 1
+        utterance.preUtteranceDelay = 0.08
+        utterance.postUtteranceDelay = 0.15
+
+        let id = ObjectIdentifier(utterance)
+        activeUtteranceID = id
+        synthesizer.speak(utterance)
+
+        startupWatchdog = Task { [weak self] in
+            do {
+                try await Task.sleep(for: Self.startupTimeout)
+            } catch {
+                return
+            }
+            self?.handleStartupTimeout(for: id)
+        }
+    }
+
+    private func handleStartupTimeout(for id: ObjectIdentifier) {
+        guard id == activeUtteranceID, let request = activeRequest else { return }
+
+        if retryCount == 0 {
+            retryCount = 1
+            replaceSynthesizer(stoppingCurrent: true)
+            // 所选系统语音资源若刚好失效，重试时让系统自动选择可用语音。
+            startUtterance(request, useSelectedVoice: false)
+        } else {
+            finishUtterance(id: id, success: false)
+            replaceSynthesizer(stoppingCurrent: true)
+        }
+    }
+
+    private func cancelCurrentUtterance(replacingSynthesizer: Bool) {
+        let id = activeUtteranceID
+        finishUtterance(id: id, success: false)
+        if replacingSynthesizer {
+            replaceSynthesizer(stoppingCurrent: true)
+        } else if synthesizer.isSpeaking || synthesizer.isPaused {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+    }
+
+    private func replaceSynthesizer(stoppingCurrent: Bool) {
+        startupWatchdog?.cancel()
+        startupWatchdog = nil
+
+        let previous = synthesizer
+        previous.delegate = nil
+        if stoppingCurrent, previous.isSpeaking || previous.isPaused {
+            previous.stopSpeaking(at: .immediate)
+        }
+
+        let replacement = AVSpeechSynthesizer()
+        replacement.delegate = self
+        synthesizer = replacement
     }
 }
 
 extension SystemEnglishSpeechProvider: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in
+            guard self?.activeUtteranceID == id else { return }
+            self?.startupWatchdog?.cancel()
+            self?.startupWatchdog = nil
+        }
+    }
+
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         let id = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
@@ -182,9 +265,10 @@ final class KokoroEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
     }
 
     func stop() {
-        audioPlayer?.stop()
-        audioPlayer = nil
-        finishPlayback(success: false)
+        let player = audioPlayer
+        player?.delegate = nil
+        player?.stop()
+        finishPlayback(player: player, success: false)
     }
 
     private func cacheURL(for request: EnglishSpeechRequest) -> URL? {
@@ -213,7 +297,7 @@ final class KokoroEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
                 player.volume = EnglishLearningManager.playbackVolume(volume)
                 player.prepareToPlay()
                 if !player.play() {
-                    finishPlayback(success: false)
+                    finishPlayback(player: player, success: false)
                 }
             } catch {
                 continuation.resume(returning: false)
@@ -221,7 +305,10 @@ final class KokoroEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
         }
     }
 
-    private func finishPlayback(success: Bool) {
+    private func finishPlayback(player: AVAudioPlayer?, success: Bool) {
+        if let player, player !== audioPlayer {
+            return
+        }
         let continuation = playbackContinuation
         playbackContinuation = nil
         audioPlayer = nil
@@ -268,13 +355,13 @@ final class KokoroEnglishSpeechProvider: NSObject, EnglishSpeechProviding {
 extension KokoroEnglishSpeechProvider: AVAudioPlayerDelegate {
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor [weak self] in
-            self?.finishPlayback(success: flag)
+            self?.finishPlayback(player: player, success: flag)
         }
     }
 
     nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         Task { @MainActor [weak self] in
-            self?.finishPlayback(success: false)
+            self?.finishPlayback(player: player, success: false)
         }
     }
 }

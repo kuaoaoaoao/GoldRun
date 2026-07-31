@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import PostHog
 
-enum AnalyticsEvent: String {
+enum AnalyticsEvent: String, CaseIterable {
     case appLaunched = "app_launched"
     case popoverOpened = "popover_opened"
     case settingsOpened = "settings_opened"
@@ -19,10 +19,52 @@ enum Analytics {
     private static let logger = Logger(subsystem: "GoldRun", category: "Analytics")
     private static let state = AnalyticsState()
     private static let disabledEnvironmentKey = "POSTHOG_DISABLED"
+    private static let allowedCustomPropertyKeys: Set<String> = [
+        "app_version",
+        "app_build",
+        "os_name",
+        "os_version",
+        "cpu_arch",
+        "chip_model",
+        "device_model",
+        "tab",
+        "language",
+        "mode",
+        "source",
+        "success",
+        "error_type",
+        "profit_state",
+        "profit_percent_bucket",
+        "tone",
+    ]
+    private static let allowedSDKPropertyKeys: Set<String> = [
+        "$app_name",
+        "$app_version",
+        "$app_build",
+        "$app_namespace",
+        "$device_manufacturer",
+        "$device_model",
+        "$device_type",
+        "$os_name",
+        "$os_version",
+        "$lib",
+        "$lib_version",
+        "$is_testflight",
+        "$is_sideloaded",
+        "$is_emulator",
+        "$is_ios_running_on_mac",
+        "$is_mac_catalyst_app",
+        "$is_identified",
+        "$session_id",
+    ]
     private static let sensitivePropertyKeys: Set<String> = [
+        "email",
         "error_message",
+        "file_path",
+        "name",
         "profit_loss",
         "profit_percent",
+        "token",
     ]
 
     static var isConfigured: Bool {
@@ -54,10 +96,11 @@ enum Analytics {
             return
         }
 
-        let config = PostHogConfig(projectToken: trimmedProjectToken, host: trimmedHost)
-        // 只发送本文件中明确列出的事件，避免 SDK 自动采集超出隐私说明的生命周期数据。
-        config.captureApplicationLifecycleEvents = false
-        config.optOut = !enabled
+        let config = makePostHogConfiguration(
+            projectToken: trimmedProjectToken,
+            host: trimmedHost,
+            enabled: enabled
+        )
         PostHogSDK.shared.setup(config)
         state.markConfigured()
 
@@ -90,16 +133,64 @@ enum Analytics {
         PostHogSDK.shared.capture(event.rawValue, properties: sanitized(properties))
     }
 
+    static func makePostHogConfiguration(
+        projectToken: String,
+        host: String,
+        enabled: Bool
+    ) -> PostHogConfig {
+        let config = PostHogConfig(projectToken: projectToken, host: host)
+
+        // GoldRun only uses explicit, allowlisted events. Keep every SDK-side automatic
+        // collection path disabled so future PostHog defaults cannot widen collection.
+        config.captureApplicationLifecycleEvents = false
+        config.captureScreenViews = false
+        config.enableSwizzling = false
+        config.personProfiles = .never
+        config.setDefaultPersonProperties = false
+        config.preloadFeatureFlags = false
+        config.sendFeatureFlagEvent = false
+        config.errorTrackingConfig.autoCapture = false
+        config.logs.setBeforeSend { _ in nil }
+        config.optOut = !enabled
+
+        // This is a second boundary after call-site sanitization: unknown SDK events are
+        // dropped and automatic properties are reduced to the documented safe subset.
+        config.setBeforeSend { event in
+            guard AnalyticsEvent(rawValue: event.event) != nil else { return nil }
+            event.properties = privacySafeEventProperties(event.properties)
+            return event
+        }
+
+        return config
+    }
+
     private static var isEnvironmentEnabled: Bool {
         ProcessInfo.processInfo.environment[disabledEnvironmentKey] != "1"
     }
 
     private static func sanitized(_ properties: [String: Any]) -> [String: Any] {
         properties.reduce(into: [:]) { result, pair in
-            guard !sensitivePropertyKeys.contains(pair.key),
+            guard allowedCustomPropertyKeys.contains(pair.key),
+                  !sensitivePropertyKeys.contains(pair.key),
                   let value = sanitizedValue(pair.value) else { return }
             result[pair.key] = value
         }
+    }
+
+    static func privacySafeEventProperties(_ properties: [String: Any]) -> [String: Any] {
+        let allowedKeys = allowedCustomPropertyKeys.union(allowedSDKPropertyKeys)
+        var result = properties.reduce(into: [String: Any]()) { sanitized, pair in
+            guard allowedKeys.contains(pair.key),
+                  !sensitivePropertyKeys.contains(pair.key),
+                  let value = sanitizedValue(pair.value) else { return }
+            sanitized[pair.key] = value
+        }
+
+        // PostHog still receives the request's source IP as transport metadata, but these
+        // flags prevent GeoIP enrichment and person-profile creation during ingestion.
+        result["$geoip_disable"] = true
+        result["$process_person_profile"] = false
+        return result
     }
 
     private static func sanitizedValue(_ value: Any) -> Any? {

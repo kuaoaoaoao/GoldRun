@@ -2,9 +2,10 @@
 import AppKit
 import SwiftUI
 import Combine
+import UserNotifications
 
 @MainActor
-final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private let contextPopover = NSPopover()
@@ -24,9 +25,12 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let popoverPinState = PopoverPinState()
     private var allowsPopoverClose = false
     private var activeAnimationFramesPerSecond: Double?
+    private var rotationUsesSecondary = false
+    private var lastMenuBarRotationAt = Date()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        UNUserNotificationCenter.current().delegate = self
 
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem = statusItem
@@ -64,9 +68,26 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         contextPopover.behavior = .transient
         contextPopover.animates = false
-        contextPopover.contentSize = NSSize(width: 216, height: 232)
+        contextPopover.contentSize = NSSize(width: 216, height: 296)
         contextPopover.contentViewController = NSHostingController(
             rootView: StatusContextMenuView(
+                showToday: { [weak self] in
+                    self?.performContextQuickAction(mode: .today)
+                },
+                addCountdown: { [weak self] in
+                    self?.performContextQuickAction(mode: .calendar, quickAction: .addCountdown)
+                },
+                recordGoldTrade: { [weak self] in
+                    self?.performContextQuickAction(mode: .gold, quickAction: .recordGoldTrade)
+                },
+                refreshAll: { [weak self] in
+                    self?.contextPopover.performClose(nil)
+                    Task { @MainActor in
+                        await self?.refreshGoldPriceNow()
+                        await self?.codexViewModel.refresh()
+                        await self?.claudeViewModel.refresh()
+                    }
+                },
                 toggleEnglishPlayback: { [weak self] in
                     self?.toggleEnglishPlaybackFromContextMenu()
                 },
@@ -92,8 +113,10 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
 
         observeSettingsWindowLifecycle()
+        observeNavigationRequests()
         observeSettingsChanges()
         viewModel.start()
+        ClipboardHistoryStore.shared.startMonitoring()
         startIconAnimation()
         startGoldPriceUpdates()
 
@@ -101,6 +124,29 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         // 启动后台自动检查更新
         UpdateChecker.shared.startAutoCheck()
+    }
+
+    private func observeNavigationRequests() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleNavigationRequestNotification),
+            name: .goldRunPresentNavigationRequest,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleGoldRefreshNotification),
+            name: .goldRunRefreshGold,
+            object: nil
+        )
+    }
+
+    @objc private func handleNavigationRequestNotification() {
+        presentRequestedNavigation()
+    }
+
+    @objc private func handleGoldRefreshNotification() {
+        Task { @MainActor [weak self] in await self?.refreshGoldPriceNow() }
     }
 
     // 监听设置变化
@@ -111,6 +157,26 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self?.updateStatusItemLength()
                 self?.refreshIcon()
             }
+            .store(in: &cancellables)
+
+        settings.$menuBarCompositionStyle
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.rotationUsesSecondary = false
+                self?.lastMenuBarRotationAt = Date()
+                self?.updateStatusItemLength()
+                self?.refreshIcon()
+            }
+            .store(in: &cancellables)
+
+        settings.$menuBarSecondaryDisplayMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshIcon() }
+            .store(in: &cancellables)
+
+        settings.$menuBarRotationSeconds
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.lastMenuBarRotationAt = Date() }
             .store(in: &cancellables)
 
         settings.$language
@@ -181,10 +247,13 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         goldPriceTask?.cancel()
         englishLearning.stop()
         GoldPriceStore.shared.flushToDisk()
+        ClipboardHistoryStore.shared.stopMonitoring()
         UpdateChecker.shared.stopAutoCheck()
         if let windowCloseObserver {
             NotificationCenter.default.removeObserver(windowCloseObserver)
         }
+        NotificationCenter.default.removeObserver(self, name: .goldRunPresentNavigationRequest, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .goldRunRefreshGold, object: nil)
         viewModel.stop()
         codexViewModel.stop()
         claudeViewModel.stop()
@@ -214,13 +283,26 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             }
             closeMonitorPopover()
         } else {
-            if settings.lastViewModeRaw == ViewMode.codex.rawValue {
-                codexViewModel.start()
-                claudeViewModel.start()
-            }
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            Analytics.capture(.popoverOpened)
+            presentMonitorPopover(relativeTo: button)
         }
+    }
+
+    private func presentRequestedNavigation() {
+        contextPopover.performClose(nil)
+        guard let button = statusItem?.button else { return }
+        if !popover.isShown {
+            presentMonitorPopover(relativeTo: button)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func presentMonitorPopover(relativeTo button: NSStatusBarButton) {
+        if AppNavigationRouter.shared.request?.mode == .codex || settings.lastViewModeRaw == ViewMode.codex.rawValue {
+            codexViewModel.start()
+            claudeViewModel.start()
+        }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        Analytics.capture(.popoverOpened)
     }
 
     private func setPopoverPinned(_ pinned: Bool) {
@@ -330,6 +412,11 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         ])
     }
 
+    private func performContextQuickAction(mode: ViewMode, quickAction: GoldRunQuickAction? = nil) {
+        contextPopover.performClose(nil)
+        AppNavigationRouter.shared.open(mode, quickAction: quickAction)
+    }
+
     private func observeSettingsWindowLifecycle() {
         windowCloseObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -393,36 +480,54 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             )
         }
 
-        // 根据设置显示菜单栏标题，保持每种模式都有固定宽度上限。
-        let nextTitle: String
-        switch settings.menuBarDisplayMode {
-        case .goldPrice:
-            nextTitle = " \(goldPriceText)"
-        case .date:
-            nextTitle = " \(menuBarDateText)"
-        case .cpu:
-            nextTitle = " CPU \(percentageText(viewModel.snapshot.cpu.usage))"
-        case .memory:
-            nextTitle = " MEM \(percentageText(viewModel.snapshot.memory.usage))"
-        case .network:
-            let network = viewModel.snapshot.network
-            nextTitle = " ↓\(compactNetworkSpeedText(network.downloadSpeed)) ↑\(compactNetworkSpeedText(network.uploadSpeed))"
-        case .english:
-            let playback = englishLearning.state == .playing ? " ▶" : ""
-            nextTitle = " \(compactStatusText(englishLearning.menuBarText, limit: 12))\(playback)"
-        case .codex:
-            nextTitle = " \(codexMenuBarText)"
-        case .claude:
-            nextTitle = " \(claudeMenuBarText)"
-        case .countdown:
-            nextTitle = " \(countdownMenuBarText)"
+        if settings.menuBarCompositionStyle == .rotation,
+           Date().timeIntervalSince(lastMenuBarRotationAt) >= TimeInterval(settings.menuBarRotationSeconds) {
+            rotationUsesSecondary.toggle()
+            lastMenuBarRotationAt = Date()
         }
+
+        // 组合只改变展示，不改变任何模块的采样与轮询频率。
+        let rendered = MenuBarCompositionFormatter.render(
+            style: settings.menuBarCompositionStyle,
+            primary: settings.menuBarDisplayMode,
+            secondary: settings.menuBarSecondaryDisplayMode,
+            rotationUsesSecondary: rotationUsesSecondary,
+            value: { [weak self] mode, compact in
+                self?.menuBarValue(for: mode, compact: compact) ?? "--"
+            }
+        )
+        let nextTitle = " \(rendered)"
 
         let compactTitle = compactStatusText(nextTitle, limit: statusTitleLimit)
         if statusItem?.button?.title != compactTitle {
             statusItem?.button?.title = compactTitle
         }
         updateStatusItemLength(for: compactTitle)
+    }
+
+    private func menuBarValue(for mode: MenuBarDisplayMode, compact: Bool) -> String {
+        switch mode {
+        case .goldPrice:
+            return compact ? "Au \(goldPriceText)" : goldPriceText
+        case .date:
+            return menuBarDateText
+        case .cpu:
+            return "\(compact ? "C" : "CPU") \(percentageText(viewModel.snapshot.cpu.usage))"
+        case .memory:
+            return "\(compact ? "M" : "MEM") \(percentageText(viewModel.snapshot.memory.usage))"
+        case .network:
+            let network = viewModel.snapshot.network
+            return "↓\(compactNetworkSpeedText(network.downloadSpeed)) ↑\(compactNetworkSpeedText(network.uploadSpeed))"
+        case .english:
+            let playback = englishLearning.state == .playing ? " ▶" : ""
+            return compactStatusText(englishLearning.menuBarText, limit: compact ? 8 : 12) + playback
+        case .codex:
+            return compact ? compactStatusText(codexMenuBarText.replacingOccurrences(of: "Codex", with: "Cx"), limit: 10) : codexMenuBarText
+        case .claude:
+            return compact ? compactStatusText(claudeMenuBarText.replacingOccurrences(of: "Claude", with: "Cl"), limit: 10) : claudeMenuBarText
+        case .countdown:
+            return compactStatusText(countdownMenuBarText, limit: compact ? 8 : 14)
+        }
     }
 
     // 菜单栏日期文本
@@ -468,6 +573,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private var statusTitleLimit: Int {
+        if settings.menuBarCompositionStyle == .pair { return 24 }
         switch settings.menuBarDisplayMode {
         case .goldPrice: return 18
         case .date: return 12
@@ -490,6 +596,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private var minimumStatusItemLength: CGFloat {
+        if settings.menuBarCompositionStyle == .pair { return 118 }
         switch settings.menuBarDisplayMode {
         case .goldPrice: return 76
         case .date: return 82
@@ -502,6 +609,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private var maximumStatusItemLength: CGFloat {
+        if settings.menuBarCompositionStyle == .pair { return 184 }
         switch settings.menuBarDisplayMode {
         case .goldPrice: return 132
         case .date: return 124
@@ -588,9 +696,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             GoldPriceStore.shared.checkFreshness()
             GoldPriceStore.shared.lastFetchFailed = false
             GoldPriceAlertManager.shared.handle(quote: quote)
-            Analytics.capture(.goldPriceFetched, properties: [
-                "price_cny_per_gram": quote.cnyPerGram,
-            ], minimumInterval: 60 * 60)
+            Analytics.capture(.goldPriceFetched, minimumInterval: 60 * 60)
         } catch {
             if goldPriceText == "--" {
                 goldPriceText = goldPriceFallbackText(for: error)
@@ -620,9 +726,24 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         return LocalizedString.goldPrice("parse_error")
     }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor in
+            LocalReminderCenter.shared.handle(response)
+            completionHandler()
+        }
+    }
 }
 
 private struct StatusContextMenuView: View {
+    let showToday: () -> Void
+    let addCountdown: () -> Void
+    let recordGoldTrade: () -> Void
+    let refreshAll: () -> Void
     let toggleEnglishPlayback: () -> Void
     let previousEnglishItem: () -> Void
     let nextEnglishItem: () -> Void
@@ -635,6 +756,10 @@ private struct StatusContextMenuView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            quickActions
+
+            Divider()
+
             displayModePicker
 
             Divider()
@@ -680,6 +805,36 @@ private struct StatusContextMenuView: View {
         .padding(.vertical, 4)
         .frame(width: 216)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var quickActions: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(LocalizedString.l(settings.language, en: "Quick actions", zh: "快捷操作", ja: "クイック操作", ko: "빠른 작업"))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+
+            HStack(spacing: 4) {
+                quickActionButton(icon: "sun.max.fill", help: LocalizedString.l(settings.language, en: "Show Today", zh: "查看今天", ja: "今日を表示", ko: "오늘 보기"), action: showToday)
+                quickActionButton(icon: "calendar.badge.plus", help: LocalizedString.l(settings.language, en: "Add countdown", zh: "添加倒数日", ja: "追加", ko: "카운트다운 추가"), action: addCountdown)
+                quickActionButton(icon: "plus.forwardslash.minus", help: LocalizedString.l(settings.language, en: "Record trade", zh: "记录交易", ja: "取引を記録", ko: "거래 기록"), action: recordGoldTrade)
+                quickActionButton(icon: "arrow.clockwise", help: LocalizedString.l(settings.language, en: "Refresh", zh: "全部刷新", ja: "更新", ko: "새로고침"), action: refreshAll)
+            }
+            .padding(.horizontal, 10)
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func quickActionButton(icon: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 28)
+                .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
     }
 
     private var displayModePicker: some View {

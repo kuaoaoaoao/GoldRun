@@ -76,5 +76,7 @@ final class SystemMonitorViewModel {
         if let gpuTemp = snapshot.temperature.gpuTemperature {
             gpuTempHistory.append(gpuTemp)
         }
+
+        SystemHistoryStore.shared.record(snapshot: snapshot)
     }
 }

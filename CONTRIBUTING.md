@@ -30,7 +30,7 @@ xcodebuild \
   test
 ```
 
-CI 会设置 `POSTHOG_DISABLED=1`。本地和 fork 构建不需要任何分析令牌。
+CI 测试会设置 `POSTHOG_DISABLED=1`。本地和 fork 构建不需要任何分析令牌。
 
 ## 提交改动
 
@@ -59,7 +59,9 @@ CI 会设置 `POSTHOG_DISABLED=1`。本地和 fork 构建不需要任何分析�
 
 ## 发布与遥测配置
 
-维护者如需在自己的发行构建中启用 PostHog，可以把 `POSTHOG_API_KEY` 和可选的 `POSTHOG_HOST` 作为 Xcode 构建设置或 Scheme 环境变量提供。令牌不得硬编码进源码。用户仍需在应用设置中主动开启匿名统计。
+维护者如需在自己的发行构建中启用 PostHog，可以把 `POSTHOG_API_KEY` 和可选的 `POSTHOG_HOST` 作为 Xcode 构建设置或 Scheme 环境变量提供。令牌不得硬编码进源码。手动运行 `Package unsigned macOS build` 时，可在仓库中配置 `POSTHOG_PROJECT_API_KEY` Secret 和可选的 `POSTHOG_HOST` Variable；未配置 Secret 时，生成的应用仍保持统计不可用。无论构建是否配置令牌，用户都必须在应用设置中主动开启匿名统计。
+
+本地 `.env` 仅用于保存参考值，Xcode 不会自动读取它。请把 `.env.example` 复制为 `.env`，再将对应值加入 Scheme 的 Environment Variables，或作为 `xcodebuild` 构建设置传入。
 
 仓库当前不依赖付费 Apple Developer Program 账号发布。维护者可以手动运行
 `Package unsigned macOS build` Action 获取 ad hoc 签名的 ZIP 和 SHA-256，并在 Release 中明确标注“未使用 Developer ID、未经 Apple 公证”。不要把这种临时签名描述成 Apple 已验证或安全认证。

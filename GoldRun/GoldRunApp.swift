@@ -43,6 +43,7 @@ struct GoldRunApp: App {
     init() {
         CloudSyncStore.shared.start()
         CloudSyncStore.shared.pushBirthdaysFromLocalDefaults()
+        LocalReminderCenter.shared.start()
         let projectToken = RuntimeConfiguration.postHogProjectToken
         if projectToken.isEmpty {
             // fork / 本地构建没有令牌时强制保持关闭，之后配置令牌也需要用户重新主动开启。

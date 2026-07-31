@@ -593,6 +593,7 @@ h3 {
   grid-template-columns: minmax(0, 0.95fr) minmax(480px, 1.05fr);
   gap: 70px;
   align-items: start;
+  scroll-margin-top: 108px;
 }
 
 .feature-list {
@@ -601,12 +602,12 @@ h3 {
 
 .feature-tab {
   width: 100%;
-  min-height: 103px;
+  min-height: 91px;
   display: grid;
   grid-template-columns: 38px 1fr 28px;
   align-items: center;
   gap: 12px;
-  padding: 18px 0;
+  padding: 14px 0;
   text-align: left;
   color: var(--muted);
   background: transparent;
@@ -664,6 +665,7 @@ h3 {
   position: sticky;
   top: 108px;
   min-height: 660px;
+  scroll-margin-top: 108px;
 }
 
 .feature-stage::before {

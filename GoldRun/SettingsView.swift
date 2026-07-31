@@ -7,6 +7,7 @@ import UserNotifications
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case general = "general"
     case monitors = "monitors"
+    case reminders = "reminders"
     case menubar = "menubar"
     case english = "english"
     case data = "data"
@@ -18,6 +19,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .general: return LocalizedString.l(lang, en: "General", zh: "通用", ja: "一般", ko: "일반")
         case .monitors: return LocalizedString.l(lang, en: "Monitors", zh: "监控", ja: "監視", ko: "모니터")
+        case .reminders: return LocalizedString.l(lang, en: "Reminders", zh: "提醒", ja: "通知", ko: "알림")
         case .menubar: return LocalizedString.l(lang, en: "Menu Bar", zh: "菜单栏", ja: "メニュー", ko: "메뉴 막대")
         case .english: return LocalizedString.l(lang, en: "English", zh: "英语", ja: "英語", ko: "영어")
         case .data: return LocalizedString.l(lang, en: "Data", zh: "数据", ja: "データ", ko: "데이터")
@@ -31,6 +33,8 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
             return LocalizedString.l(lang, en: "Language, startup and privacy", zh: "语言、启动与隐私", ja: "言語、起動、プライバシー", ko: "언어, 시작 및 개인정보")
         case .monitors:
             return LocalizedString.l(lang, en: "Choose metrics and sampling speed", zh: "选择指标与采样速度", ja: "指標とサンプリング速度", ko: "지표 및 샘플링 속도")
+        case .reminders:
+            return LocalizedString.l(lang, en: "Dates, study and system attention", zh: "日期、学习与系统异常提醒", ja: "日付、学習、システム通知", ko: "날짜, 학습 및 시스템 알림")
         case .menubar:
             return LocalizedString.l(lang, en: "Control the menu bar at a glance", zh: "控制菜单栏的显示方式", ja: "メニューバーの表示を管理", ko: "메뉴 막대 표시 관리")
         case .english:
@@ -46,6 +50,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gear"
         case .monitors: return "chart.bar.fill"
+        case .reminders: return "bell.badge.fill"
         case .menubar: return "menubar.rectangle"
         case .english: return "character.book.closed"
         case .data: return "icloud.and.arrow.down"
@@ -61,6 +66,7 @@ struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var textbookStore = EnglishTextbookStore.shared
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
+    @ObservedObject private var reminderCenter = LocalReminderCenter.shared
     @State private var selectedCategory: SettingsCategory = .general
     // 系统通知权限被拒时在到价提醒开关下提示，避免用户以为开了就能收到
     @State private var notificationPermissionDenied = false
@@ -83,6 +89,8 @@ struct SettingsView: View {
                             generalContent
                         case .monitors:
                             monitorsContent
+                        case .reminders:
+                            remindersContent
                         case .menubar:
                             menubarContent
                         case .english:
@@ -446,6 +454,165 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - 本地提醒设置
+
+    private var remindersContent: some View {
+        VStack(spacing: 16) {
+            SettingsCard(
+                icon: "bell.badge.fill",
+                title: LocalizedString.l(settings.language, en: "Reminder categories", zh: "提醒类别", ja: "通知カテゴリ", ko: "알림 종류"),
+                description: LocalizedString.l(settings.language, en: "Enable only what you want to be interrupted for", zh: "只开启真正需要打断你的提醒", ja: "必要な通知だけを有効にします", ko: "필요한 알림만 켜세요")
+            ) {
+                VStack(spacing: 0) {
+                    reminderToggleRow(
+                        icon: "hourglass",
+                        title: LocalizedString.l(settings.language, en: "Countdowns", zh: "倒数日", ja: "カウントダウン", ko: "카운트다운"),
+                        isOn: $settings.countdownRemindersEnabled
+                    )
+                    Divider().padding(.horizontal, 14)
+                    reminderToggleRow(
+                        icon: "gift.fill",
+                        title: LocalizedString.l(settings.language, en: "Birthdays", zh: "生日", ja: "誕生日", ko: "생일"),
+                        isOn: $settings.birthdayRemindersEnabled
+                    )
+                    Divider().padding(.horizontal, 14)
+                    reminderToggleRow(
+                        icon: "character.book.closed.fill",
+                        title: LocalizedString.l(settings.language, en: "English check-in", zh: "英语打卡", ja: "英語チェックイン", ko: "영어 학습"),
+                        isOn: $settings.englishRemindersEnabled
+                    )
+                    Divider().padding(.horizontal, 14)
+                    reminderToggleRow(
+                        icon: "exclamationmark.triangle.fill",
+                        title: LocalizedString.l(settings.language, en: "Sustained system anomalies", zh: "持续系统异常", ja: "継続するシステム異常", ko: "지속 시스템 이상"),
+                        isOn: $settings.systemAnomalyRemindersEnabled
+                    )
+
+                    if notificationPermissionDenied && hasAnyLocalReminderEnabled {
+                        Divider().padding(.horizontal, 14)
+                        Label(LocalizedString.settings("notification_permission_denied"), systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(AppTheme.warning)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                    }
+                }
+            }
+
+            SettingsCard(
+                icon: "calendar.badge.clock",
+                title: LocalizedString.l(settings.language, en: "Timing", zh: "提醒时间", ja: "通知時刻", ko: "알림 시간"),
+                description: LocalizedString.l(settings.language, en: "Shared schedule for date and study reminders", zh: "日期和学习提醒共用此时间设置", ja: "日付と学習通知の共通設定", ko: "날짜 및 학습 알림 공통 설정")
+            ) {
+                VStack(spacing: 0) {
+                    settingsPickerRow(icon: "calendar.badge.minus", title: LocalizedString.l(settings.language, en: "Remind before", zh: "提前提醒", ja: "事前通知", ko: "미리 알림")) {
+                        Picker("", selection: $settings.reminderDaysBefore) {
+                            ForEach([0, 1, 3, 7], id: \.self) { days in
+                                Text(days == 0
+                                    ? LocalizedString.l(settings.language, en: "Same day", zh: "当天", ja: "当日", ko: "당일")
+                                    : LocalizedString.l(settings.language, en: "\(days) days", zh: "\(days) 天", ja: "\(days)日前", ko: "\(days)일 전"))
+                                    .tag(days)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 110)
+                    }
+                    Divider().padding(.horizontal, 14)
+                    settingsPickerRow(icon: "clock", title: LocalizedString.l(settings.language, en: "Delivery time", zh: "送达时间", ja: "通知時刻", ko: "알림 시간")) {
+                        Picker("", selection: $settings.reminderHour) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                Text(String(format: "%02d:00", hour)).tag(hour)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 100)
+                    }
+                    Divider().padding(.horizontal, 14)
+                    settingsPickerRow(icon: "timer", title: LocalizedString.l(settings.language, en: "Snooze", zh: "稍后提醒", ja: "再通知", ko: "다시 알림")) {
+                        Picker("", selection: $settings.reminderSnoozeMinutes) {
+                            ForEach([10, 30, 60], id: \.self) { minutes in
+                                Text("\(minutes) min").tag(minutes)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 100)
+                    }
+                }
+                .onChange(of: settings.reminderDaysBefore) { _, _ in rescheduleLocalReminders() }
+                .onChange(of: settings.reminderHour) { _, _ in rescheduleLocalReminders() }
+            }
+
+            SettingsCard(
+                icon: "moon.zzz.fill",
+                title: LocalizedString.l(settings.language, en: "Quiet hours", zh: "免打扰时段", ja: "静かな時間", ko: "방해 금지 시간"),
+                description: LocalizedString.l(settings.language, en: "Noncritical reminders wait until quiet hours end", zh: "非紧急提醒会等免打扰结束后送达", ja: "緊急でない通知は終了後に届きます", ko: "긴급하지 않은 알림은 종료 후 전달됩니다")
+            ) {
+                VStack(spacing: 0) {
+                    MonitorToggleRow(
+                        icon: "moon.fill",
+                        title: LocalizedString.l(settings.language, en: "Enable quiet hours", zh: "开启免打扰", ja: "静かな時間を有効化", ko: "방해 금지 켜기"),
+                        isOn: $settings.reminderQuietHoursEnabled
+                    )
+                    if settings.reminderQuietHoursEnabled {
+                        Divider().padding(.horizontal, 14)
+                        HStack(spacing: 8) {
+                            Text(LocalizedString.l(settings.language, en: "From", zh: "从", ja: "開始", ko: "시작"))
+                                .font(.system(size: 12))
+                            hourPicker(selection: $settings.reminderQuietStartHour)
+                            Text(LocalizedString.l(settings.language, en: "to", zh: "到", ja: "終了", ko: "종료"))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            hourPicker(selection: $settings.reminderQuietEndHour)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                    }
+                }
+                .onChange(of: settings.reminderQuietHoursEnabled) { _, _ in rescheduleLocalReminders() }
+                .onChange(of: settings.reminderQuietStartHour) { _, _ in rescheduleLocalReminders() }
+                .onChange(of: settings.reminderQuietEndHour) { _, _ in rescheduleLocalReminders() }
+            }
+        }
+        .onAppear {
+            reminderCenter.refreshAuthorizationStatus {
+                refreshNotificationPermission()
+            }
+        }
+    }
+
+    private func reminderToggleRow(icon: String, title: String, isOn: Binding<Bool>) -> some View {
+        MonitorToggleRow(icon: icon, title: title, isOn: isOn)
+            .onChange(of: isOn.wrappedValue) { _, enabled in
+                if enabled {
+                    reminderCenter.requestAuthorizationIfNeeded {
+                        refreshNotificationPermission()
+                        rescheduleLocalReminders()
+                    }
+                } else {
+                    rescheduleLocalReminders()
+                }
+            }
+    }
+
+    private func hourPicker(selection: Binding<Int>) -> some View {
+        Picker("", selection: selection) {
+            ForEach(0..<24, id: \.self) { hour in
+                Text(String(format: "%02d:00", hour)).tag(hour)
+            }
+        }
+        .labelsHidden()
+        .frame(width: 92)
+    }
+
+    private var hasAnyLocalReminderEnabled: Bool {
+        settings.countdownRemindersEnabled || settings.birthdayRemindersEnabled ||
+            settings.englishRemindersEnabled || settings.systemAnomalyRemindersEnabled
+    }
+
+    private func rescheduleLocalReminders() {
+        Task { await reminderCenter.rescheduleAll() }
+    }
+
     // MARK: - 菜单栏设置内容
 
     private var menubarContent: some View {
@@ -471,6 +638,59 @@ struct SettingsView: View {
 
                         if mode != MenuBarDisplayMode.allCases.last {
                             Divider().padding(.horizontal, 14)
+                        }
+                    }
+                }
+            }
+
+            SettingsCard(
+                icon: "rectangle.2.swap",
+                title: LocalizedString.l(settings.language, en: "Menu bar composition", zh: "菜单栏组合", ja: "メニューバー構成", ko: "메뉴 막대 구성"),
+                description: LocalizedString.l(settings.language, en: "Show one value, a compact pair, or rotate two values", zh: "显示单项、双项紧凑组合，或定时轮播", ja: "単一、2項目、切り替え表示", ko: "단일, 압축 2개 또는 순환 표시")
+            ) {
+                VStack(spacing: 0) {
+                    settingsPickerRow(
+                        icon: "rectangle.2.swap",
+                        title: LocalizedString.l(settings.language, en: "Layout", zh: "显示方式", ja: "表示方法", ko: "표시 방식")
+                    ) {
+                        Picker("", selection: $settings.menuBarCompositionStyle) {
+                            ForEach(MenuBarCompositionStyle.allCases) { style in
+                                Text(style.displayName(lang: settings.language)).tag(style)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 150)
+                    }
+
+                    if settings.menuBarCompositionStyle != .single {
+                        Divider().padding(.horizontal, 14)
+                        settingsPickerRow(
+                            icon: "plus.rectangle.on.rectangle",
+                            title: LocalizedString.l(settings.language, en: "Second value", zh: "第二项", ja: "2番目の項目", ko: "두 번째 항목")
+                        ) {
+                            Picker("", selection: $settings.menuBarSecondaryDisplayMode) {
+                                ForEach(MenuBarDisplayMode.allCases.filter { $0 != settings.menuBarDisplayMode }) { mode in
+                                    Text(mode.displayName(lang: settings.language)).tag(mode)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 150)
+                        }
+                    }
+
+                    if settings.menuBarCompositionStyle == .rotation {
+                        Divider().padding(.horizontal, 14)
+                        settingsPickerRow(
+                            icon: "timer",
+                            title: LocalizedString.l(settings.language, en: "Switch every", zh: "切换间隔", ja: "切り替え間隔", ko: "전환 간격")
+                        ) {
+                            Picker("", selection: $settings.menuBarRotationSeconds) {
+                                ForEach([5, 10, 15, 30], id: \.self) { seconds in
+                                    Text("\(seconds)s").tag(seconds)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 90)
                         }
                     }
                 }

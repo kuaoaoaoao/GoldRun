@@ -3,7 +3,8 @@
 The wizard has completed a PostHog integration for the GoldRun macOS menu bar app. Changes include:
 
 - **`GoldRun.xcodeproj/project.pbxproj`** — Added `posthog-ios` (v3.64.1) as an SPM dependency with the three required pbxproj objects (`PBXBuildFile`, `XCSwiftPackageProductDependency`, `XCRemoteSwiftPackageReference`) and linked the Frameworks build phase.
-- **`GoldRun/GoldRunApp.swift`** — Imported PostHog and called `PostHogSDK.shared.setup(config)` once in the `App` initializer, with `captureApplicationLifecycleEvents` enabled. The project token ships hardcoded in the binary (the recommended approach for iOS/macOS), with an optional Xcode-scheme override via `POSTHOG_API_KEY` / `POSTHOG_HOST` env vars.
+- **`GoldRun/GoldRunApp.swift`** — Configures PostHog once in the `App` initializer. The project token is supplied through `POSTHOG_API_KEY` rather than committed to source.
+- **`GoldRun/Analytics.swift`** — Enforces explicit opt-in, an event/property allowlist, anonymous-only events (`personProfiles = .never`), disabled GeoIP enrichment, and no automatic lifecycle, screen, replay, log, or crash collection.
 - **`GoldRun/MacAppDelegate.swift`** — Imported PostHog; added `app_launched`, `popover_opened`, `settings_opened`, `gold_price_fetched`, and `gold_price_fetch_failed` capture calls.
 - **`GoldRun/ContentView.swift`** — Imported PostHog; added `view_tab_switched` capture on tab button tap.
 - **`GoldRun/SettingsView.swift`** — Imported PostHog; added `language_changed`, `menu_bar_display_mode_changed`, and `holiday_data_updated` capture calls.
@@ -37,9 +38,10 @@ The wizard has completed a PostHog integration for the GoldRun macOS menu bar ap
 - PostHog setup now goes through `GoldRun/Analytics.swift`, which validates the project token and host URL before setup.
 - Set `POSTHOG_DISABLED=1` in the Xcode scheme environment to disable analytics locally.
 - Event names are centralized in `AnalyticsEvent` to avoid string typos at call sites.
-- Sensitive event properties are filtered before capture: `error_message`, `profit_loss`, and `profit_percent`.
+- Event and property allowlists are enforced before capture, with an additional denylist for sensitive fields such as names, email addresses, file paths, tokens, raw error messages, and exact profit values.
 - High-frequency events can be throttled with `minimumInterval`; `gold_price_fetched` is limited to once per hour and `gold_position_analyzed` to once every 30 seconds.
 - User-sensitive values are bucketed where useful. Gold position analytics sends `profit_state` and `profit_percent_bucket`, not exact profit/loss values.
+- Release packaging injects `POSTHOG_PROJECT_API_KEY` only when that repository Secret is configured; packages built without it keep analytics unavailable.
 - GitHub Release pages cannot run custom analytics JavaScript. The website tracks outbound download clicks, and GitHub Actions syncs GitHub's cumulative Release asset `download_count` into PostHog once per day.
 - Public usage stats are served from `docs/usage-stats.html`. It is ready for a public PostHog dashboard iframe, but the iframe URL must be pasted after choosing exactly which aggregate dashboard is safe to share.
 - `app_launched` now includes aggregate launch properties for public stats: `app_version`, `app_build`, `os_name`, `os_version`, `cpu_arch`, `chip_model`, and `device_model`.
@@ -58,9 +60,9 @@ For download analytics details, see `docs/posthog-download-analytics.md`.
 
 ## Verify before merging
 
-- [ ] Open the project in Xcode so it can resolve the `posthog-ios` SPM package, then do a full production Archive build and fix any errors introduced by the generated code.
-- [ ] Run the test suite — any call sites that were instrumented may need updated mocks or fixtures.
-- [ ] Add `POSTHOG_API_KEY` and `POSTHOG_HOST` to `.env.example` (or your team's onboarding docs) so collaborators know what values to set in their Xcode schemes for local override.
+- [x] Resolve the `posthog-ios` SPM package and complete both the Debug test build and a Release verification build.
+- [x] Run the full macOS test suite, including the analytics privacy tests.
+- [x] Add `POSTHOG_API_KEY` and `POSTHOG_HOST` to `.env.example` and document that Xcode does not load `.env` automatically.
 
 ### Agent skill
 

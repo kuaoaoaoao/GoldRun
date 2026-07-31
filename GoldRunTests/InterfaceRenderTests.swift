@@ -196,6 +196,70 @@ final class InterfaceRenderTests: XCTestCase {
         XCTAssertFalse(pngData.isEmpty)
     }
 
+    func testNotesRendersAtMenuBarSize() throws {
+        let store = NotesStore(fileURL: nil)
+        let work = try XCTUnwrap(store.addGroup(name: "工作"))
+        _ = store.addGroup(name: "生活")
+        _ = store.saveNote(
+            title: "发布前检查",
+            body: "确认构建、更新说明和下载页都已准备好。",
+            groupID: work.id,
+            now: Date().addingTimeInterval(-180)
+        )
+        let pinned = try XCTUnwrap(store.saveNote(
+            title: "周末采购",
+            body: "咖啡豆、牛奶、充电线",
+            groupID: nil,
+            now: Date().addingTimeInterval(-60)
+        ))
+        store.togglePin(id: pinned.id)
+
+        try render(
+            NotesView(store: store)
+                .frame(width: 304, height: 464)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .environment(\.colorScheme, .light),
+            size: NSSize(width: 304, height: 464),
+            filename: "goldrun-notes-preview.png"
+        )
+    }
+
+    func testClipboardHistoryRendersAtMenuBarSize() throws {
+        let suiteName = "GoldRun.InterfaceRenderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("\(suiteName).pasteboard"))
+        let store = ClipboardHistoryStore(fileURL: nil, userDefaults: defaults, pasteboard: pasteboard)
+        store.ingest("https://github.com/example/goldrun", at: Date().addingTimeInterval(-20))
+        store.ingest("给设置页面补一张深色模式截图", at: Date().addingTimeInterval(-45))
+        store.ingest("xcodebuild -project GoldRun.xcodeproj -scheme GoldRun build", at: Date().addingTimeInterval(-90))
+        let command = try XCTUnwrap(store.entries.first(where: { $0.text.hasPrefix("xcodebuild") }))
+        store.togglePin(id: command.id)
+
+        try render(
+            ClipboardHistoryView(store: store)
+                .frame(width: 304, height: 464)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .environment(\.colorScheme, .light),
+            size: NSSize(width: 304, height: 464),
+            filename: "goldrun-clipboard-preview.png"
+        )
+    }
+
+    func testPersonalToolsNavigationRendersAtMenuBarWidth() throws {
+        try render(
+            ModuleNavigationRail(selection: .constant(.clipboard)) {
+                Image(systemName: "pin")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .padding(8)
+            .background(Color(nsColor: .windowBackgroundColor)),
+            size: NSSize(width: 336, height: 52),
+            filename: "goldrun-personal-tools-navigation-preview.png"
+        )
+    }
+
     private func render<Content: View>(
         _ content: Content,
         size: NSSize,

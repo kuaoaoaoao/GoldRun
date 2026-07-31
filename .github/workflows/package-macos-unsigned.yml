@@ -15,7 +15,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 35
     env:
-      POSTHOG_DISABLED: "1"
+      POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
+      POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
 
     steps:
       - name: Checkout
@@ -30,6 +31,8 @@ jobs:
           -destination 'platform=macOS'
           -derivedDataPath '${{ runner.temp }}/GoldRun-derived'
           CODE_SIGNING_ALLOWED=NO
+          POSTHOG_API_KEY="$POSTHOG_PROJECT_API_KEY"
+          POSTHOG_HOST="$POSTHOG_HOST"
           build
 
       - name: Apply ad hoc signature and verify bundle

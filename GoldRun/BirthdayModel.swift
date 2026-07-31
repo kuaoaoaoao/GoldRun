@@ -118,5 +118,8 @@ class BirthdayManager {
                 CloudSyncStore.shared.pushBirthdaysJSON(json)
             }
         }
+        Task { @MainActor in
+            await LocalReminderCenter.shared.rescheduleAll()
+        }
     }
 }

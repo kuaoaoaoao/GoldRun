@@ -50,6 +50,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CAFE04CAFE04CAFE04CAF004 /* Exceptions for "GoldRun" folder in "GoldRun" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8FCE25472FBE97330023FC83 /* GoldRun */;
+		};
 		DA7B0000000000000000000E /* Exceptions for "GoldRun Watch Complication" folder in "GoldRun Watch Complication" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -62,6 +69,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8FCE254A2FBE97330023FC83 /* GoldRun */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CAFE04CAFE04CAFE04CAF004 /* Exceptions for "GoldRun" folder in "GoldRun" target */,
+			);
 			path = GoldRun;
 			sourceTree = "<group>";
 		};
@@ -487,10 +497,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GoldRun/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = GoldRun;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_POSTHOG_API_KEY = "$(POSTHOG_API_KEY)";
-				INFOPLIST_KEY_POSTHOG_HOST = "$(POSTHOG_HOST)";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -535,10 +544,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GoldRun/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = GoldRun;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_POSTHOG_API_KEY = "$(POSTHOG_API_KEY)";
-				INFOPLIST_KEY_POSTHOG_HOST = "$(POSTHOG_HOST)";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

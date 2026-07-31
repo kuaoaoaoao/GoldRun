@@ -1,42 +1,55 @@
 import SwiftUI
+import Combine
 import AppKit
 
 // MARK: - 视图模式
 
-enum ViewMode: String, CaseIterable {
+enum ViewMode: String, CaseIterable, Sendable {
+    case today
     case monitor
     case gold
     case calendar
     case english
     case codex
+    case notes
+    case clipboard
 
     var icon: String {
         switch self {
+        case .today: return "sun.max.fill"
         case .monitor: return "chart.bar.fill"
         case .gold: return "chart.line.uptrend.xyaxis"
         case .calendar: return "calendar"
         case .english: return "character.book.closed"
         case .codex: return "sparkles"
+        case .notes: return "note.text"
+        case .clipboard: return "doc.on.clipboard"
         }
     }
 
     var displayName: String {
         switch self {
+        case .today: return LocalizedString.l(AppSettings.shared.language, en: "Today", zh: "今天", ja: "今日", ko: "오늘")
         case .monitor: return LocalizedString.calendar("monitor")
         case .gold: return LocalizedString.goldPrice("gold_price")
         case .calendar: return LocalizedString.calendar("calendar")
         case .english: return LocalizedString.english("english")
         case .codex: return "Codex"
+        case .notes: return LocalizedString.l(AppSettings.shared.language, en: "Notes", zh: "备忘录", ja: "メモ", ko: "메모")
+        case .clipboard: return LocalizedString.l(AppSettings.shared.language, en: "Clipboard", zh: "剪切板", ja: "クリップボード", ko: "클립보드")
         }
     }
 
     var keyboardShortcut: KeyEquivalent {
         switch self {
+        case .today: return "0"
         case .monitor: return "1"
         case .gold: return "2"
         case .calendar: return "3"
         case .english: return "4"
         case .codex: return "5"
+        case .notes: return "6"
+        case .clipboard: return "7"
         }
     }
 }
@@ -46,14 +59,23 @@ struct ContentView: View {
     // 重启后回到上次使用的模块
     @State private var viewMode: ViewMode = ViewMode(rawValue: AppSettings.shared.lastViewModeRaw) ?? .monitor
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var router = AppNavigationRouter.shared
+    @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var progressStore = EnglishProgressStore.shared
+    @State private var goldStore = GoldPriceStore.shared
+    @State private var tradeStore = GoldTradeStore.shared
+    @State private var codexModel = CodexMonitorViewModel.shared
+    @State private var claudeModel = ClaudeMonitorViewModel.shared
 
     var body: some View {
         VStack(spacing: 0) {
-            ModuleNavigationRail(selection: $viewMode)
+            ModuleNavigationRail(selection: $viewMode, todayAttention: todayAttention)
                 .padding(.bottom, 8)
 
             Group {
                 switch viewMode {
+                case .today:
+                    TodayOverviewView(snapshot: viewModel.snapshot)
                 case .monitor:
                     MonitorPanel(
                         snapshot: viewModel.snapshot,
@@ -72,6 +94,10 @@ struct ContentView: View {
                     EnglishLearningView()
                 case .codex:
                     AIMonitorView()
+                case .notes:
+                    NotesView()
+                case .clipboard:
+                    ClipboardHistoryView()
                 }
             }
             .id(viewMode)
@@ -93,10 +119,25 @@ struct ContentView: View {
             }
         }
         .onAppear { viewModel.start() }
+        .onReceive(router.$request.compactMap { $0 }) { request in
+            viewMode = request.mode
+        }
         .onDisappear { viewModel.stop() }
         .onChange(of: viewMode) { _, newValue in
             AppSettings.shared.lastViewModeRaw = newValue.rawValue
         }
+    }
+
+    private var todayAttention: TodaySeverity? {
+        TodaySummaryBuilder.maximumSeverity(in: TodaySummaryBuilder.current(
+            snapshot: viewModel.snapshot,
+            settings: settings,
+            progressStore: progressStore,
+            goldStore: goldStore,
+            tradeStore: tradeStore,
+            codexModel: codexModel,
+            claudeModel: claudeModel
+        ))
     }
 }
 
@@ -108,17 +149,20 @@ struct ModuleNavigationRail<Trailing: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var selectionAnimation
+    var todayAttention: TodaySeverity?
 
     init(
         selection: Binding<ViewMode>,
+        todayAttention: TodaySeverity? = nil,
         @ViewBuilder trailing: () -> Trailing
     ) {
         _selection = selection
+        self.todayAttention = todayAttention
         self.trailing = trailing()
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             ForEach(ViewMode.allCases, id: \.self) { mode in
                 Button {
                     guard selection != mode else { return }
@@ -132,16 +176,25 @@ struct ModuleNavigationRail<Trailing: View>: View {
                     HStack(spacing: 4) {
                         Image(systemName: mode.icon)
                             .font(.system(size: 11, weight: .semibold))
+                            .overlay(alignment: .topTrailing) {
+                                if mode == .today, let todayAttention, todayAttention >= .warning {
+                                    Circle()
+                                        .fill(todayAttention.color)
+                                        .frame(width: 5, height: 5)
+                                        .offset(x: 3, y: -3)
+                                }
+                            }
 
                         if selection == mode {
                             Text(mode.displayName)
                                 .font(.caption.weight(.semibold))
                                 .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                                 .transition(.opacity.combined(with: .move(edge: .leading)))
                         }
                     }
-                    .frame(minWidth: 28, minHeight: 28)
-                    .padding(.horizontal, selection == mode ? 7 : 0)
+                    .frame(minWidth: selection == mode ? 28 : 24, minHeight: 28)
+                    .padding(.horizontal, selection == mode ? 5 : 0)
                     .foregroundStyle(selection == mode ? AppTheme.accent : AppTheme.textSecondary(colorScheme))
                     .background {
                         if selection == mode {
@@ -176,8 +229,8 @@ struct ModuleNavigationRail<Trailing: View>: View {
 }
 
 extension ModuleNavigationRail where Trailing == EmptyView {
-    init(selection: Binding<ViewMode>) {
-        self.init(selection: selection) { EmptyView() }
+    init(selection: Binding<ViewMode>, todayAttention: TodaySeverity? = nil) {
+        self.init(selection: selection, todayAttention: todayAttention) { EmptyView() }
     }
 }
 
@@ -198,6 +251,8 @@ struct MonitorPanel: View {
                     status: overallStatus,
                     updatedAt: snapshot.updatedAt
                 )
+
+                SystemHistoryCard()
 
                 if settings.showCPU || settings.showMemory {
                     HStack(alignment: .top, spacing: 8) {
@@ -1437,7 +1492,7 @@ struct Separator: View {
 
 // MARK: - 趋势图表
 
-private struct SparklineChart: View {
+struct SparklineChart: View {
     let values: [Double]
     var color: Color = .blue
     var showGradient: Bool = true

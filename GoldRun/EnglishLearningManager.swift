@@ -19,8 +19,8 @@ final class EnglishLearningManager: NSObject, ObservableObject {
     private let textbookStore: EnglishTextbookStore
     private let progressStore: EnglishProgressStore
     private let settings: AppSettings
-    private let systemSpeechProvider: SystemEnglishSpeechProvider
-    private let kokoroSpeechProvider: KokoroEnglishSpeechProvider
+    private let systemSpeechProvider: EnglishSpeechProviding
+    private let kokoroSpeechProvider: EnglishSpeechProviding
     private var queue: [EnglishLearningItem] = []
     private var sessionTask: Task<Void, Never>?
     private var sessionID = UUID()
@@ -61,8 +61,8 @@ final class EnglishLearningManager: NSObject, ObservableObject {
         textbookStore: EnglishTextbookStore? = nil,
         progressStore: EnglishProgressStore,
         settings: AppSettings,
-        systemSpeechProvider: SystemEnglishSpeechProvider? = nil,
-        kokoroSpeechProvider: KokoroEnglishSpeechProvider? = nil
+        systemSpeechProvider: EnglishSpeechProviding? = nil,
+        kokoroSpeechProvider: EnglishSpeechProviding? = nil
     ) {
         self.repository = repository
         self.textbookStore = textbookStore ?? .shared
@@ -319,7 +319,12 @@ final class EnglishLearningManager: NSObject, ObservableObject {
                 for segment in item.speechSegments {
                     guard await waitUntilPlaying(id: id) else { return }
                     currentSpokenText = segment
-                    guard await speak(segment, rate: rate, language: settings.englishAccent.rawValue),
+                    guard await speak(
+                        segment,
+                        rate: rate,
+                        language: settings.englishAccent.rawValue,
+                        sessionID: id
+                    ),
                           isValidSession(id) else { return }
                 }
             }
@@ -327,7 +332,12 @@ final class EnglishLearningManager: NSObject, ObservableObject {
             if settings.englishSpeakTranslation, !item.translation.isEmpty {
                 guard await waitUntilPlaying(id: id) else { return }
                 currentSpokenText = item.translation
-                guard await speak(item.translation, rate: min(rate, 0.42), language: "zh-CN"),
+                guard await speak(
+                    item.translation,
+                    rate: min(rate, 0.42),
+                    language: "zh-CN",
+                    sessionID: id
+                ),
                       isValidSession(id) else { return }
             }
 
@@ -359,8 +369,9 @@ final class EnglishLearningManager: NSObject, ObservableObject {
         return isValidSession(id) && state == .playing
     }
 
-    private func speak(_ text: String, rate: Double, language: String) async -> Bool {
+    private func speak(_ text: String, rate: Double, language: String, sessionID id: UUID) async -> Bool {
         guard !text.isEmpty else { return true }
+        guard isValidSession(id) else { return false }
         let request = EnglishSpeechRequest(
             text: text,
             rate: rate,
@@ -372,17 +383,25 @@ final class EnglishLearningManager: NSObject, ObservableObject {
 
         if language.hasPrefix("en"), settings.englishTTSBackend == .kokoro {
             activeSpeechProvider = kokoroSpeechProvider
-            if await kokoroSpeechProvider.speak(request), isValidSession(sessionID) {
-                activeSpeechProvider = nil
+            let didSpeak = await kokoroSpeechProvider.speak(request)
+            guard isValidSession(id) else { return false }
+            clearActiveProvider(kokoroSpeechProvider, for: id)
+            if didSpeak {
                 return true
             }
-            activeSpeechProvider = nil
         }
 
+        guard isValidSession(id) else { return false }
         activeSpeechProvider = systemSpeechProvider
         let didSpeak = await systemSpeechProvider.speak(request)
-        activeSpeechProvider = nil
+        guard isValidSession(id) else { return false }
+        clearActiveProvider(systemSpeechProvider, for: id)
         return didSpeak
+    }
+
+    private func clearActiveProvider(_ provider: EnglishSpeechProviding, for id: UUID) {
+        guard id == sessionID, activeSpeechProvider === provider else { return }
+        activeSpeechProvider = nil
     }
 
     private func selectedVoice(language: String) -> AVSpeechSynthesisVoice? {
@@ -403,7 +422,6 @@ final class EnglishLearningManager: NSObject, ObservableObject {
     }
 
     private func stopUtterance() {
-        activeSpeechProvider?.stop()
         systemSpeechProvider.stop()
         kokoroSpeechProvider.stop()
         activeSpeechProvider = nil

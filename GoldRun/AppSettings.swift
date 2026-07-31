@@ -100,7 +100,58 @@ class AppSettings: ObservableObject {
     @Published var menuBarDisplayMode: MenuBarDisplayMode {
         didSet {
             userDefaults.set(menuBarDisplayMode.rawValue, forKey: "menubar_display_mode")
+            if menuBarSecondaryDisplayMode == menuBarDisplayMode {
+                menuBarSecondaryDisplayMode = MenuBarDisplayMode.allCases.first { $0 != menuBarDisplayMode } ?? .date
+            }
         }
+    }
+
+    @Published var menuBarCompositionStyle: MenuBarCompositionStyle {
+        didSet { userDefaults.set(menuBarCompositionStyle.rawValue, forKey: "menubar_composition_style") }
+    }
+    @Published var menuBarSecondaryDisplayMode: MenuBarDisplayMode {
+        didSet {
+            if menuBarSecondaryDisplayMode == menuBarDisplayMode {
+                menuBarSecondaryDisplayMode = MenuBarDisplayMode.allCases.first { $0 != menuBarDisplayMode } ?? .date
+                return
+            }
+            userDefaults.set(menuBarSecondaryDisplayMode.rawValue, forKey: "menubar_secondary_display_mode")
+        }
+    }
+    @Published var menuBarRotationSeconds: Int {
+        didSet { userDefaults.set(menuBarRotationSeconds, forKey: "menubar_rotation_seconds") }
+    }
+
+    // 本地提醒设置。全部默认关闭，只有用户主动开启时才申请通知权限。
+    @Published var countdownRemindersEnabled: Bool {
+        didSet { userDefaults.set(countdownRemindersEnabled, forKey: "reminder_countdown_enabled") }
+    }
+    @Published var birthdayRemindersEnabled: Bool {
+        didSet { userDefaults.set(birthdayRemindersEnabled, forKey: "reminder_birthday_enabled") }
+    }
+    @Published var englishRemindersEnabled: Bool {
+        didSet { userDefaults.set(englishRemindersEnabled, forKey: "reminder_english_enabled") }
+    }
+    @Published var systemAnomalyRemindersEnabled: Bool {
+        didSet { userDefaults.set(systemAnomalyRemindersEnabled, forKey: "reminder_system_enabled") }
+    }
+    @Published var reminderDaysBefore: Int {
+        didSet { userDefaults.set(reminderDaysBefore, forKey: "reminder_days_before") }
+    }
+    @Published var reminderHour: Int {
+        didSet { userDefaults.set(reminderHour, forKey: "reminder_hour") }
+    }
+    @Published var reminderQuietHoursEnabled: Bool {
+        didSet { userDefaults.set(reminderQuietHoursEnabled, forKey: "reminder_quiet_enabled") }
+    }
+    @Published var reminderQuietStartHour: Int {
+        didSet { userDefaults.set(reminderQuietStartHour, forKey: "reminder_quiet_start_hour") }
+    }
+    @Published var reminderQuietEndHour: Int {
+        didSet { userDefaults.set(reminderQuietEndHour, forKey: "reminder_quiet_end_hour") }
+    }
+    @Published var reminderSnoozeMinutes: Int {
+        didSet { userDefaults.set(reminderSnoozeMinutes, forKey: "reminder_snooze_minutes") }
     }
 
     // 英语学习设置
@@ -205,7 +256,27 @@ class AppSettings: ObservableObject {
         self.lastViewModeRaw = userDefaults.string(forKey: "last_view_mode") ?? ""
 
         let modeRaw = userDefaults.string(forKey: "menubar_display_mode") ?? MenuBarDisplayMode.goldPrice.rawValue
-        self.menuBarDisplayMode = MenuBarDisplayMode(rawValue: modeRaw) ?? .goldPrice
+        let primaryMode = MenuBarDisplayMode(rawValue: modeRaw) ?? .goldPrice
+        self.menuBarDisplayMode = primaryMode
+        let compositionRaw = userDefaults.string(forKey: "menubar_composition_style") ?? MenuBarCompositionStyle.single.rawValue
+        self.menuBarCompositionStyle = MenuBarCompositionStyle(rawValue: compositionRaw) ?? .single
+        let secondaryRaw = userDefaults.string(forKey: "menubar_secondary_display_mode") ?? MenuBarDisplayMode.date.rawValue
+        let savedSecondary = MenuBarDisplayMode(rawValue: secondaryRaw) ?? .date
+        self.menuBarSecondaryDisplayMode = savedSecondary == primaryMode
+            ? (MenuBarDisplayMode.allCases.first { $0 != primaryMode } ?? .date)
+            : savedSecondary
+        self.menuBarRotationSeconds = max(userDefaults.object(forKey: "menubar_rotation_seconds") as? Int ?? 10, 5)
+
+        self.countdownRemindersEnabled = userDefaults.object(forKey: "reminder_countdown_enabled") as? Bool ?? false
+        self.birthdayRemindersEnabled = userDefaults.object(forKey: "reminder_birthday_enabled") as? Bool ?? false
+        self.englishRemindersEnabled = userDefaults.object(forKey: "reminder_english_enabled") as? Bool ?? false
+        self.systemAnomalyRemindersEnabled = userDefaults.object(forKey: "reminder_system_enabled") as? Bool ?? false
+        self.reminderDaysBefore = userDefaults.object(forKey: "reminder_days_before") as? Int ?? 1
+        self.reminderHour = userDefaults.object(forKey: "reminder_hour") as? Int ?? 9
+        self.reminderQuietHoursEnabled = userDefaults.object(forKey: "reminder_quiet_enabled") as? Bool ?? true
+        self.reminderQuietStartHour = userDefaults.object(forKey: "reminder_quiet_start_hour") as? Int ?? 22
+        self.reminderQuietEndHour = userDefaults.object(forKey: "reminder_quiet_end_hour") as? Int ?? 8
+        self.reminderSnoozeMinutes = userDefaults.object(forKey: "reminder_snooze_minutes") as? Int ?? 30
 
         let accentRaw = userDefaults.string(forKey: "english_accent") ?? EnglishAccent.american.rawValue
         self.englishAccent = EnglishAccent(rawValue: accentRaw) ?? .american
@@ -306,6 +377,25 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
         case .codex: return "terminal"
         case .claude: return "sparkles"
         case .countdown: return "timer"
+        }
+    }
+}
+
+enum MenuBarCompositionStyle: String, CaseIterable, Identifiable {
+    case single
+    case pair
+    case rotation
+
+    var id: String { rawValue }
+
+    func displayName(lang: AppLanguage) -> String {
+        switch self {
+        case .single:
+            return LocalizedString.l(lang, en: "Single", zh: "单项", ja: "単一", ko: "단일")
+        case .pair:
+            return LocalizedString.l(lang, en: "Compact Pair", zh: "双项紧凑", ja: "コンパクト2項目", ko: "압축 2개")
+        case .rotation:
+            return LocalizedString.l(lang, en: "Rotate", zh: "定时轮播", ja: "切り替え", ko: "순환")
         }
     }
 }

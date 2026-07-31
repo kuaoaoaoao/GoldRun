@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - 日历视图
 
@@ -14,6 +15,7 @@ struct CalendarView: View {
     @State private var countdownRevision = 0
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var router = AppNavigationRouter.shared
 
     private let calendar = Calendar.current
     private var weekdaySymbols: [String] {
@@ -71,6 +73,13 @@ struct CalendarView: View {
         }
         .sheet(isPresented: $showYearMonthPicker) {
             YearMonthPickerView(currentMonth: $currentMonth, isPresented: $showYearMonthPicker)
+        }
+        .onReceive(router.$request.compactMap { $0 }) { request in
+            guard request.quickAction == .addCountdown else { return }
+            selectedDate = Date()
+            currentMonth = Date()
+            showAddCountdown = true
+            router.consumeQuickAction(request.id)
         }
     }
 

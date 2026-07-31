@@ -53,6 +53,8 @@
 
   var featureTabs = document.querySelectorAll(".feature-tab");
   var featurePanels = document.querySelectorAll(".feature-panel");
+  var workbenchLayout = document.querySelector(".workbench-layout");
+  var featureStage = document.querySelector(".feature-stage");
 
   featureTabs.forEach(function (tab) {
     tab.addEventListener("click", function () {
@@ -65,6 +67,13 @@
       featurePanels.forEach(function (panel) {
         panel.hidden = panel.id !== tab.dataset.panel;
       });
+
+      var scrollTarget = window.matchMedia("(max-width: 1020px)").matches
+        ? featureStage
+        : workbenchLayout;
+      if (scrollTarget) {
+        scrollTarget.scrollIntoView({ block: "start", behavior: "auto" });
+      }
     });
 
     tab.addEventListener("keydown", function (event) {

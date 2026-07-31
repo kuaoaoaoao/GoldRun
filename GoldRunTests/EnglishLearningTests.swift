@@ -267,6 +267,36 @@ final class EnglishLearningTests: XCTestCase {
         XCTAssertTrue(KokoroEnglishSpeechProvider.canAttempt(commandPath: "/bin/echo"))
     }
 
+    func testCancelledKokoroSessionDoesNotStartStaleSystemFallback() async {
+        let repository = EnglishContentRepository()
+        let progressStore = EnglishProgressStore(persistenceURL: nil)
+        let settings = AppSettings.shared
+        let previousBackend = settings.englishTTSBackend
+        settings.englishTTSBackend = .kokoro
+        defer { settings.englishTTSBackend = previousBackend }
+
+        let kokoro = SuspendedEnglishSpeechProvider()
+        let system = ImmediateEnglishSpeechProvider(result: false)
+        let manager = EnglishLearningManager(
+            repository: repository,
+            textbookStore: EnglishTextbookStore(persistenceURL: nil, settings: settings),
+            progressStore: progressStore,
+            settings: settings,
+            systemSpeechProvider: system,
+            kokoroSpeechProvider: kokoro
+        )
+
+        manager.replay()
+        await waitUntil { kokoro.speakCount == 1 }
+
+        manager.replay()
+        await waitUntil { kokoro.speakCount == 2 }
+        await Task.yield()
+
+        XCTAssertEqual(system.speakCount, 0)
+        manager.stop()
+    }
+
     func testIdleMenuBarReturnsToDailyWordAfterNavigation() {
         let repository = EnglishContentRepository()
         let store = EnglishProgressStore(persistenceURL: nil)
@@ -419,4 +449,56 @@ final class EnglishLearningTests: XCTestCase {
             hour: hour
         ).date!
     }
+
+    private func waitUntil(
+        maxYields: Int = 100,
+        _ condition: @escaping @MainActor () -> Bool
+    ) async {
+        for _ in 0..<maxYields {
+            if condition() { return }
+            await Task.yield()
+        }
+        XCTFail("Timed out waiting for asynchronous condition")
+    }
+}
+
+@MainActor
+private final class SuspendedEnglishSpeechProvider: EnglishSpeechProviding {
+    private(set) var speakCount = 0
+    private var continuations: [CheckedContinuation<Bool, Never>] = []
+
+    func speak(_ request: EnglishSpeechRequest) async -> Bool {
+        speakCount += 1
+        return await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func pause() {}
+    func resume() {}
+
+    func stop() {
+        let pending = continuations
+        continuations.removeAll()
+        pending.forEach { $0.resume(returning: false) }
+    }
+}
+
+@MainActor
+private final class ImmediateEnglishSpeechProvider: EnglishSpeechProviding {
+    private(set) var speakCount = 0
+    private let result: Bool
+
+    init(result: Bool) {
+        self.result = result
+    }
+
+    func speak(_ request: EnglishSpeechRequest) async -> Bool {
+        speakCount += 1
+        return result
+    }
+
+    func pause() {}
+    func resume() {}
+    func stop() {}
 }

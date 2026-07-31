@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="GoldRun 是源码公开的 macOS 菜单栏工作台，把系统监控、实时金价、AI 额度、日历倒数日和英语学习放进一个轻量悬浮窗。">
+  <meta name="description" content="GoldRun 是源码公开的 macOS 菜单栏工作台，把系统监控、实时金价、AI 额度、日历倒数日、分组备忘录、剪切板历史和英语学习放进一个轻量悬浮窗。">
   <meta name="theme-color" content="#08231f">
   <meta property="og:title" content="GoldRun — 让常用信息，安静地待在手边">
-  <meta property="og:description" content="原生 macOS 菜单栏工作台：系统状态、金价分析、Codex / Claude 额度、日历倒数日与英语学习。">
+  <meta property="og:description" content="原生 macOS 菜单栏工作台：系统状态、金价分析、AI 额度、日历倒数日、分组备忘录、剪切板历史与英语学习。">
   <meta property="og:image" content="https://kuaoaoaoao.github.io/GoldRun/images/app-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
   <link rel="icon" href="images/app-icon.png">
   <script>document.documentElement.classList.add("js");</script>
-  <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="site.css?v=20260731-notes-clipboard-2">
   <title>GoldRun — macOS 菜单栏工作台</title>
 </head>
 <body>
@@ -49,7 +49,7 @@
         <div class="hero-copy reveal">
           <p class="eyebrow"><span></span> 原生 macOS 菜单栏工具</p>
           <h1>让常用信息，<em>安静地待在手边。</em></h1>
-          <p class="hero-intro">看一眼金价和 Mac 状态，查一下 AI 额度，记住重要日子，再学一个单词。GoldRun 把这些小事收进菜单栏，需要时展开，不用时隐身。</p>
+          <p class="hero-intro">看一眼金价和 Mac 状态，查一下 AI 额度，记一条备忘，找回刚复制的文字，再学一个单词。GoldRun 把这些小事收进菜单栏，需要时展开，不用时隐身。</p>
 
           <div class="hero-actions">
             <a class="button button-primary" href="https://github.com/kuaoaoaoao/GoldRun/releases" data-analytics-event="download_clicked" data-analytics-location="hero" data-analytics-destination="github_releases" data-analytics-platform="macos">
@@ -119,8 +119,8 @@
     <section class="workbench section" id="workbench">
       <div class="shell">
         <div class="section-heading reveal">
-          <p class="kicker">一个入口，五种日常</p>
-          <h2>你不用打开五个应用。</h2>
+          <p class="kicker">一个入口，七种日常</p>
+          <h2>常用工具，不必散落各处。</h2>
           <p>选择一个场景，右侧就是 GoldRun 当前版本的真实界面。</p>
         </div>
 
@@ -149,6 +149,16 @@
             <button class="feature-tab" id="tab-calendar" type="button" role="tab" aria-selected="false" aria-controls="panel-calendar" data-panel="panel-calendar">
               <span class="feature-index">05</span>
               <span><strong>最近有什么重要日子？</strong><small>公历、农历、节假日、生日与倒数日</small></span>
+              <span class="feature-arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="feature-tab" id="tab-notes" type="button" role="tab" aria-selected="false" aria-controls="panel-notes" data-panel="panel-notes">
+              <span class="feature-index">06</span>
+              <span><strong>刚想到的事记在哪里？</strong><small>标题、正文、分组、搜索与固定，全部保存在本机</small></span>
+              <span class="feature-arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="feature-tab" id="tab-clipboard" type="button" role="tab" aria-selected="false" aria-controls="panel-clipboard" data-panel="panel-clipboard">
+              <span class="feature-index">07</span>
+              <span><strong>刚才复制的内容去哪了？</strong><small>纯文本历史、搜索、固定、暂停与一键复制</small></span>
               <span class="feature-arrow" aria-hidden="true">↗</span>
             </button>
           </div>
@@ -193,6 +203,22 @@
                 <p>查看节假日与调休，为生日、考试或纪念日创建一次性或每年重复的提醒。</p>
               </div>
               <img src="images/feature-calendar.png" alt="GoldRun 日历界面">
+            </article>
+            <article class="feature-panel" id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
+              <div class="feature-panel-copy">
+                <span>分组备忘录</span>
+                <strong>随手记下，也能快速找回</strong>
+                <p>按工作、生活等分组整理，支持全文搜索、固定与安全删除；删除分组不会误删其中的备忘。</p>
+              </div>
+              <img src="images/feature-notes.png" alt="GoldRun 分组备忘录界面">
+            </article>
+            <article class="feature-panel" id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" hidden>
+              <div class="feature-panel-copy">
+                <span>剪切板历史</span>
+                <strong>找回复制过的纯文本</strong>
+                <p>自动去重并保留最多 200 条，支持搜索、固定、重新复制和暂停记录，所有内容只存在当前 Mac。</p>
+              </div>
+              <img src="images/feature-clipboard.png" alt="GoldRun 剪切板历史界面">
             </article>
           </div>
         </div>
@@ -377,6 +403,6 @@
     </div>
   </footer>
 
-  <script src="site.js"></script>
+  <script src="site.js?v=20260731-notes-clipboard-2"></script>
 </body>
 </html>

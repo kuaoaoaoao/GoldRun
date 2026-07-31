@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import AppKit
 import UniformTypeIdentifiers
 
@@ -12,6 +13,7 @@ struct GoldTradeLedgerCard: View {
     @State private var tradeStore = GoldTradeStore.shared
     @State private var priceStore = GoldPriceStore.shared
     @ObservedObject private var appSettings = AppSettings.shared
+    @ObservedObject private var router = AppNavigationRouter.shared
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var isExpanded = false
@@ -65,6 +67,11 @@ struct GoldTradeLedgerCard: View {
         }
         .onAppear {
             if !tradeStore.records.isEmpty { isExpanded = true }
+        }
+        .onReceive(router.$request.compactMap { $0 }) { request in
+            guard request.quickAction == .recordGoldTrade else { return }
+            withAnimation(.easeInOut(duration: 0.15)) { isExpanded = true }
+            router.consumeQuickAction(request.id)
         }
     }
 

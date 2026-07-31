@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import Combine
 
 @MainActor
 @Observable
@@ -15,6 +16,13 @@ struct MenuBarMonitorView: View {
     private let onPinChange: (Bool) -> Void
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var router = AppNavigationRouter.shared
+    @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var progressStore = EnglishProgressStore.shared
+    @State private var goldStore = GoldPriceStore.shared
+    @State private var tradeStore = GoldTradeStore.shared
+    @State private var codexModel = CodexMonitorViewModel.shared
+    @State private var claudeModel = ClaudeMonitorViewModel.shared
 
     init(
         viewModel: SystemMonitorViewModel,
@@ -28,7 +36,7 @@ struct MenuBarMonitorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ModuleNavigationRail(selection: $viewMode) {
+            ModuleNavigationRail(selection: $viewMode, todayAttention: todayAttention) {
                 Button {
                     withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
                         pinState.isPinned.toggle()
@@ -52,6 +60,8 @@ struct MenuBarMonitorView: View {
 
             Group {
                 switch viewMode {
+                case .today:
+                    TodayOverviewView(snapshot: viewModel.snapshot)
                 case .monitor:
                     MonitorPanel(
                         snapshot: viewModel.snapshot,
@@ -70,6 +80,10 @@ struct MenuBarMonitorView: View {
                     EnglishLearningView()
                 case .codex:
                     AIMonitorView()
+                case .notes:
+                    NotesView()
+                case .clipboard:
+                    ClipboardHistoryView()
                 }
             }
             .id(viewMode)
@@ -80,6 +94,9 @@ struct MenuBarMonitorView: View {
         .padding(8)
         .onChange(of: viewMode) { _, newValue in
             AppSettings.shared.lastViewModeRaw = newValue.rawValue
+        }
+        .onReceive(router.$request.compactMap { $0 }) { request in
+            viewMode = request.mode
         }
         .background {
             ZStack {
@@ -95,5 +112,17 @@ struct MenuBarMonitorView: View {
                 )
             }
         }
+    }
+
+    private var todayAttention: TodaySeverity? {
+        TodaySummaryBuilder.maximumSeverity(in: TodaySummaryBuilder.current(
+            snapshot: viewModel.snapshot,
+            settings: settings,
+            progressStore: progressStore,
+            goldStore: goldStore,
+            tradeStore: tradeStore,
+            codexModel: codexModel,
+            claudeModel: claudeModel
+        ))
     }
 }

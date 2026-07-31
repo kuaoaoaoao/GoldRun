@@ -225,5 +225,8 @@ final class CountdownManager {
         if let data = try? JSONEncoder().encode(events) {
             userDefaults.set(data, forKey: storageKey)
         }
+        Task { @MainActor in
+            await LocalReminderCenter.shared.rescheduleAll()
+        }
     }
 }
