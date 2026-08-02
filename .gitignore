@@ -26,7 +26,7 @@ skills/
 # Local build and release scratch space
 demo/
 github-public-release/
-GoldRun 2026-*/
+CoolRun 2026-*/
 
 # Xcode user and build output
 **/xcuserdata/

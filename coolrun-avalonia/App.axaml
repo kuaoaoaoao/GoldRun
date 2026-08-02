@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CoolRun.App">
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+
+  <!-- 托盘图标：左键弹出面板，右键菜单 -->
+  <TrayIcon.Icons>
+    <TrayIcons>
+      <TrayIcon Icon="/Assets/icon.ico"
+                ToolTipText="CoolRun"
+                Clicked="OnTrayClicked">
+        <TrayIcon.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="显示 / 隐藏" Click="OnToggleMenuClicked" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="退出 CoolRun" Click="OnQuitMenuClicked" />
+          </NativeMenu>
+        </TrayIcon.Menu>
+      </TrayIcon>
+    </TrayIcons>
+  </TrayIcon.Icons>
+</Application>

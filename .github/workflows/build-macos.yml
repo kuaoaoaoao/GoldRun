@@ -32,16 +32,16 @@ jobs:
         run: >
           xcodebuild
           -resolvePackageDependencies
-          -project GoldRun.xcodeproj
-          -scheme GoldRun
+          -project CoolRun.xcodeproj
+          -scheme CoolRun
 
       - name: Build and test macOS app
         run: >
           xcodebuild
-          -project GoldRun.xcodeproj
-          -scheme GoldRun
+          -project CoolRun.xcodeproj
+          -scheme CoolRun
           -configuration Debug
           -destination 'platform=macOS'
-          -derivedDataPath '${{ runner.temp }}/GoldRun-derived'
+          -derivedDataPath '${{ runner.temp }}/CoolRun-derived'
           CODE_SIGNING_ALLOWED=NO
           test

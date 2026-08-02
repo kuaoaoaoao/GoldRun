@@ -21,6 +21,6 @@
 
 - 只从本仓库的 GitHub Releases 或自行构建的源码安装。
 - macOS 社区构建未使用 Developer ID 且未经 Apple 公证；安装前必须核对 Release 提供的 SHA-256。无法确认来源时不要绕过 Gatekeeper。
-- `.goldrun` 备份未加密，不要上传到公开 Issue。
+- `.coolrun` 备份未加密，不要上传到公开 Issue。
 - AI 监控会读取本机 CLI 登录状态；共享日志和截图前请检查账号、路径与配额信息。
 - 金价和分析结果仅供信息参考，不构成投资建议。

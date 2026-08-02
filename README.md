@@ -1,24 +1,25 @@
-# GoldRun
+# CoolRun
 
-[![macOS CI](https://github.com/kuaoaoaoao/GoldRun/actions/workflows/build-macos.yml/badge.svg)](https://github.com/kuaoaoaoao/GoldRun/actions/workflows/build-macos.yml)
+[![macOS CI](https://github.com/kuaoaoaoao/CoolRun/actions/workflows/build-macos.yml/badge.svg)](https://github.com/kuaoaoaoao/CoolRun/actions/workflows/build-macos.yml)
 [![PolyForm Noncommercial License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg)](LICENSE)
 
-GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时金价、日历倒数日、备忘录、剪切板历史、英语学习和 AI 额度放进一个轻量悬浮窗。
+CoolRun 是一款原生 macOS 菜单栏效率工具，把系统监控、Mac 诊断、实时金价、日历倒数日、备忘录、剪切板历史、英语学习和 AI 额度放进一个轻量悬浮窗。
 
 它默认常驻菜单栏，不占 Dock。菜单栏可以显示金价、日期、系统状态、英语内容、最近倒数日或 Codex/Claude 剩余额度；点击后打开悬浮面板。悬浮窗支持固定，适合边工作边查看信息或学习英语。
 
-![GoldRun 动态演示](docs/images/GoldRunShowDemo.gif)
+![CoolRun 动态演示](docs/images/CoolRunShowDemo.gif)
 
-官网：[kuaoaoaoao.github.io/GoldRun](https://kuaoaoaoao.github.io/GoldRun/)
+官网：[kuaoaoaoao.github.io/CoolRun](https://kuaoaoaoao.github.io/CoolRun/)
 
-下载：[GitHub Releases](https://github.com/kuaoaoaoao/GoldRun/releases)
+下载：[GitHub Releases](https://github.com/kuaoaoaoao/CoolRun/releases)
 
 ## GitHub Star History
 
-[![GoldRun Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/GoldRun&type=Date)](https://star-history.com/#kuaoaoaoao/GoldRun&Date)
+[![CoolRun Star History Chart](https://api.star-history.com/svg?repos=kuaoaoaoao/CoolRun&type=Date)](https://star-history.com/#kuaoaoaoao/CoolRun&Date)
 
 ## 当前重点功能
 
+- 新增 Mac 诊断：排查睡眠唤醒与耗电、逐层检测网络、分析 System Data 占用，并安全清理高置信度应用残留。
 - 新增分组备忘录：支持标题/正文、分组管理、搜索、固定、移动和安全删除；删除分组时其中备忘会移到“未分组”。
 - 新增剪切板历史：自动记录启动后复制的纯文本，支持搜索、固定、一键复制、暂停和清空；最多保留 200 条且仅存在本机。
 - 新增“今天”总览：把系统健康、最近倒数日/生日、黄金持仓、英语进度和 AI 额度按紧急程度集中排序，并可直接跳转到对应模块。
@@ -39,6 +40,7 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 
 - 你想把金价固定在 macOS 菜单栏里，随手看一眼。
 - 你想知道 Mac 当前是不是高负载、内存是否紧张、温度是否偏高。
+- 你想排查 Mac 为什么睡不着、网络哪一层异常，或 System Data 为什么变大。
 - 你想要一个小白也能看懂的金价分析面板，而不只是技术指标。
 - 你同时使用 Codex 或 Claude Code，希望随手查看额度和重置时间。
 - 你想把考试、纪念日等公历或农历日期固定在菜单栏。
@@ -71,6 +73,14 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 - 进程：按 CPU 或内存排序，可合并同名进程，并在确认后结束进程。
 - 点击指标可复制到剪贴板。
 - 自动记录最近 7 天的本地趋势，并保留 30 天持续异常事件；高负载需连续出现才会记录，避免瞬时抖动误报。
+
+### Mac 诊断
+
+- 睡眠与耗电：读取 macOS 电源断言和最近 24 小时睡眠/唤醒记录，指出可能阻止休眠的进程与异常唤醒。
+- 网络诊断：依次检查本地接口、默认路由、DNS、外网连通与 HTTPS，并提示 VPN 接口；不抓包、不保存浏览历史。
+- System Data 洞察：只读统计缓存、日志、应用支持、容器、开发文件和设备备份，展示大目录并支持在 Finder 中定位。
+- 应用残留：只列出符合严格规则的高置信度候选，删除前再次校验并要求确认，文件仅移入废纸篓；不永久删除。
+- 睡眠与网络诊断只保留有上限的本地摘要；原始系统日志、完整目录清单和文件内容不会保存。
 
 ### 今天与本地提醒
 
@@ -199,9 +209,9 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 
 ### 从 GitHub Releases 安装
 
-1. 打开 [GitHub Releases](https://github.com/kuaoaoaoao/GoldRun/releases)。
-2. 下载最新的 `GoldRun.dmg`，双击打开。
-3. 将 `GoldRun.app` 拖入 `Applications` 文件夹。
+1. 打开 [GitHub Releases](https://github.com/kuaoaoaoao/CoolRun/releases)。
+2. 下载最新的 `CoolRun.dmg`，双击打开。
+3. 将 `CoolRun.app` 拖入 `Applications` 文件夹。
 4. 启动后，在 macOS 菜单栏找到金币图标。
 
 > 当前安装包未经 Apple 公证。若首次启动被 macOS 拦截，请打开“系统设置 → 隐私与安全性”，在安全性区域选择“仍要打开”。请只从本项目的 GitHub Releases 下载。
@@ -212,9 +222,9 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 - 点击图钉按钮：固定或取消固定悬浮面板。
 - 固定后可一边使用其他应用，一边查看数据或学习英语。
 - 右键点击菜单栏金币图标：打开快捷菜单，可直接查看今天、添加倒数日、记录交易或刷新数据。
-- 在 macOS“快捷指令”中搜索 GoldRun：可打开指定模块、刷新金价或控制英语播放。
+- 在 macOS“快捷指令”中搜索 CoolRun：可打开指定模块、刷新金价或控制英语播放。
 - 快捷菜单中的“设置”：打开设置页面。
-- 快捷菜单中的“退出程序”：退出 GoldRun。
+- 快捷菜单中的“退出程序”：退出 CoolRun。
 
 ## 从源码运行
 
@@ -229,17 +239,17 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 1. 克隆项目：
 
    ```bash
-   git clone https://github.com/kuaoaoaoao/GoldRun.git
-   cd GoldRun
+   git clone https://github.com/kuaoaoaoao/CoolRun.git
+   cd CoolRun
    ```
 
 2. 使用 Xcode 打开：
 
    ```bash
-   open GoldRun.xcodeproj
+   open CoolRun.xcodeproj
    ```
 
-3. 选择 `GoldRun` scheme。
+3. 选择 `CoolRun` scheme。
 4. 运行目标选择 `My Mac`。
 5. 点击运行。
 
@@ -248,11 +258,11 @@ GoldRun 是一款原生 macOS 菜单栏效率工具，把系统监控、实时�
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild \
-  -project GoldRun.xcodeproj \
-  -scheme GoldRun \
+  -project CoolRun.xcodeproj \
+  -scheme CoolRun \
   -configuration Debug \
   -destination 'platform=macOS' \
-  -derivedDataPath /tmp/GoldRun-derived \
+  -derivedDataPath /tmp/CoolRun-derived \
   CODE_SIGNING_ALLOWED=NO \
   test
 ```
@@ -261,14 +271,14 @@ xcodebuild \
 
 ## 平台状态
 
-- `GoldRun`：主要维护的 macOS SwiftUI + AppKit 应用；Xcode project、target 和 scheme 均使用 `GoldRun`。
-- `GoldRun Watch`：watchOS 辅助目标，功能范围较小。
-- `goldrun-windows`：Tauri 实验版，不保证与 macOS 功能一致。
-- `goldrun-avalonia`：Avalonia 技术验证版本，不保证功能一致。
+- `CoolRun`：主要维护的 macOS SwiftUI + AppKit 应用；Xcode project、target 和 scheme 均使用 `CoolRun`。
+- `CoolRun Watch`：watchOS 辅助目标，功能范围较小。
+- `coolrun-windows`：Tauri 实验版，不保证与 macOS 功能一致。
+- `coolrun-avalonia`：Avalonia 技术验证版本，不保证功能一致。
 
 ## 打包发布
 
-仓库的 `Package unsigned macOS build` Action 可以在不配置 Apple 账号的情况下生成 `GoldRun.dmg`。它会先运行 Release 构建，再应用 ad hoc 临时签名并验证 App Bundle。该签名不能代替 Developer ID 或 Apple 公证。Action 生成的文件默认保留 30 天，发布者核对后可手动上传到 GitHub Release。
+仓库的 `Package unsigned macOS build` Action 可以在不配置 Apple 账号的情况下生成 `CoolRun.dmg`。它会先运行 Release 构建，再应用 ad hoc 临时签名并验证 App Bundle。该签名不能代替 Developer ID 或 Apple 公证。Action 生成的文件默认保留 30 天，发布者核对后可手动上传到 GitHub Release。
 
 ### 制作 DMG
 
@@ -281,12 +291,12 @@ xcodebuild \
 也可以手动指定 app 路径：
 
 ```bash
-./scripts/create-dmg.sh /path/to/GoldRun.app
+./scripts/create-dmg.sh /path/to/CoolRun.app
 ```
 
 DMG 不会自动获得 Developer ID 签名或公证，公开发布时需要明确说明。
 
-脚本会在项目根目录生成 `GoldRun.dmg`。
+脚本会在项目根目录生成 `CoolRun.dmg`。
 
 ## 金价数据说明
 
@@ -301,15 +311,15 @@ news.google.com
 home.treasury.gov
 ```
 
-接口均由第三方提供，稳定性和数据准确性取决于服务方。部分数据不可用时，应用会使用缓存或降低分析完整度。GoldRun 仅展示接口数据和基于历史样本的规则分析，不构成投资建议。
+接口均由第三方提供，稳定性和数据准确性取决于服务方。部分数据不可用时，应用会使用缓存或降低分析完整度。CoolRun 仅展示接口数据和基于历史样本的规则分析，不构成投资建议。
 
 ## 项目结构
 
 ```text
-GoldRun
-├── GoldRun.xcodeproj
-├── GoldRun
-│   ├── GoldRunApp.swift
+CoolRun
+├── CoolRun.xcodeproj
+├── CoolRun
+│   ├── CoolRunApp.swift
 │   ├── MacAppDelegate.swift
 │   ├── ContentView.swift
 │   ├── MenuBarMonitorView.swift
@@ -330,13 +340,13 @@ GoldRun
 │   ├── SystemSampler.swift
 │   ├── SystemMetrics.swift
 │   ├── AppVersion.swift
-│   ├── GoldRun.entitlements
+│   ├── CoolRun.entitlements
 │   └── Assets.xcassets
 ├── docs
 │   └── index.html
 ├── scripts
 │   └── create-dmg.sh
-├── GoldRunTests
+├── CoolRunTests
 ├── CONTRIBUTING.md
 ├── PRIVACY.md
 ├── SECURITY.md
@@ -349,6 +359,9 @@ GoldRun
 - `MacAppDelegate.swift`：菜单栏图标、金币动画、悬浮窗、固定逻辑、右键菜单和金价刷新。
 - `ContentView.swift`：主面板视图模式、系统监控面板和公共 UI 组件。
 - `MenuBarMonitorView.swift`：菜单栏悬浮面板。
+- `DiagnosticsView.swift`、`DiagnosticsViewModel.swift`：Mac 诊断界面与状态协调。
+- `SleepDiagnostics.swift`、`NetworkDiagnostics.swift`：睡眠耗电和分层网络诊断。
+- `StorageDiagnostics.swift`、`AppResidueService.swift`：System Data 只读分析与应用残留安全清理。
 - `GoldAnalysisView.swift`：金价分析 UI。
 - `GoldAnalysisEngine.swift`：基础统计、技术指标快照和交易信号。
 - `GoldAdvancedStrategy.swift`：高级量化策略分析。
@@ -364,7 +377,14 @@ GoldRun
 
 ## 隐私说明
 
-系统监控、生日、倒数日、备忘录、剪切板历史、学习进度和持仓默认只保存在本机。匿名统计默认关闭，AI 凭据不会进入备份或统计。完整的数据保存位置、网络目标和统计事件范围见 [PRIVACY.md](PRIVACY.md)。
+系统监控、诊断摘要、生日、倒数日、备忘录、剪切板历史、学习进度和持仓默认只保存在本机。System Data 与残留扫描在本地进行，清理操作只会把确认的项目移入废纸篓。匿名统计默认关闭，AI 凭据不会进入备份或统计。完整的数据保存位置、网络目标和统计事件范围见 [PRIVACY.md](PRIVACY.md)。
+
+## 版本与开发路线
+
+- [当前版本更新总结](docs/release-summary.md)
+- [Mac 诊断与后续路线](docs/mac-diagnostics-roadmap.md)
+- 下一项计划：输出设备快速切换。
+- 后续计划：外接屏工作区快照与恢复。
 
 ## 贡献
 
@@ -372,9 +392,10 @@ GoldRun
 
 可以改进的方向：
 
-- 更多贵金属或自定义数据源。
-- 更完整的金价分析回测。
-- 更完善的多平台功能对齐。
+- 诊断权限提示、历史趋势和脱敏报告导出。
+- 输出设备快速切换，以及后续的分应用音量评估。
+- 外接屏工作区快照、预览、恢复和撤销。
+- 更多贵金属数据源、金价回测与多平台功能对齐。
 
 ## 许可证
 
@@ -389,4 +410,4 @@ GoldRun
 ## 作者
 
 - 作者：kuaoaoaoao
-- GitHub：[github.com/kuaoaoaoao/GoldRun](https://github.com/kuaoaoaoao/GoldRun)
+- GitHub：[github.com/kuaoaoaoao/CoolRun](https://github.com/kuaoaoaoao/CoolRun)

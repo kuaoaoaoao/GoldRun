@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CoolRun</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="panel">
+      <header class="tabs">
+        <button class="tab active" data-tab="system">系统监控</button>
+        <button class="tab" data-tab="gold">金价分析</button>
+      </header>
+
+      <!-- 系统监控 -->
+      <main id="tab-system" class="tab-page">
+        <section class="card">
+          <div class="metric-row">
+            <span class="metric-label">CPU</span>
+            <span class="metric-value" id="cpu-usage">--%</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="cpu-bar"></div></div>
+          <div class="metric-sub" id="cpu-detail">-- 核心</div>
+        </section>
+
+        <section class="card">
+          <div class="metric-row">
+            <span class="metric-label">内存</span>
+            <span class="metric-value" id="mem-usage">--%</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="mem-bar"></div></div>
+          <div class="metric-sub" id="mem-detail">-- / --</div>
+        </section>
+
+        <section class="card">
+          <div class="metric-row">
+            <span class="metric-label">磁盘</span>
+            <span class="metric-value" id="disk-usage">--%</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="disk-bar"></div></div>
+          <div class="metric-sub" id="disk-detail">-- / --</div>
+        </section>
+
+        <section class="card">
+          <div class="metric-row">
+            <span class="metric-label">网络</span>
+            <span class="metric-value small" id="net-speed">↓ --  ↑ --</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">开机时长</span>
+            <span class="metric-value small" id="uptime">--</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">CPU 温度</span>
+            <span class="metric-value small" id="cpu-temp">--</span>
+          </div>
+        </section>
+
+        <section class="card" id="sensors-card" hidden>
+          <div class="card-title">温度传感器</div>
+          <div id="sensor-list" class="list"></div>
+        </section>
+      </main>
+
+      <!-- 金价分析 -->
+      <main id="tab-gold" class="tab-page" hidden>
+        <section class="card gold-header">
+          <div>
+            <div class="gold-price" id="gold-price">--</div>
+            <div class="metric-sub" id="gold-updated">--</div>
+          </div>
+          <div class="gold-change" id="gold-change">--</div>
+        </section>
+
+        <section class="card">
+          <div class="range-selector" id="range-selector">
+            <button class="range active" data-range="today">1D</button>
+            <button class="range" data-range="w">1W</button>
+            <button class="range" data-range="m">1M</button>
+            <button class="range" data-range="q">3M</button>
+            <button class="range" data-range="h">6M</button>
+            <button class="range" data-range="y">1Y</button>
+          </div>
+          <canvas id="gold-chart" width="372" height="160"></canvas>
+          <div class="metric-sub chart-range" id="chart-range">--</div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">技术指标</div>
+          <div class="indicator-grid" id="indicator-grid"></div>
+          <div class="metric-sub" id="tech-hint">--</div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">多平台金价</div>
+          <div id="multi-source-list" class="list"></div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span id="footer-status">CoolRun for Windows</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

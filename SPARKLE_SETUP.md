@@ -1,10 +1,10 @@
 # Sparkle update setup
 
-GoldRun has Sparkle wired into the app, but Sparkle needs a signing key and an appcast before real updates can be shipped.
+CoolRun has Sparkle wired into the app, but Sparkle needs a signing key and an appcast before real updates can be shipped.
 
 ## 1. Resolve Sparkle in Xcode
 
-Open `GoldRun.xcodeproj` in Xcode. Xcode should resolve this Swift Package:
+Open `CoolRun.xcodeproj` in Xcode. Xcode should resolve this Swift Package:
 
 `https://github.com/sparkle-project/Sparkle`
 
@@ -24,7 +24,7 @@ It is currently set to:
 
 The current feed URL placeholder is:
 
-`https://github.com/kuaoaoaoao/GoldRun/releases/download/appcast/appcast.xml`
+`https://github.com/kuaoaoaoao/CoolRun/releases/download/appcast/appcast.xml`
 
 You can replace `INFOPLIST_KEY_SUFeedURL` with any stable HTTPS URL that hosts your appcast.
 

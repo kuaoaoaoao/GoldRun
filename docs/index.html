@@ -3,26 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="GoldRun 是源码公开的 macOS 菜单栏工作台，把系统监控、实时金价、AI 额度、日历倒数日、分组备忘录、剪切板历史和英语学习放进一个轻量悬浮窗。">
+  <meta name="description" content="CoolRun 是源码公开的 macOS 菜单栏工作台，把系统监控、Mac 诊断、实时金价、AI 额度、日历倒数日、分组备忘录、剪切板历史和英语学习放进一个轻量悬浮窗。">
   <meta name="theme-color" content="#08231f">
-  <meta property="og:title" content="GoldRun — 让常用信息，安静地待在手边">
-  <meta property="og:description" content="原生 macOS 菜单栏工作台：系统状态、金价分析、AI 额度、日历倒数日、分组备忘录、剪切板历史与英语学习。">
-  <meta property="og:image" content="https://kuaoaoaoao.github.io/GoldRun/images/app-icon.png">
+  <meta property="og:title" content="CoolRun — 看见 Mac 状态，也找到问题原因">
+  <meta property="og:description" content="原生 macOS 菜单栏工作台：排查睡眠耗电、网络、System Data 和应用残留，也能查看金价、AI 额度与日常信息。">
+  <meta property="og:image" content="https://kuaoaoaoao.github.io/CoolRun/images/og-mac-diagnostics.png">
+  <meta property="og:image:alt" content="CoolRun Mac 诊断：睡眠、网络、System Data 与应用残留">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://kuaoaoaoao.github.io/CoolRun/">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CoolRun — 看见 Mac 状态，也找到问题原因">
+  <meta name="twitter:description" content="睡眠、网络、System Data 与应用残留，一起放进原生 macOS 菜单栏工作台。">
+  <meta name="twitter:image" content="https://kuaoaoaoao.github.io/CoolRun/images/og-mac-diagnostics.png">
+  <meta name="twitter:image:alt" content="CoolRun Mac 诊断功能预览">
   <link rel="icon" href="images/app-icon.png">
   <script>document.documentElement.classList.add("js");</script>
-  <link rel="stylesheet" href="site.css?v=20260731-notes-clipboard-2">
-  <title>GoldRun — macOS 菜单栏工作台</title>
+  <link rel="stylesheet" href="site.css?v=20260801-mac-diagnostics">
+  <title>CoolRun — Mac 诊断与菜单栏工作台</title>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
 
   <header class="site-header">
     <nav class="nav shell" aria-label="主导航">
-      <a class="brand" href="#top" aria-label="GoldRun 首页">
+      <a class="brand" href="#top" aria-label="CoolRun 首页">
         <img src="images/app-icon.png" alt="" width="34" height="34">
-        <span>GoldRun</span>
+        <span>CoolRun</span>
       </a>
 
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">
@@ -32,13 +41,14 @@
       </button>
 
       <div class="nav-links" id="nav-links">
+        <a href="#diagnostics">Mac 诊断</a>
         <a href="#workbench">功能</a>
         <a href="#gold">金价分析</a>
         <a href="#why">为什么是菜单栏</a>
         <a href="#stars">Stars</a>
         <a href="#install">安装</a>
         <a href="usage-stats.html">公开统计</a>
-        <a class="nav-github" href="https://github.com/kuaoaoaoao/GoldRun" data-analytics-event="github_link_clicked" data-analytics-location="nav" data-analytics-destination="repository">GitHub ↗</a>
+        <a class="nav-github" href="https://github.com/kuaoaoaoao/CoolRun" data-analytics-event="github_link_clicked" data-analytics-location="nav" data-analytics-destination="repository">GitHub ↗</a>
       </div>
     </nav>
   </header>
@@ -47,16 +57,16 @@
     <section class="hero" id="top">
       <div class="hero-grid shell">
         <div class="hero-copy reveal">
-          <p class="eyebrow"><span></span> 原生 macOS 菜单栏工具</p>
-          <h1>让常用信息，<em>安静地待在手边。</em></h1>
-          <p class="hero-intro">看一眼金价和 Mac 状态，查一下 AI 额度，记一条备忘，找回刚复制的文字，再学一个单词。GoldRun 把这些小事收进菜单栏，需要时展开，不用时隐身。</p>
+          <p class="eyebrow"><span></span> 原生 Mac 诊断与菜单栏工具</p>
+          <h1>看见 Mac 状态，<em>也找到问题原因。</em></h1>
+          <p class="hero-intro">Mac 合盖后为什么掉电，Wi-Fi 满格为什么没网，System Data 到底占在哪里，卸载应用还留下了什么——CoolRun 把诊断和日常工具收进菜单栏，需要时展开，不用时隐身。</p>
 
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/kuaoaoaoao/GoldRun/releases" data-analytics-event="download_clicked" data-analytics-location="hero" data-analytics-destination="github_releases" data-analytics-platform="macos">
+            <a class="button button-primary" href="https://github.com/kuaoaoaoao/CoolRun/releases" data-analytics-event="download_clicked" data-analytics-location="hero" data-analytics-destination="github_releases" data-analytics-platform="macos">
               下载 macOS 版
               <span aria-hidden="true">↓</span>
             </a>
-            <a class="button button-secondary" href="https://github.com/kuaoaoaoao/GoldRun" data-analytics-event="github_link_clicked" data-analytics-location="hero" data-analytics-destination="repository">
+            <a class="button button-secondary" href="https://github.com/kuaoaoaoao/CoolRun" data-analytics-event="github_link_clicked" data-analytics-location="hero" data-analytics-destination="repository">
               查看项目源码
             </a>
           </div>
@@ -65,11 +75,11 @@
             <li>macOS 15+</li>
             <li>SwiftUI 原生</li>
             <li>非商用免费</li>
-            <li>本地优先</li>
+            <li>诊断本地运行</li>
           </ul>
         </div>
 
-        <div class="hero-stage reveal" aria-label="GoldRun 界面预览">
+        <div class="hero-stage reveal" aria-label="CoolRun 界面预览">
           <div class="desktop-glow" aria-hidden="true"></div>
           <div class="menu-rail">
             <span class="apple-dot" aria-hidden="true"></span>
@@ -109,19 +119,68 @@
 
     <section class="quick-strip" aria-label="核心能力">
       <div class="quick-grid shell">
-        <div><span>01</span><strong>随手查看</strong><p>一眼获取重要状态</p></div>
-        <div><span>02</span><strong>按需展开</strong><p>固定后也能持续操作</p></div>
-        <div><span>03</span><strong>保存在本机</strong><p>个人记录无需云端账号</p></div>
-        <div><span>04</span><strong>源码可审查</strong><p>SwiftUI 源码完全公开</p></div>
+        <div><span>01</span><strong>发现问题</strong><p>从状态数字找到异常方向</p></div>
+        <div><span>02</span><strong>解释原因</strong><p>睡眠、网络与存储分层检查</p></div>
+        <div><span>03</span><strong>安全处理</strong><p>只读优先，清理仅进废纸篓</p></div>
+        <div><span>04</span><strong>本地优先</strong><p>诊断摘要和个人记录留在本机</p></div>
+      </div>
+    </section>
+
+    <section class="diagnostics-story section" id="diagnostics">
+      <div class="diagnostics-shell shell">
+        <div class="diagnostics-copy reveal">
+          <p class="kicker">Mac Diagnostics</p>
+          <h2>不是多看几个数字，<br>是知道下一步查哪里。</h2>
+          <p>四条诊断路径都按需运行。能确认的直接说明，无法访问的范围明确标记，任何清理都把决定权留给用户。</p>
+          <ul class="diagnostics-principles">
+            <li><span>只读优先</span>睡眠、网络和 System Data 检查不会修改系统设置。</li>
+            <li><span>结果可解释</span>按检查层级展示，不用自己拼终端输出。</li>
+            <li><span>删除可恢复</span>高置信残留经二次确认后也只移入废纸篓。</li>
+          </ul>
+        </div>
+
+        <div class="diagnostic-console reveal" aria-label="CoolRun Mac 诊断能力预览">
+          <div class="console-head">
+            <span><i aria-hidden="true"></i> CoolRun / Mac 诊断</span>
+            <small>本地检查</small>
+          </div>
+          <div class="diagnostic-grid">
+            <article>
+              <span class="diagnostic-symbol" aria-hidden="true">☾</span>
+              <div><small>睡眠与耗电</small><strong>找到阻止休眠的进程</strong><p>电源断言 · Wake · Dark Wake · 电量变化</p></div>
+              <em class="status-watch">需留意</em>
+            </article>
+            <article>
+              <span class="diagnostic-symbol" aria-hidden="true">⌁</span>
+              <div><small>网络医生</small><strong>判断故障发生在哪一层</strong><p>接口 · 网关 · DNS · Ping · HTTPS · VPN</p></div>
+              <em class="status-clear">可连接</em>
+            </article>
+            <article>
+              <span class="diagnostic-symbol" aria-hidden="true">▦</span>
+              <div><small>System Data</small><strong>解释空间被谁占用</strong><p>缓存 · 日志 · 容器 · 开发文件 · 设备备份</p></div>
+              <em>只读</em>
+            </article>
+            <article>
+              <span class="diagnostic-symbol" aria-hidden="true">⌫</span>
+              <div><small>应用残留</small><strong>只列出高置信候选</strong><p>严格匹配 · 二次确认 · 路径复核 · 移入废纸篓</p></div>
+              <em>可恢复</em>
+            </article>
+          </div>
+          <div class="console-foot">
+            <span>原始日志不留存</span>
+            <span>不读取文件内容</span>
+            <span>不永久删除</span>
+          </div>
+        </div>
       </div>
     </section>
 
     <section class="workbench section" id="workbench">
       <div class="shell">
         <div class="section-heading reveal">
-          <p class="kicker">一个入口，七种日常</p>
+          <p class="kicker">诊断之外，七种日常</p>
           <h2>常用工具，不必散落各处。</h2>
-          <p>选择一个场景，右侧就是 GoldRun 当前版本的真实界面。</p>
+          <p>选择一个场景，右侧就是 CoolRun 当前版本的真实界面。</p>
         </div>
 
         <div class="workbench-layout">
@@ -170,7 +229,7 @@
                 <strong>找到拖慢 Mac 的进程</strong>
                 <p>按 CPU 或内存排序，同名进程可以合并查看，也能在确认后结束进程。</p>
               </div>
-              <img src="images/feature-process.png" alt="GoldRun Mac 进程监控界面">
+              <img src="images/feature-process.png" alt="CoolRun Mac 进程监控界面">
             </article>
             <article class="feature-panel" id="panel-gold" role="tabpanel" aria-labelledby="tab-gold" hidden>
               <div class="feature-panel-copy">
@@ -178,7 +237,7 @@
                 <strong>从一个数字看到完整上下文</strong>
                 <p>价格走势、RSI、MACD、支撑与压力，以及自己的成本和浮盈浮亏，都放在一起。</p>
               </div>
-              <img src="images/gold-analyze.png" alt="GoldRun 金价分析界面">
+              <img src="images/gold-analyze.png" alt="CoolRun 金价分析界面">
             </article>
             <article class="feature-panel" id="panel-ai" role="tabpanel" aria-labelledby="tab-ai" hidden>
               <div class="feature-panel-copy">
@@ -186,7 +245,7 @@
                 <strong>先看到最紧张的额度窗口</strong>
                 <p>统一查看 Codex 与 Claude Code，并把剩余比例、重置时间和使用节奏讲清楚。</p>
               </div>
-              <img src="images/feature-ai.png" alt="GoldRun AI 额度总览界面">
+              <img src="images/feature-ai.png" alt="CoolRun AI 额度总览界面">
             </article>
             <article class="feature-panel" id="panel-english" role="tabpanel" aria-labelledby="tab-english" hidden>
               <div class="feature-panel-copy">
@@ -194,7 +253,7 @@
                 <strong>把碎片时间变成一次复习</strong>
                 <p>覆盖日常到 TOEFL 的分级内容，记录掌握度、收藏、连续学习天数和待复习项目。</p>
               </div>
-              <img src="images/feature-english.png" alt="GoldRun 英语学习界面">
+              <img src="images/feature-english.png" alt="CoolRun 英语学习界面">
             </article>
             <article class="feature-panel" id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar" hidden>
               <div class="feature-panel-copy">
@@ -202,7 +261,7 @@
                 <strong>公历和农历，不必分开记</strong>
                 <p>查看节假日与调休，为生日、考试或纪念日创建一次性或每年重复的提醒。</p>
               </div>
-              <img src="images/feature-calendar.png" alt="GoldRun 日历界面">
+              <img src="images/feature-calendar.png" alt="CoolRun 日历界面">
             </article>
             <article class="feature-panel" id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
               <div class="feature-panel-copy">
@@ -210,7 +269,7 @@
                 <strong>随手记下，也能快速找回</strong>
                 <p>按工作、生活等分组整理，支持全文搜索、固定与安全删除；删除分组不会误删其中的备忘。</p>
               </div>
-              <img src="images/feature-notes.png" alt="GoldRun 分组备忘录界面">
+              <img src="images/feature-notes.png" alt="CoolRun 分组备忘录界面">
             </article>
             <article class="feature-panel" id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" hidden>
               <div class="feature-panel-copy">
@@ -218,7 +277,7 @@
                 <strong>找回复制过的纯文本</strong>
                 <p>自动去重并保留最多 200 条，支持搜索、固定、重新复制和暂停记录，所有内容只存在当前 Mac。</p>
               </div>
-              <img src="images/feature-clipboard.png" alt="GoldRun 剪切板历史界面">
+              <img src="images/feature-clipboard.png" alt="CoolRun 剪切板历史界面">
             </article>
           </div>
         </div>
@@ -230,7 +289,7 @@
         <div class="gold-copy reveal">
           <p class="kicker kicker-gold">金价分析，不止报数</p>
           <h2>指标很多，<br>结论要说人话。</h2>
-          <p>GoldRun 会记录历史价格，整理走势、波动率、均线、RSI 与 MACD，再给出“观望为主”“不建议追买”“盈利可分批落袋”这样的直白说明。</p>
+          <p>CoolRun 会记录历史价格，整理走势、波动率、均线、RSI 与 MACD，再给出“观望为主”“不建议追买”“盈利可分批落袋”这样的直白说明。</p>
           <ul>
             <li><span>趋势</span>折线、迷你 K 线与周期切换</li>
             <li><span>持仓</span>成本、市值、浮盈浮亏与收益率</li>
@@ -249,7 +308,7 @@
             </div>
           </div>
           <div class="advice-card">
-            <img src="images/feature-gold-advice.png" alt="GoldRun 金价建议卡片：观望为主">
+            <img src="images/feature-gold-advice.png" alt="CoolRun 金价建议卡片：观望为主">
           </div>
           <p>价格会变，判断需要上下文。</p>
         </div>
@@ -288,6 +347,7 @@
         </div>
         <div class="map-grid">
           <article><span>CPU</span><h3>系统状态</h3><p>温度、网络、储存、电池、内存压力和运行时间。</p></article>
+          <article><span>⌁</span><h3>Mac 诊断</h3><p>排查睡眠唤醒、网络分层、System Data 与应用残留。</p></article>
           <article><span>¥/g</span><h3>个人持仓</h3><p>输入持有克数与买入均价，数据保存在本机。</p></article>
           <article><span>AI</span><h3>额度提醒</h3><p>默认关闭，只有主动开启后才会请求通知权限。</p></article>
           <article><span>Aa</span><h3>语音学习</h3><p>macOS 系统语音，也支持高级用户配置本机 Kokoro TTS。</p></article>
@@ -316,18 +376,18 @@
         <div>
           <p class="kicker">Source available on GitHub</p>
           <h2>知道它在你的 Mac 上做了什么。</h2>
-          <p>GoldRun 公开源代码供审查、学习和非商业使用；任何商业用途都需要事先取得书面授权。</p>
+          <p>CoolRun 公开源代码供审查、学习和非商业使用；任何商业用途都需要事先取得书面授权。</p>
           <div class="source-actions">
-            <a class="button button-light" href="https://github.com/kuaoaoaoao/GoldRun" data-analytics-event="github_link_clicked" data-analytics-location="open_source" data-analytics-destination="repository">打开 GitHub ↗</a>
-            <a href="https://github.com/kuaoaoaoao/GoldRun/issues" data-analytics-event="feedback_clicked" data-analytics-location="open_source" data-analytics-destination="github_issues">提交反馈</a>
+            <a class="button button-light" href="https://github.com/kuaoaoaoao/CoolRun" data-analytics-event="github_link_clicked" data-analytics-location="open_source" data-analytics-destination="repository">打开 GitHub ↗</a>
+            <a href="https://github.com/kuaoaoaoao/CoolRun/issues" data-analytics-event="feedback_clicked" data-analytics-location="open_source" data-analytics-destination="github_issues">提交反馈</a>
           </div>
         </div>
         <div class="code-window" aria-label="从源码构建示例">
           <div><span></span><span></span><span></span><em>Terminal</em></div>
           <pre><code><b>$</b> git clone \
-  github.com/kuaoaoaoao/GoldRun
+  github.com/kuaoaoaoao/CoolRun
 
-<b>$</b> open GoldRun.xcodeproj
+<b>$</b> open CoolRun.xcodeproj
 
 <i># 选择 My Mac，然后运行</i></code></pre>
         </div>
@@ -339,11 +399,11 @@
         <div class="star-copy reveal">
           <p class="kicker">Public on GitHub</p>
           <h2>每一颗 Star，<br>都让金币再转一圈。</h2>
-          <p>仓库已经公开。这里直接展示 GitHub Star 的增长记录，也欢迎把 GoldRun 分享给同样喜欢菜单栏小工具的人。</p>
-          <a class="button button-star" href="https://github.com/kuaoaoaoao/GoldRun">去 GitHub 点个 Star <span aria-hidden="true">★</span></a>
+          <p>仓库已经公开。这里直接展示 GitHub Star 的增长记录，也欢迎把 CoolRun 分享给同样喜欢菜单栏小工具的人。</p>
+          <a class="button button-star" href="https://github.com/kuaoaoaoao/CoolRun">去 GitHub 点个 Star <span aria-hidden="true">★</span></a>
         </div>
-        <a class="star-chart reveal" href="https://star-history.com/#kuaoaoaoao/GoldRun&amp;Date" aria-label="查看 GoldRun Star History">
-          <img src="https://api.star-history.com/svg?repos=kuaoaoaoao/GoldRun&amp;type=Date" alt="GoldRun GitHub Star History 图表" loading="lazy">
+        <a class="star-chart reveal" href="https://star-history.com/#kuaoaoaoao/CoolRun&amp;Date" aria-label="查看 CoolRun Star History">
+          <img src="https://api.star-history.com/svg?repos=kuaoaoaoao/CoolRun&amp;type=Date" alt="CoolRun GitHub Star History 图表" loading="lazy">
         </a>
       </div>
     </section>
@@ -352,18 +412,18 @@
       <div class="shell">
         <div class="section-heading install-heading reveal">
           <p class="kicker">三步开始</p>
-          <h2>把 GoldRun 放进菜单栏。</h2>
+          <h2>把 CoolRun 放进菜单栏。</h2>
           <p>当前 Release 直接提供 DMG，安装不需要终端命令。</p>
         </div>
 
         <ol class="install-steps">
           <li class="reveal">
             <span>1</span>
-            <div><h3>下载</h3><p>从 GitHub Releases 下载最新的 GoldRun.dmg。</p></div>
+            <div><h3>下载</h3><p>从 GitHub Releases 下载最新的 CoolRun.dmg。</p></div>
           </li>
           <li class="reveal">
             <span>2</span>
-            <div><h3>移入应用程序</h3><p>打开 DMG，把 GoldRun.app 拖进 Applications。</p></div>
+            <div><h3>移入应用程序</h3><p>打开 DMG，把 CoolRun.app 拖进 Applications。</p></div>
           </li>
           <li class="reveal">
             <span>3</span>
@@ -377,7 +437,7 @@
             <span>Free for personal use · Source available · macOS 15+</span>
             <h2>让菜单栏，多一个真正有用的入口。</h2>
           </div>
-          <a class="button button-primary" href="https://github.com/kuaoaoaoao/GoldRun/releases" data-analytics-event="download_clicked" data-analytics-location="final_cta" data-analytics-destination="github_releases" data-analytics-platform="macos">
+          <a class="button button-primary" href="https://github.com/kuaoaoaoao/CoolRun/releases" data-analytics-event="download_clicked" data-analytics-location="final_cta" data-analytics-destination="github_releases" data-analytics-platform="macos">
             前往下载
             <span aria-hidden="true">↗</span>
           </a>
@@ -390,19 +450,20 @@
     <div class="footer-inner shell">
       <a class="brand footer-brand" href="#top">
         <img src="images/app-icon.png" alt="" width="30" height="30">
-        <span>GoldRun</span>
+        <span>CoolRun</span>
       </a>
-      <p>让 macOS 菜单栏多一点金币乐趣。</p>
+      <p>看见 Mac 状态，也找到问题原因。</p>
       <div class="footer-links">
-        <a href="https://github.com/kuaoaoaoao/GoldRun">源码</a>
-        <a href="https://github.com/kuaoaoaoao/GoldRun/releases">下载</a>
+        <a href="https://github.com/kuaoaoaoao/CoolRun">源码</a>
+        <a href="https://github.com/kuaoaoaoao/CoolRun/releases">下载</a>
         <a href="usage-stats.html">公开统计</a>
-        <a href="https://github.com/kuaoaoaoao/GoldRun/issues">反馈</a>
+        <a href="https://github.com/kuaoaoaoao/CoolRun/blob/main/docs/mac-diagnostics-roadmap.md">路线</a>
+        <a href="https://github.com/kuaoaoaoao/CoolRun/issues">反馈</a>
       </div>
       <span class="copyright">© <span id="year">2026</span> kuaoaoaoao · PolyForm Noncommercial 1.0.0</span>
     </div>
   </footer>
 
-  <script src="site.js?v=20260731-notes-clipboard-2"></script>
+  <script src="site.js?v=20260801-mac-diagnostics"></script>
 </body>
 </html>

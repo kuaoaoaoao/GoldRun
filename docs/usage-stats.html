@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="GoldRun 匿名使用统计：总用户数、下载趋势、平台和系统版本分布。">
-  <meta property="og:title" content="GoldRun - Usage Stats">
-  <meta property="og:description" content="GoldRun 的匿名聚合使用统计，不包含个人身份信息。">
+  <meta name="description" content="CoolRun 匿名使用统计：总用户数、下载趋势、平台和系统版本分布。">
+  <meta property="og:title" content="CoolRun - Usage Stats">
+  <meta property="og:description" content="CoolRun 的匿名聚合使用统计，不包含个人身份信息。">
   <meta property="og:type" content="website">
-  <title>GoldRun - Usage Stats</title>
+  <title>CoolRun - Usage Stats</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -324,9 +324,9 @@
     <nav class="nav" aria-label="统计页导航">
       <a class="brand" href="./">
         <span class="brand-mark" aria-hidden="true"></span>
-        <span>GoldRun</span>
+        <span>CoolRun</span>
       </a>
-      <a class="download" href="https://github.com/kuaoaoaoao/GoldRun/releases" data-analytics-event="download_clicked" data-analytics-location="usage_stats_header" data-analytics-destination="github_releases" data-analytics-platform="macos">↓ 下载最新版</a>
+      <a class="download" href="https://github.com/kuaoaoaoao/CoolRun/releases" data-analytics-event="download_clicked" data-analytics-location="usage_stats_header" data-analytics-destination="github_releases" data-analytics-platform="macos">↓ 下载最新版</a>
     </nav>
   </header>
 
@@ -350,8 +350,8 @@
       <iframe
         id="posthog-stats-frame"
         class="embed-frame"
-        name="GoldRunUsageStats"
-        title="GoldRun PostHog usage stats"
+        name="CoolRunUsageStats"
+        title="CoolRun PostHog usage stats"
         src="https://us.posthog.com/shared/NCljBCk7uRExpX70gzArXl7QXa8WZw"
         hidden
       ></iframe>
@@ -396,7 +396,7 @@
       }
 
       window.addEventListener("message", function (event) {
-        if (event.data && event.data.event === "posthog:dimensions" && event.data.name === "GoldRunUsageStats") {
+        if (event.data && event.data.event === "posthog:dimensions" && event.data.name === "CoolRunUsageStats") {
           iframe.height = event.data.height;
         }
       });

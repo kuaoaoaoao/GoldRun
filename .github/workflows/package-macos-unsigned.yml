@@ -25,11 +25,11 @@ jobs:
       - name: Build release app without Developer ID
         run: >
           xcodebuild
-          -project GoldRun.xcodeproj
-          -scheme GoldRun
+          -project CoolRun.xcodeproj
+          -scheme CoolRun
           -configuration Release
           -destination 'platform=macOS'
-          -derivedDataPath '${{ runner.temp }}/GoldRun-derived'
+          -derivedDataPath '${{ runner.temp }}/CoolRun-derived'
           CODE_SIGNING_ALLOWED=NO
           POSTHOG_API_KEY="$POSTHOG_PROJECT_API_KEY"
           POSTHOG_HOST="$POSTHOG_HOST"
@@ -37,34 +37,34 @@ jobs:
 
       - name: Apply ad hoc signature and verify bundle
         env:
-          APP_PATH: ${{ runner.temp }}/GoldRun-derived/Build/Products/Release/GoldRun.app
+          APP_PATH: ${{ runner.temp }}/CoolRun-derived/Build/Products/Release/CoolRun.app
         run: |
           test -d "$APP_PATH"
           codesign --force --deep --sign - "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
-      - name: Create GoldRun DMG
+      - name: Create CoolRun DMG
         env:
-          APP_PATH: ${{ runner.temp }}/GoldRun-derived/Build/Products/Release/GoldRun.app
-          DIST_DIR: ${{ runner.temp }}/GoldRun-dist
-          DMG_DIR: ${{ runner.temp }}/GoldRun-dmg
+          APP_PATH: ${{ runner.temp }}/CoolRun-derived/Build/Products/Release/CoolRun.app
+          DIST_DIR: ${{ runner.temp }}/CoolRun-dist
+          DMG_DIR: ${{ runner.temp }}/CoolRun-dmg
         run: |
           mkdir -p "$DIST_DIR"
           mkdir -p "$DMG_DIR"
-          ditto "$APP_PATH" "$DMG_DIR/GoldRun.app"
+          ditto "$APP_PATH" "$DMG_DIR/CoolRun.app"
           ln -s /Applications "$DMG_DIR/Applications"
           hdiutil create \
-            -volname "GoldRun" \
+            -volname "CoolRun" \
             -srcfolder "$DMG_DIR" \
             -ov \
             -format UDZO \
-            "$DIST_DIR/GoldRun.dmg"
-          test -f "$DIST_DIR/GoldRun.dmg"
+            "$DIST_DIR/CoolRun.dmg"
+          test -f "$DIST_DIR/CoolRun.dmg"
 
       - name: Upload unsigned community build
         uses: actions/upload-artifact@v4
         with:
-          name: GoldRun-macOS-unsigned-${{ github.sha }}
-          path: ${{ runner.temp }}/GoldRun-dist/GoldRun.dmg
+          name: CoolRun-macOS-unsigned-${{ github.sha }}
+          path: ${{ runner.temp }}/CoolRun-dist/CoolRun.dmg
           if-no-files-found: error
           retention-days: 30

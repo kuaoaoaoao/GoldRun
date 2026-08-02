@@ -1,6 +1,6 @@
 # PostHog release download analytics
 
-GoldRun 的 GitHub Pages 当前不加载 PostHog SDK，也不发送页面访问或链接点击事件。网站上的下载按钮直接跳转到 GitHub Releases。
+CoolRun 的 GitHub Pages 当前不加载 PostHog SDK，也不发送页面访问或链接点击事件。网站上的下载按钮直接跳转到 GitHub Releases。
 
 ## GitHub Release 下载快照
 
@@ -17,7 +17,7 @@ GitHub Release 页面不能注入项目自己的 JavaScript。仓库通过
 | 属性 | 含义 |
 | --- | --- |
 | `release_tag` | Release 标签，例如 `v1.0.0` |
-| `asset_name` | 资源文件名，例如 `GoldRun.dmg` |
+| `asset_name` | 资源文件名，例如 `CoolRun.dmg` |
 | `download_count` | GitHub 返回的累计下载次数 |
 | `asset_size` | 资源大小，单位为字节 |
 | `browser_download_url` | GitHub 资源下载地址 |

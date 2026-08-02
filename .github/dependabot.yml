@@ -7,11 +7,11 @@ updates:
       interval: weekly
 
   - package-ecosystem: npm
-    directory: /goldrun-windows
+    directory: /coolrun-windows
     schedule:
       interval: monthly
 
   - package-ecosystem: cargo
-    directory: /goldrun-windows/src-tauri
+    directory: /coolrun-windows/src-tauri
     schedule:
       interval: monthly
