@@ -443,6 +443,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, 
 
     private func startIconAnimation() {
         iconTimer?.invalidate()
+        iconTimer = nil
         activeAnimationFramesPerSecond = settings.menuBarAnimationRate.framesPerSecond
 
         if activeAnimationFramesPerSecond == nil {
@@ -456,12 +457,15 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, 
 
         // 动画关闭时仍以 1Hz 更新日期、CPU、内存和网速文本。
         let timerFrequency = activeAnimationFramesPerSecond ?? 1
-        let timer = Timer.scheduledTimer(withTimeInterval: 1 / timerFrequency, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1 / timerFrequency, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.refreshIcon()
             }
         }
         timer.tolerance = min(0.05, 0.25 / timerFrequency)
+        // Picker/Menu tracking 会切换 RunLoop mode；注册到 common modes，避免切换动画后
+        // 新计时器停留在默认 mode，直到其它设置再次触发重建才恢复。
+        RunLoop.main.add(timer, forMode: .common)
         iconTimer = timer
         refreshIcon()
     }

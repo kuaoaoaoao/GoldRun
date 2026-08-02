@@ -5,6 +5,47 @@ import AppKit
 
 @MainActor
 final class InterfaceRenderTests: XCTestCase {
+    func testGoldSummaryCardRendersAtMenuBarWidth() throws {
+        let updateDate = Date().addingTimeInterval(-1_205)
+        let statistics = PriceStatistics(
+            currentPrice: 881.64,
+            periodHigh: 895.75,
+            periodLow: 875.23,
+            periodAverage: 883.18,
+            change: 0,
+            changePercent: 0,
+            maxDrawdown: -0.02,
+            recordCount: 256,
+            firstRecordDate: updateDate.addingTimeInterval(-86_400),
+            lastUpdateDate: updateDate
+        )
+        let quote = GoldPriceQuote(
+            cnyPerGram: 881.64,
+            updatedAt: updateDate,
+            yesterdayPrice: 881.88,
+            changeAmount: 0,
+            changeRatePercent: 0,
+            isMarketClosed: true
+        )
+
+        try render(
+            GoldPriceSummaryCard(
+                statistics: statistics,
+                quote: quote,
+                health: .stale(116_459),
+                lastUpdateDate: updateDate,
+                updateInterval: 30,
+                language: .chinese
+            )
+            .padding(10)
+            .frame(width: 304)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, .light),
+            size: NSSize(width: 304, height: 152),
+            filename: "coolrun-gold-summary-preview.png"
+        )
+    }
+
     func testGoldDecisionCardRendersAtMenuBarWidth() throws {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         let records = (0..<96).map { index in
